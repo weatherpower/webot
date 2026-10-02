@@ -425,3 +425,8 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
 none (the nearest-camera lookup returns nothing and a pinned camera is refused), so WeBot never mentions
 them. Live Control can still search and preview cameras privately and shows an OFF AIR notice. Set
 `CAMERA_ON_AIR=true` in `.env` and restart once you have broadcast permission.
+- **Talk timer:** Live Control → WeBot → "At most": one line every 1/2/3/5/10/15 minutes or every scene
+  (default 2 min), so talking mode doesn't burn through voice usage. A follow-up (like the camera intro) may
+  finish the thought just started; breaking alerts, new tornado-level warnings and typed lines skip the
+  timer. Live Control shows the characters sent to the paid voice in the last hour (cache hits are free).
+  Control action `talk` with `gap` (minutes).

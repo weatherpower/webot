@@ -124,7 +124,20 @@
           <span class="status">TALK</span>
           <div class="seg" id="talk-mode"><button data-v="auto">Auto (WIS 100+)</button><button data-v="on">Start talking</button><button data-v="off">Quiet</button></div>
         </div>
+        <div class="row">
+          <label for="talk-gap" class="status">AT MOST</label>
+          <select id="talk-gap" class="grow">
+            <option value="0">Every scene</option>
+            <option value="1">One line a minute</option>
+            <option value="2">One line every 2 min</option>
+            <option value="3">One line every 3 min</option>
+            <option value="5">One line every 5 min</option>
+            <option value="10">One line every 10 min</option>
+            <option value="15">One line every 15 min</option>
+          </select>
+        </div>
         <p class="status" id="talk-line" style="margin:6px 0 0"></p>
+        <p class="status" id="usage-line" style="margin:4px 0 0"></p>
         <div class="row">
           <button class="btn" id="voice">Voice</button>
           <button class="btn" id="sound">Sounds</button>
@@ -344,6 +357,9 @@
       document.querySelectorAll('#talk-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === talk)));
       $('talk-line').innerHTML = (talk === 'on' ? 'WeBot talks about everything on screen.' : talk === 'off' ? 'WeBot stays quiet (typed "Say it" lines still play).' : 'WeBot stays quiet on calm days and starts talking once the WIS reaches 100.')
         + (control.stream?.tts ? ' · Stream: <b>' + esc(control.stream.tts) + '</b>' : '');
+      if (document.activeElement !== $('talk-gap')) $('talk-gap').value = String(control.talkGap ?? 2);
+      const chars = control.stream?.chars;
+      $('usage-line').innerHTML = chars == null ? '' : 'VOICE USAGE · <b>' + Number(chars).toLocaleString() + '</b> characters sent to the voice in the last hour (repeats play from cache for free). Breaking alerts, new tornado warnings and typed lines skip the timer.';
       const st = control.stream;
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
@@ -406,6 +422,10 @@
       const name = (key) => (THEME_LIST.find(([k]) => k === key) || [])[1] || key;
       $('theme-line').innerHTML = onAir ? 'ON AIR: <b style="color:var(--ok)">' + esc(name(onAir).toUpperCase()) + '</b>' + (pick === 'auto' ? ' · picked by the weather' : '') : 'The stream will report its look once it\'s on air.';
     };
+    $('talk-gap').addEventListener('change', () => {
+      const gap = Number($('talk-gap').value);
+      act({ action: 'talk', gap }, gap ? 'WeBot: at most one line every ' + gap + ' min' : 'WeBot: talks every scene');
+    });
     $('talk-mode').addEventListener('click', (e) => {
       const v = e.target.closest('button')?.dataset.v;
       if (v) act({ action: 'talk', mode: v }, v === 'on' ? 'WeBot is talking' : v === 'off' ? 'WeBot is quiet' : 'WeBot talks at WIS 100+');

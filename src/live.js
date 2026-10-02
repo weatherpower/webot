@@ -240,7 +240,8 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, commands: [] };
+const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
 const loadControl = async () => {
@@ -265,7 +266,9 @@ export const noteStreamBeat = (query = {}) => {
     playing: clip(query.np, 90),
     mood: MUSIC_MOODS.includes(query.mood) ? query.mood : '',
     tts: clip(query.tts, 40),
-    theme: THEMES.includes(query.theme) ? query.theme : ''
+    theme: THEMES.includes(query.theme) ? query.theme : '',
+    // Characters the stream sent to a paid voice (Puter/OpenAI) in the last hour.
+    chars: Math.max(0, Math.min(10_000_000, Math.round(Number(query.chars) || 0)))
   };
 };
 
@@ -422,9 +425,13 @@ export const applyLiveCommand = async (body = {}) => {
     }
     // auto = WeBot talks once the WIS reaches 100; on = "Start talking"; off = quiet.
     case 'talk':
-      current.talk = ['auto', 'on', 'off'].includes(body.mode) ? body.mode : 'auto';
-      // Choosing to hear him also turns the master voice switch back on.
-      if (current.talk !== 'off') current.voice = true;
+      if ('mode' in body) {
+        current.talk = ['auto', 'on', 'off'].includes(body.mode) ? body.mode : 'auto';
+        // Choosing to hear him also turns the master voice switch back on.
+        if (current.talk !== 'off') current.voice = true;
+      }
+      // Talk timer: minutes between ordinary lines (0 = every scene).
+      if ('gap' in body) current.talkGap = TALK_GAPS.includes(Number(body.gap)) ? Number(body.gap) : 2;
       break;
     case 'theme':
       current.theme = THEMES.includes(body.theme) ? body.theme : 'auto';

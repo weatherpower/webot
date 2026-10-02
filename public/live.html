@@ -379,6 +379,12 @@
     const talkAllowed = () => talkMode() === 'on' || (talkMode() === 'auto' && wisScore() >= 100);
     // Calm day: below WIS 100 and no tornado warnings. The show slows down and stays mellow.
     const isCalm = () => wisScore() < 100 && !(S.live?.tallies?.tor);
+    // Talk timer: ordinary lines are spaced out (Live Control → Talk → "At most every"), to save voice usage.
+    const talkGapMs = () => Math.max(0, Number(S.control.talkGap ?? 2)) * 60 * 1000;
+    // Characters actually sent to a paid voice in the last hour (cached repeats don't count).
+    const ttsLog = [];
+    const noteTtsChars = (n) => { ttsLog.push({ t: Date.now(), n }); while (ttsLog.length && Date.now() - ttsLog[0].t > 3600 * 1000) ttsLog.shift(); };
+    const ttsCharsHour = () => ttsLog.filter((x) => Date.now() - x.t < 3600 * 1000).reduce((sum, x) => sum + x.n, 0);
     const soundOn = () => OPT.sound && S.control.sound !== false;
     const byKey = (key) => S.alerts.find((a) => a.key === key);
     const stateLine = (a) => (a.states || []).map((s) => STATE_NAMES[s] || s).join(' & ');
@@ -574,6 +580,7 @@
       const key = cfg.openaiVoice + '|' + cfg.speed + '|' + text;
       if (pt.cache.has(key)) return Promise.resolve(pt.cache.get(key));
       const pace = cfg.speed > 1.05 ? ' Talk a little faster than normal.' : cfg.speed < 0.95 ? ' Talk a little slower than normal.' : '';
+      noteTtsChars(text.length);
       return puter.ai.txt2speech(text, { provider: 'openai', model: 'gpt-4o-mini-tts', voice: cfg.openaiVoice, instructions: VOICE_STYLE + pace })
         // Decoded audio plays through Web Audio like the other engines; if the clip can't be
         // fetched, the audio element Puter returned plays as-is.
@@ -653,6 +660,7 @@
       if (cfg.engine === 'puter' && pt.state === 'ready') return puterAudio(text, cfg);
       if (cfg.engine === 'neural' && neural.state === 'ready') return neuralAudio(text, cfg.voice, cfg.speed);
       if (cfg.engine === 'openai' && S.openaiVoice) {
+        noteTtsChars(text.length);
         return fetch(BASE + '/api/v3/live/tts?' + new URLSearchParams({ text, voice: cfg.openaiVoice, speed: cfg.speed }))
           .then((r) => { if (!r.ok) throw new Error('voice ' + r.status); return r.arrayBuffer(); })
           .then((bytes) => actx.decodeAudioData(bytes));
@@ -727,6 +735,14 @@
     const say = (text, opts = {}) => {
       if (!text) return;
       if (!opts.force && !talkAllowed()) return;
+      // Typed lines always play; urgent alerts skip the wait; a follow-up (like the camera intro) may finish
+      // the thought just started; everything else waits for the talk timer.
+      if (!opts.force) {
+        const since = Date.now() - (S.lastTalkAt || 0);
+        const followUp = opts.followUp && since < 25000;
+        if (!opts.urgent && !followUp && since < talkGapMs()) return;
+        if (!followUp) S.lastTalkAt = Date.now();
+      }
       if (!voiceOn() || !(canNeural() || speechWorks()) || (actx && actx.state !== 'running')) {
         bot.classList.add('talk');
         setTimeout(() => bot.classList.remove('talk'), Math.min(6000, 1200 + text.length * 30));
@@ -1894,7 +1910,8 @@
         if (shot.fresh && !S.spoken.has(a.key)) {
           talked.set(a.key, { at: Date.now(), reports: reportsNear(a).length });
           S.spoken.add(a.key);
-          say(spokenAlert(a, 'New ' + a.event.toLowerCase() + '. '), { label: 'NEW ALERT' });
+          // New tornado / most dangerous warnings are read right away; others wait for the talk timer.
+          say(spokenAlert(a, 'New ' + a.event.toLowerCase() + '. '), { label: 'NEW ALERT', urgent: a.rank <= 3 });
         }
       } else {
         setSelected('');
@@ -2080,7 +2097,7 @@
     const chatter = (text) => { if (text && !speech.busy && !speech.queue.length) say(text); };
     // Lines that must not be dropped (like the camera intro) wait their turn instead, unless a lot is queued.
     // (The queue holds sentences, and one alert line is several sentences, so the cap is generous.)
-    const sayNext = (text) => { if (text && speech.queue.length < 14) say(text); };
+    const sayNext = (text) => { if (text && speech.queue.length < 14) say(text, { followUp: true }); };
 
     // Camera names as they'd be said on air: "ARDOT US 71 @ Gilham RXR Overpass" -> "U.S. 71 at the Gilham railroad crossing overpass".
     const camSpoken = (name) => String(name || '')
@@ -2404,7 +2421,7 @@
       chime('breaking');
       setMood('danger');
       S.spoken.add(a.key);
-      say(spokenAlert(a, test ? 'This is a test of the WeatherPower alert system. ' : 'Breaking. '), { label: test ? 'TEST ALERT' : 'BREAKING' });
+      say(spokenAlert(a, test ? 'This is a test of the WeatherPower alert system. ' : 'Breaking. '), { label: test ? 'TEST ALERT' : 'BREAKING', urgent: true });
       setTimeout(() => {
         brk.classList.add('out');
         setTimeout(() => { brk.classList.remove('show', 'out'); resolve(); }, 520);
@@ -2440,7 +2457,7 @@
     };
     const loadLive = async () => {
       // The query is a heartbeat for the control panel: what is playing and which voice is on.
-      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '' }));
+      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '', chars: ttsCharsHour() }));
       const prevRev = S.control.rev;
       const prevCtl = S.control;
       S.live = body;
