@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>WeatherPower Live Control</title>
+  <link rel="icon" type="image/png" href="/warningcenter/favicon.ico">
+  <style>
+    @font-face { font-family: "WP Display"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 400 700; }
+    @font-face { font-family: "WP Sans"; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 400 900; }
+    @font-face { font-family: "WP Mono"; src: url("/warningcenter/public/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 400 700; }
+    :root { --bg: #070a10; --panel: #0e141f; --line: rgba(255,255,255,.1); --text: #eef2f8; --muted: #8e99ab; --brand: #1a8cff; --ok: #34e07a; --warn: #ffd34d; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "WP Sans", system-ui, sans-serif; padding: 16px 16px 48px; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    .wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; }
+    header .brand { display: flex; align-items: center; gap: 10px; }
+    header img { width: 38px; height: 38px; border-radius: 9px; }
+    h1 { margin: 0; font-family: "WP Display"; font-size: 26px; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+    h1 small { display: block; font-family: "WP Mono"; font-size: 11px; letter-spacing: .18em; color: var(--muted); margin-top: 4px; }
+    h2 { margin: 0 0 10px; font-family: "WP Display"; font-size: 19px; letter-spacing: .04em; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .row + .row { margin-top: 10px; }
+    input, select, textarea { background: #151d2b; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 9px 11px; min-width: 0; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+    textarea { width: 100%; min-height: 72px; resize: vertical; }
+    .grow { flex: 1; }
+    .btn { border: 1px solid rgba(255,255,255,.16); background: #182133; border-radius: 9px; padding: 9px 14px; cursor: pointer; font-weight: 600; }
+    .btn:hover { background: #1f2b42; }
+    .btn.primary { background: var(--brand); border-color: transparent; color: #fff; }
+    .btn.on { background: var(--ok); color: #06210f; border-color: transparent; }
+    .btn.warn { background: var(--warn); color: #1d1600; border-color: transparent; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .seg { display: inline-flex; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; overflow: hidden; }
+    .seg button { border: 0; background: transparent; padding: 8px 12px; cursor: pointer; font-weight: 600; }
+    .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
+    .status { font-family: "WP Mono"; font-size: 12px; letter-spacing: .08em; color: var(--muted); }
+    .status b { color: var(--text); }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-family: "WP Mono"; font-size: 11px; letter-spacing: .1em; }
+    .pill i { width: 8px; height: 8px; border-radius: 50%; background: #f2b33d; }
+    .pill.ok i { background: var(--ok); }
+    .list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 460px; overflow: auto; }
+    .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid transparent; }
+    .item.pinned { border-color: var(--warn); }
+    .item button { flex: none; }
+    .item i { flex: none; width: 10px; height: 34px; border-radius: 3px; background: var(--c); }
+    .item div { flex: 1; min-width: 0; }
+    .item b { display: block; font-family: "WP Display"; font-weight: 500; font-size: 16px; text-transform: uppercase; letter-spacing: .02em; }
+    .item span { display: block; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips button { font-size: 13px; padding: 6px 10px; }
+    .note { color: var(--muted); font-size: 13.5px; margin: 8px 0 0; }
+    code { font-family: "WP Mono"; font-size: 12.5px; background: #151d2b; padding: 1px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+    ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; color: #cdd5e1; }
+    .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #fff; color: #111; padding: 10px 16px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .locked .needs-token { opacity: .4; pointer-events: none; }
+  </style>
+</head>
+<body class="locked">
+  <div class="wrap">
+    <header>
+      <div class="brand"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><h1>Live Control<small>WEATHERPOWER LIVE STREAM</small></h1></div>
+      <div class="row"><span class="pill" id="conn"><i></i><span>NOT CONNECTED</span></span><a class="btn" id="open-stream" target="_blank" rel="noopener">Open stream ↗</a></div>
+    </header>
+
+    <section class="box">
+      <h2>Control token</h2>
+      <div class="row">
+        <label for="token" class="status">TOKEN</label>
+        <input id="token" type="password" class="grow" autocomplete="off" placeholder="Your CONTROLLER_TOKEN">
+        <button class="btn primary" id="connect">Connect</button>
+      </div>
+      <p class="note">The token is the same one your controller uses. It stays in this browser only.</p>
+    </section>
+
+    <div class="grid needs-token">
+      <section class="box">
+        <h2>Show</h2>
+        <div class="row"><div class="seg" id="mode">
+          <button data-mode="auto">Auto</button><button data-mode="national">National</button><button data-mode="outlook">Outlook</button><button data-mode="reports">Reports</button>
+        </div></div>
+        <div class="row">
+          <label for="state" class="status">FOCUS</label>
+          <select id="state" class="grow"><option value="">Whole country</option></select>
+        </div>
+        <div class="row">
+          <button class="btn" id="next">Skip to next ⏭</button>
+          <button class="btn" id="unpin">Unpin</button>
+          <button class="btn" id="reload">Reload stream</button>
+        </div>
+        <p class="status" id="state-line"></p>
+      </section>
+
+      <section class="box">
+        <h2>Bot</h2>
+        <textarea id="say" maxlength="300" placeholder="Type something for the bot to say on stream…"></textarea>
+        <div class="row"><button class="btn primary" id="say-btn">Say it</button><span class="status" id="say-count">0 / 300</span></div>
+        <div class="row chips" id="quick"></div>
+        <div class="row">
+          <button class="btn" id="voice">Voice</button>
+          <button class="btn" id="sound">Sounds</button>
+        </div>
+      </section>
+
+      <section class="box">
+        <h2>Banner message</h2>
+        <input id="banner" maxlength="160" style="width:100%" placeholder="e.g. Live coverage tonight at 7 PM — subscribe!">
+        <div class="row">
+          <label for="minutes" class="status">SHOW FOR</label>
+          <select id="minutes"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">1 hour</option><option value="180">3 hours</option><option value="720">12 hours</option></select>
+          <button class="btn primary" id="banner-set">Show</button>
+          <button class="btn" id="banner-clear">Clear</button>
+        </div>
+        <p class="status" id="banner-line"></p>
+      </section>
+
+      <section class="box">
+        <h2>Test</h2>
+        <p class="note" style="margin-top:0">Plays the breaking-alert takeover on the top-ranked warning (or the one you pick below). It's labeled <b>TEST</b> on screen.</p>
+        <div class="row"><button class="btn warn" id="test">Run breaking test</button></div>
+      </section>
+    </div>
+
+    <section class="box needs-token">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">Active alerts</h2><input id="filter" placeholder="Filter (event, county, state)" style="min-width:220px"></div>
+      <div class="list" id="alerts" style="margin-top:10px"></div>
+    </section>
+
+    <section class="box">
+      <h2>Put it on YouTube / Twitch with OBS</h2>
+      <ol>
+        <li>In OBS add a <b>Browser</b> source. URL: <code id="obs-url"></code>, width <b>1920</b>, height <b>1080</b>.</li>
+        <li>Tick <b>Control audio via OBS</b> so the alert chimes go to the stream.</li>
+        <li>The bot's voice uses Windows speech. If it isn't heard on stream, open the stream URL in Chrome instead, add it with <b>Window Capture</b>, and capture desktop audio.</li>
+        <li>URL options: <code>?state=OK</code> focus one state · <code>?voice=0</code> · <code>?sound=0</code> · <code>?bot=0</code> · <code>?tips=0</code> · <code>?speed=1.5</code> slower shots · <code>?tz=America/Chicago</code> clock zone.</li>
+      </ol>
+    </section>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+  (() => {
+    const BASE = '/warningcenter';
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const STATES = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming', PR: 'Puerto Rico' };
+    const QUICK = ['Stay safe out there, everyone!', 'Let’s take a look at the next warning.', 'If you are under a tornado warning, get to your safe place now.', 'Thanks for watching WeatherPower Live!', 'Things are quiet right now. Great time to check your weather radio batteries.'];
+    let token = '';
+    try { token = localStorage.getItem('wp-live-token') || ''; } catch {}
+    let control = null;
+    let alerts = [];
+
+    const streamUrl = location.origin + BASE + '/live';
+    $('open-stream').href = streamUrl;
+    $('obs-url').textContent = streamUrl;
+    $('token').value = token;
+    Object.entries(STATES).forEach(([code, name]) => $('state').insertAdjacentHTML('beforeend', '<option value="' + code + '">' + esc(name) + '</option>'));
+    QUICK.forEach((q) => $('quick').insertAdjacentHTML('beforeend', '<button class="btn" data-q="' + esc(q) + '">' + esc(q.length > 34 ? q.slice(0, 32) + '…' : q) + '</button>'));
+
+    const toast = (msg) => { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 2400); };
+    const send = async (body, okMsg) => {
+      const response = await fetch(BASE + '/api/v3/live/control', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Controller-Token': token }, body: JSON.stringify(body)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setConnected(false, data.error || 'Error ' + response.status);
+        throw new Error(data.error || 'Error ' + response.status);
+      }
+      control = data.control;
+      setConnected(true);
+      render();
+      if (okMsg) toast(okMsg);
+      return data;
+    };
+    const act = (body, okMsg) => send(body, okMsg).catch((e) => toast(e.message));
+
+    const setConnected = (ok, message) => {
+      document.body.classList.toggle('locked', !ok);
+      $('conn').classList.toggle('ok', ok);
+      $('conn').querySelector('span').textContent = ok ? 'CONNECTED' : (message || 'NOT CONNECTED').toUpperCase();
+    };
+
+    const render = () => {
+      if (!control) return;
+      document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === (control.mode || 'auto'))));
+      $('state').value = control.state || '';
+      $('voice').classList.toggle('on', control.voice !== false);
+      $('voice').textContent = control.voice !== false ? 'Voice: on' : 'Voice: off';
+      $('sound').classList.toggle('on', control.sound !== false);
+      $('sound').textContent = control.sound !== false ? 'Sounds: on' : 'Sounds: off';
+      const pinned = control.pin && alerts.find((a) => a.key === control.pin);
+      $('state-line').innerHTML = 'PINNED: <b>' + esc(pinned ? pinned.eventLabel + ' · ' + pinned.area : control.pin ? 'expired alert' : 'nothing') + '</b>';
+      $('unpin').disabled = !control.pin;
+      $('banner-line').innerHTML = control.banner ? 'SHOWING UNTIL <b>' + esc(new Date(control.banner.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '</b>: ' + esc(control.banner.text) : 'No banner message.';
+      renderAlerts();
+    };
+    const renderAlerts = () => {
+      const q = $('filter').value.trim().toLowerCase();
+      const list = alerts
+        .filter((a) => ['warnings', 'watches', 'discussions', 'statements'].includes(a.group) && a.geometry)
+        .filter((a) => !q || [a.event, a.area, a.areaDesc, (a.states || []).join(' ')].join(' ').toLowerCase().includes(q))
+        .slice(0, 80);
+      $('alerts').innerHTML = list.length ? list.map((a) => '<div class="item' + (control?.pin === a.key ? ' pinned' : '') + '" style="--c:' + esc(a.color) + '"><i></i><div><b>' + esc(a.eventLabel) + '</b><span>' + esc(a.area || a.areaDesc) + ' · until ' + esc(a.times?.expires || '') + '</span></div>'
+        + '<button class="btn" data-pin="' + esc(a.key) + '">' + (control?.pin === a.key ? 'Pinned' : 'Pin') + '</button><button class="btn" data-test="' + esc(a.key) + '" title="Breaking test with this alert">Test</button></div>').join('')
+        : '<p class="note">No alerts match.</p>';
+    };
+
+    const loadAlerts = async () => {
+      try {
+        const body = await fetch(BASE + '/api/v3/alerts', { cache: 'no-store' }).then((r) => r.json());
+        alerts = body.alerts || [];
+        renderAlerts();
+      } catch {}
+    };
+
+    $('connect').addEventListener('click', () => {
+      token = $('token').value.trim();
+      try { localStorage.setItem('wp-live-token', token); } catch {}
+      act({ action: 'ping' }, 'Connected');
+    });
+    $('mode').addEventListener('click', (e) => { const m = e.target.closest('button')?.dataset.mode; if (m) act({ action: 'mode', mode: m }, 'Showing: ' + m); });
+    $('state').addEventListener('change', () => act({ action: 'state', state: $('state').value }, $('state').value ? 'Focus: ' + STATES[$('state').value] : 'Whole country'));
+    $('next').addEventListener('click', () => act({ action: 'next' }, 'Skipping'));
+    $('unpin').addEventListener('click', () => act({ action: 'unpin' }, 'Unpinned'));
+    $('reload').addEventListener('click', () => act({ action: 'reload' }, 'Stream will reload'));
+    $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });
+    $('say-btn').addEventListener('click', () => { const text = $('say').value.trim(); if (text) act({ action: 'say', text }, 'Sent to the bot').then(() => { $('say').value = ''; $('say-count').textContent = '0 / 300'; }); });
+    $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to the bot'); });
+    $('voice').addEventListener('click', () => act({ action: 'voice', on: control?.voice === false }));
+    $('sound').addEventListener('click', () => act({ action: 'sound', on: control?.sound === false }));
+    $('banner-set').addEventListener('click', () => act({ action: 'banner', text: $('banner').value, minutes: Number($('minutes').value) }, 'Banner set'));
+    $('banner-clear').addEventListener('click', () => act({ action: 'banner', text: '' }, 'Banner cleared'));
+    $('test').addEventListener('click', () => act({ action: 'test-breaking' }, 'Breaking test sent'));
+    $('filter').addEventListener('input', renderAlerts);
+    $('alerts').addEventListener('click', (e) => {
+      const pin = e.target.closest('[data-pin]')?.dataset.pin;
+      const test = e.target.closest('[data-test]')?.dataset.test;
+      if (pin) act({ action: 'pin', key: pin }, 'Pinned');
+      if (test) act({ action: 'test-breaking', key: test }, 'Breaking test sent');
+    });
+
+    loadAlerts();
+    setInterval(loadAlerts, 30000);
+    if (token) send({ action: 'ping' }).catch(() => {});
+  })();
+  </script>
+</body>
+</html>

@@ -17,3 +17,20 @@ export const ensureRuntimeDirs = async () => {
   await fs.mkdir(cardsDir, { recursive: true });
   await fs.mkdir(chromiumTmpDir, { recursive: true });
 };
+
+// Atomic swap of a freshly written temp file into place. On Windows the rename fails with
+// EPERM/EBUSY while another handle (a reader, antivirus, indexer) briefly holds the target.
+export const replaceFile = async (tempPath, targetPath) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await fs.rename(tempPath, targetPath);
+      return;
+    } catch (error) {
+      if (!['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || attempt >= 6) {
+        await fs.rm(tempPath, { force: true }).catch(() => {});
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 40 * 2 ** attempt));
+    }
+  }
+};

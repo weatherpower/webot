@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
-import { dataDir, ensureRuntimeDirs, projectRoot } from './paths.js';
+import { dataDir, ensureRuntimeDirs, projectRoot, replaceFile } from './paths.js';
 import { fetchActiveWarnings } from './nws.js';
 import { fetchActiveMesoscaleDiscussions } from './spc.js';
 import { fetchActiveSpcOutlooks } from './spcOutlooks.js';
@@ -14,6 +14,7 @@ import { appendLog } from './logStore.js';
 import { postCardToDiscord } from './posters/discord.js';
 import { enrichWarningTropical } from './nhc.js';
 import { queueAutoShorts } from './shorts.js';
+import { summaryFor } from './broadcast.js';
 
 const statePath = path.join(dataDir, 'rendered-alerts.json');
 const RENDER_INDEX_VERSION = '2026-10-02-broadcast-cards-v5';
@@ -221,6 +222,7 @@ const toItem = ({ warning, render, hash, status = 'rendered', error = null }) =>
   hazardStats: warning.hazardStats || [],
   impacts: warning.impacts,
   impactLine: warning.impactLine,
+  summary: warning.summary ?? summaryFor(warning.description),
   hazards: warning.hazards,
   sourceText: warning.sourceText,
   whatToDo: warning.whatToDo,
@@ -474,7 +476,7 @@ const saveRenderedState = async () => {
   await ensureRuntimeDirs();
   const tempPath = `${statePath}.${process.pid}.${Date.now()}.tmp`;
   await fs.writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-  await fs.rename(tempPath, statePath);
+  await replaceFile(tempPath, statePath);
 };
 
 const mapLimit = async (items, limit, mapper) => {

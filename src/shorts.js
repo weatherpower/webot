@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
-import { chromiumTmpDir, dataDir, ensureRuntimeDirs, projectRoot } from './paths.js';
+import { chromiumTmpDir, dataDir, ensureRuntimeDirs, projectRoot, replaceFile } from './paths.js';
 import { appendLog } from './logStore.js';
 
 const storePath = path.join(dataDir, 'shorts.json');
@@ -58,7 +58,7 @@ const save = () => {
   saving = saving.then(async () => {
     const temp = `${storePath}.${process.pid}.tmp`;
     await fs.writeFile(temp, JSON.stringify(store, null, 1));
-    await fs.rename(temp, storePath);
+    await replaceFile(temp, storePath);
   }).catch((error) => console.warn(`Shorts store save failed: ${error.message}`));
   return saving;
 };

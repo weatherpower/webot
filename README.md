@@ -243,3 +243,40 @@ If `CONTROLLER_TOKEN` is set, send it as `x-controller-token` or `?token=...` on
 - **Public API v3** (all under `/warningcenter/api/v3`): `GET alerts?group=&state=&q=`, `GET alerts.geojson`, `GET alert?key=`, `GET radar`, `GET config`, `GET shorts`, `GET short?key=`, `POST short/request?key=` (public, rate limited), `POST short/render?key=` (controller token). Keys go in the query string because Apache rejects encoded slashes in paths.
 - `bash scripts/dev-safe.sh` runs a local server on :8899 that never posts to Discord/X.
 - **Card cleanup** is now on by default: every 15 minutes, card images not used by an active alert and older than `CARD_RETENTION_HOURS` (24) are removed, along with stale state `.tmp` files, all but the 3 newest corrupt-state backups, and orphaned video files. One-time backlog: `node scripts/cleanup-cards.js --dry-run`, then without `--dry-run`. Note that an existing `.env` with `CARD_CLEANUP_ENABLED=false` still turns it off.
+
+## WeatherPower Live (24/7 stream)
+
+`/warningcenter/live` is a 1920×1080 broadcast page made for an OBS **Browser** source
+(width 1920, height 1080, "Control audio via OBS" on). It runs by itself:
+
+- **Auto-director** cycles the most important alerts: flies to the polygon, shows the alert card
+  (expires countdown, threat, people in the warning, warnings inside a watch, areas, hazards, the
+  NWS storm-location / impacts sentence), and loops the **nearest NEXRAD site's** super-res
+  reflectivity. Tornado warnings switch to storm-relative velocity partway through. National overview,
+  SPC Day 1 outlook and storm-report shots are mixed in.
+- **Breaking takeover** for new tornado warnings, PDS/emergency/destructive alerts and tornado
+  watches: full-screen sting, WeatherPower chime (not the EAS tone), and the bot reads it out.
+  Other new warnings get a chime and jump the queue.
+- **Top bar**: TOR / SVR / FFW / watch counters, rotating headline ticker, and the
+  **WeatherPower Index (WPI)** with a 24-hour sparkline (QUIET / ACTIVE / BUSY / SEVERE / EXTREME).
+- **WeatherPower bot**: talks with the browser's speech voice, eye color follows the threat,
+  seasonal hat (October / December), safety tips when it's quiet, roundup every 20 minutes.
+- **Bottom bar**: clock, now-tracking line with hazard chips, area crawl, people in the path,
+  shot progress and alert countdown.
+
+URL options: `?state=OK`, `?voice=0`, `?sound=0`, `?bot=0`, `?hat=0`, `?tips=0`, `?speed=1.5`
+(longer shots), `?tz=America/Chicago`.
+
+The bot's voice uses the operating system's speech engine. If OBS's browser source doesn't pick it
+up, open the stream URL in Chrome, add it with Window Capture, and capture desktop audio.
+
+**Control panel**: `/warningcenter/live/control` (needs `CONTROLLER_TOKEN`; the control API refuses
+to run if no token is configured). Pin an alert, focus a state, switch Auto / National / Outlook /
+Reports, skip, make the bot say something, show a banner message, toggle voice/sounds, run a
+labeled breaking-alert test, or reload the stream remotely.
+
+API: `GET /api/v3/live` (tallies, index + history, control state, storm reports),
+`GET /api/v3/live/radar?site=EWX` (single-site loop tiles), `GET /api/v3/nexrad` (radar sites),
+`POST /api/v3/live/control` with `X-Controller-Token` and `{ "action": "pin" | "unpin" | "state" |
+"mode" | "voice" | "sound" | "banner" | "say" | "next" | "test-breaking" | "reload" | "ping" }`.
+Stream state is stored in `data/live-control.json` and `data/live-index.json`.

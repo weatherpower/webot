@@ -9,6 +9,9 @@ import { getShort, listShorts, queueShort, requestShort, shortsByKey, shortsStat
 import {
   SATELLITE_STYLE, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
+import {
+  applyLiveCommand, indexSummary, liveControl, nexradSites, recentReports, requireLiveToken, siteRadar, talliesFor
+} from './live.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
 const GROUP_ORDER = ['warnings', 'watches', 'statements', 'discussions', 'outlooks', 'forecasts'];
@@ -69,6 +72,7 @@ export const toV3Alert = (item = {}, short = null, { detail = false } = {}) => {
     people: Number.isFinite(people) && item.impacts?.people !== null ? people : null,
     homes: Number.isFinite(homes) && item.impacts?.homes !== null ? homes : null,
     hazards: hazardChipsFor(item),
+    summary: item.summary || '',
     center: item.center,
     geometry: detail ? item.geometry || null : compactPublicGeometry(item.geometry) || (item.polygon?.length ? { type: 'Polygon', coordinates: [item.polygon] } : null),
     card: item.card ? { url: publicPath(item.card.path), path: item.card.path, stale: Boolean(item.staleCard) } : null,
@@ -268,6 +272,45 @@ export const apiV3Router = () => {
         return;
       }
       res.json({ ok: true, ...(await queueShort(item, { reason: 'controller', force: Boolean(req.body?.force) })) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /* ---------- live stream ---------- */
+  router.get('/live', async (req, res, next) => {
+    try {
+      const { alerts } = await currentAlerts();
+      const [index, control, reports] = await Promise.all([indexSummary(alerts), liveControl(), recentReports()]);
+      res.set('Cache-Control', 'no-store');
+      res.json({ generatedAt: new Date().toISOString(), tallies: talliesFor(alerts), index, control, reports });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/live/radar', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json(await siteRadar(req.query.site));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/nexrad', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.json({ sites: await nexradSites() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/live/control', requireLiveToken, async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json({ ok: true, control: await applyLiveCommand(req.body || {}) });
     } catch (error) {
       next(error);
     }

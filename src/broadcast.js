@@ -32,6 +32,22 @@ const VTEC_TAGS = {
   COR: 'CORRECTED'
 };
 
+// One or two on-air sentences from the NWS text: the storm-location lead for storm-based warnings
+// ("At 3:12 PM CDT, a confirmed tornado was located..."), otherwise the IMPACTS or WHAT section.
+export const summaryFor = (description = '') => {
+  const text = String(description || '').replace(/\r/g, '');
+  if (!text.trim()) return '';
+  const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const section = (label) => text.match(new RegExp(`(?:^|\\n)\\s*\\*?\\s*${label}\\.\\.\\.([\\s\\S]*?)(?=\\n\\s*\\n|\\n\\s*\\*|$)`, 'i'))?.[1];
+  const pick = paragraphs.find((p) => /^At \d{1,4}/i.test(p))
+    || section('IMPACTS?')
+    || section('WHAT')
+    || paragraphs.find((p) => p.length > 40 && !/^(HAZARD|SOURCE|LOCATIONS?)\.\.\./i.test(p))
+    || paragraphs[0];
+  const clean = String(pick || '').replace(/\s+/g, ' ').replace(/^\.+|\.{3}$/g, '').trim();
+  return clean.length > 280 ? `${clean.slice(0, 277).replace(/\s+\S*$/, '')}…` : clean;
+};
+
 export const stateCodesFor = (warning = {}) => {
   // UGC codes are authoritative: marine zones (GMZ, AMZ, PZZ...) carry no state at all.
   const ugc = (warning.ugc || []).map((code) => String(code).slice(0, 2));

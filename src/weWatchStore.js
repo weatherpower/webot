@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { dataDir, ensureRuntimeDirs } from './paths.js';
+import { dataDir, ensureRuntimeDirs, replaceFile } from './paths.js';
 
 const weWatchPath = path.join(dataDir, 'wewatches.json');
 
@@ -20,7 +20,7 @@ const writeStore = async (items) => {
   await ensureRuntimeDirs();
   const tempPath = `${weWatchPath}.${process.pid}.${Date.now()}.tmp`;
   await fs.writeFile(tempPath, `${JSON.stringify({ version: 1, items }, null, 2)}\n`, 'utf8');
-  await fs.rename(tempPath, weWatchPath);
+  await replaceFile(tempPath, weWatchPath);
 };
 
 const activeFilter = (item, { includeExpired = false, now = Date.now() } = {}) => {

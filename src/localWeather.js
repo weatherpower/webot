@@ -86,15 +86,17 @@ const simplifyForecastPeriod = (period) => ({
   detailedForecast: period.detailedForecast
 });
 
-const reportType = (type = '') => {
+const REPORT_TYPES = {
+  T: 'Tornado', G: 'Wind', H: 'Hail', R: 'Rain', F: 'Flood', D: 'Damage',
+  E: 'Flood', M: 'Marine Wind', N: 'Wind', O: 'Damage', C: 'Funnel Cloud', W: 'Waterspout', S: 'Snow', L: 'Lightning'
+};
+
+// IEM LSR one-letter codes; anything unlisted falls back to IEM's own type text.
+const reportType = (type = '', typetext = '') => {
   const upper = String(type || '').toUpperCase();
-  if (upper === 'T') return 'Tornado';
-  if (upper === 'G') return 'Wind';
-  if (upper === 'H') return 'Hail';
-  if (upper === 'R') return 'Rain';
-  if (upper === 'F') return 'Flood';
-  if (upper === 'D') return 'Damage';
-  return upper || 'Report';
+  if (REPORT_TYPES[upper]) return REPORT_TYPES[upper];
+  const text = String(typetext || '').trim().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return text || upper || 'Report';
 };
 
 const formatIemTime = (date) => {
@@ -182,7 +184,7 @@ export const fetchStormReports = async ({ hours = 12, limit = 80 } = {}) => {
       const properties = feature.properties || {};
       return {
         id: feature.id,
-        type: reportType(properties.type),
+        type: reportType(properties.type, properties.typetext),
         rawType: properties.type || '',
         magnitude: properties.magnitude || properties.magf || '',
         city: properties.city || '',

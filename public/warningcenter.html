@@ -493,7 +493,7 @@
       map.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({ id: 'reports', type: 'circle', source: 'reports', layout: { visibility: 'none' }, paint: {
         'circle-radius': 5, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#000',
-        'circle-color': ['match', ['get', 'type'], 'Tornado', '#ff2020', 'Hail', '#3fa9ff', 'Thunderstorm Wind', '#ffd400', 'Flash Flood', '#2ee06f', '#ffffff']
+        'circle-color': ['match', ['get', 'type'], 'Tornado', '#ff2020', 'Hail', '#3fa9ff', ['Wind', 'Damage', 'Marine Wind'], '#ffd400', 'Flood', '#2ee06f', 'Rain', '#36c3a4', '#ffffff']
       } });
       S.styleReady = true;
       applyTools();

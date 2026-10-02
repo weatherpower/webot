@@ -33,7 +33,7 @@ app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
-  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|favicon\.ico)\b/.test(req.url)) {
+  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|favicon\.ico)\b/.test(req.url)) {
     req.url = req.url.replace(/^\/warningcenter/, '');
   }
   if (/^\/dashboard\/(api|public|cards|controller|warningcenter|warningdetail|weatherspace)\b/.test(req.url)) {
@@ -64,6 +64,8 @@ app.use((req, res, next) => {
     '/',
     '/warningcenter',
     '/warningdetail',
+    '/live',
+    '/live/control',
     '/favicon.ico',
     '/api/health',
     '/api/maps/config',
@@ -80,7 +82,8 @@ app.use((req, res, next) => {
     || req.path.startsWith('/api/warnings/rendered/')
     || req.path.startsWith('/api/v3/')
   );
-  const isPublicShortRequest = req.method === 'POST' && req.path === '/api/v3/short/request';
+  // Live control is token-checked in its own handler, which refuses to run without a configured token.
+  const isPublicShortRequest = req.method === 'POST' && (req.path === '/api/v3/short/request' || req.path === '/api/v3/live/control');
 
   if (isPublicGet || isPublicShortRequest) {
     next();
@@ -130,6 +133,14 @@ app.get('/weatherspace', (req, res) => {
 
 app.get('/warningdetail', (req, res) => {
   res.sendFile(path.join(publicDir, 'warningdetail.html'));
+});
+
+app.get('/live', (req, res) => {
+  res.sendFile(path.join(publicDir, 'live.html'));
+});
+
+app.get('/live/control', (req, res) => {
+  res.sendFile(path.join(publicDir, 'livecontrol.html'));
 });
 
 app.get('/favicon.ico', (req, res) => {

@@ -9,7 +9,8 @@ import { publicWarningCenterFeed } from '../src/publicFeed.js';
 import { displayTimes, normalizeWarning } from '../src/warning.js';
 import { fetchDailyForecastCards } from '../src/dailyForecasts.js';
 import { forecastSearchQuery } from '../src/forecastSearch.js';
-import { areaLineFor, headlineFor, statusTagFor } from '../src/broadcast.js';
+import { areaLineFor, headlineFor, statusTagFor, summaryFor } from '../src/broadcast.js';
+import { indexLabelFor, indexValueFor, spcDay1Risk, talliesFor } from '../src/live.js';
 import { warningShortHtml } from '../src/shortHtml.js';
 import { toV3Alert } from '../src/apiV3.js';
 import { formatAlertTime } from '../src/warning.js';
@@ -368,5 +369,20 @@ assert.equal(v3.group, 'warnings');
 assert.equal(v3.people, 27604);
 assert.equal(v3.headline, 'FLASH FLOOD EMERGENCY IN KANSAS');
 assert.equal(v3.whatToDo, undefined);
+
+// Live stream: storm-location lead first, then IMPACTS / WHAT sections.
+assert.match(summaryFor('At 312 PM CDT, a tornado was located near Dodge City, moving east at 25 mph.\n\nHAZARD...Tornado.'), /^At 312 PM CDT, a tornado/);
+assert.equal(summaryFor('* WHAT...Flooding continues.\n\n* IMPACTS...Low water crossings will flood.'), 'Low water crossings will flood.');
+assert.equal(summaryFor(''), '');
+
+const liveAlert = (event, extra = {}) => ({ event, group: /watch/i.test(event) ? 'watches' : 'warnings', states: ['KS'], rank: 6, ...extra });
+const quietDay = [...Array.from({ length: 70 }, () => liveAlert('Flood Warning')), ...Array.from({ length: 30 }, () => liveAlert('Gale Warning', { states: [] }))];
+assert.equal(indexLabelFor(indexValueFor(quietDay)), 'QUIET');
+assert.equal(indexLabelFor(indexValueFor([...quietDay, liveAlert('Tornado Warning', { rank: 2 })])), 'ACTIVE');
+const outbreak = [...Array.from({ length: 15 }, () => liveAlert('Tornado Warning', { rank: 2 })), ...Array.from({ length: 30 }, () => liveAlert('Severe Thunderstorm Warning'))];
+assert.equal(indexLabelFor(indexValueFor(outbreak)), 'SEVERE');
+assert.equal(spcDay1Risk([{ group: 'outlooks', eventLabel: 'SPC DAY 1 OUTLOOK', hazards: [{ label: 'RISK', value: 'TSTM' }] }, { group: 'outlooks', eventLabel: 'SPC DAY 1 OUTLOOK', hazards: [{ label: 'RISK', value: 'ENH' }] }]), 'ENH');
+const tallies = talliesFor([liveAlert('Tornado Warning'), liveAlert('Severe Thunderstorm Warning'), liveAlert('Flash Flood Warning'), liveAlert('Tornado Watch')]);
+assert.deepEqual([tallies.tor, tallies.svr, tallies.ffw, tallies.torWatch], [1, 1, 1, 1]);
 
 console.log('Smoke checks passed.');

@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeatherPower Live</title>
+  <meta name="description" content="WeatherPower 24/7 live severe weather coverage: live warnings, local radar and the WeatherPower bot.">
+  <link rel="icon" type="image/png" href="/warningcenter/favicon.ico">
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    /* Built for a 1920x1080 OBS browser source; the stage scales to fit any other window. */
+    @font-face { font-family: "WP Display"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 400 700; }
+    @font-face { font-family: "WP Sans"; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 400 900; }
+    @font-face { font-family: "WP Mono"; src: url("/warningcenter/public/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 400 700; }
+    :root {
+      --brand: #1a8cff; --ink: #eef3fb; --muted: #97a6bd; --line: rgba(255,255,255,.11);
+      --glass: rgba(8,13,25,.9); --bar: linear-gradient(90deg, #0a1736 0%, #102c69 55%, #1747a6 100%);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #0a0f18; color: var(--ink); font-family: "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    #map { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.42), rgba(0,0,0,0) 15%, rgba(0,0,0,0) 80%, rgba(0,0,0,.5)); }
+    .mono { font-family: "WP Mono", ui-monospace, monospace; }
+
+    /* ---------- top bar ---------- */
+    .top { position: absolute; left: 0; right: 0; top: 0; height: 84px; display: flex; background: var(--bar); border-bottom: 2px solid rgba(255,255,255,.14); box-shadow: 0 6px 26px rgba(0,0,0,.45); z-index: 20; }
+    .tally { display: flex; flex: none; }
+    .tile { width: 98px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--t); position: relative; }
+    .tile + .tile { border-left: 1px solid rgba(0,0,0,.25); }
+    .tile .n { display: flex; align-items: center; gap: 6px; font-family: "WP Display"; font-weight: 700; font-size: 38px; line-height: 1; }
+    .tile .n svg { opacity: .9; }
+    .tile .l { font-family: "WP Mono"; font-size: 12px; letter-spacing: .22em; opacity: .9; }
+    .tile.zero { filter: saturate(.25) brightness(.62); }
+    .tile.bump { animation: bump 1.4s ease-out; }
+    @keyframes bump { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.9); } 20% { transform: scale(1.12); } 100% { transform: scale(1); box-shadow: 0 0 0 18px rgba(255,255,255,0); } }
+    .hl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 18px; padding: 0 26px; background: var(--hc, transparent); transition: background .6s; overflow: hidden; }
+    .hl .tag { flex: none; font-family: "WP Display"; font-weight: 700; font-size: 21px; letter-spacing: .08em; padding: 5px 12px; border-radius: 6px; background: #fff; color: #0a1020; }
+    .hl .slot { position: relative; flex: 1; min-width: 0; height: 84px; }
+    .hl .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); font-family: "WP Display"; font-weight: 700; font-size: 40px; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0,0,0,.3); transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s; }
+    .hl .txt.enter { transform: translateY(40%); opacity: 0; }
+    .hl .txt.leave { transform: translateY(-140%); opacity: 0; }
+    .wpi { flex: none; width: 372px; display: flex; align-items: center; gap: 14px; padding: 0 18px; background: rgba(0,0,0,.28); border-left: 1px solid rgba(255,255,255,.14); }
+    .wpi .meta { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: #b9cdf3; display: flex; gap: 8px; }
+    .wpi .v { font-family: "WP Display"; font-size: 40px; font-weight: 700; line-height: 1; color: var(--wc, #6fd0ff); }
+    .wpi .lab { font-family: "WP Mono"; font-size: 11px; letter-spacing: .3em; color: var(--wc, #6fd0ff); }
+    .wpi canvas { width: 176px; height: 58px; margin-left: auto; }
+
+    /* ---------- panels ---------- */
+    .panel { position: absolute; background: var(--glass); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 22px 50px rgba(0,0,0,.5); z-index: 10; }
+    .card { left: 32px; top: 112px; width: 528px; transform: translateX(-112%); opacity: 0; transition: transform .6s cubic-bezier(.2,.8,.2,1), opacity .4s; }
+    .card.show { transform: none; opacity: 1; }
+    .card .head { display: flex; align-items: center; gap: 16px; padding: 18px 22px 14px; border-top: 6px solid var(--c, var(--brand)); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)); }
+    .card .ico { flex: none; width: 54px; height: 54px; border-radius: 13px; display: grid; place-items: center; background: var(--c, var(--brand)); color: var(--ci, #fff); }
+    .card h2 { margin: 0; font-family: "WP Display"; font-size: 38px; font-weight: 700; line-height: 1.02; text-transform: uppercase; letter-spacing: .01em; }
+    .card .sub { margin-top: 6px; font-family: "WP Mono"; font-size: 14px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+    .card .status { margin-left: auto; align-self: flex-start; flex: none; font-family: "WP Display"; font-weight: 700; font-size: 17px; letter-spacing: .1em; padding: 4px 10px; border-radius: 6px; background: #fff; color: #0a1020; }
+    .card .status.pin { background: #ffd34d; }
+    .life { height: 4px; margin: 0 22px; background: rgba(255,255,255,.09); border-radius: 2px; overflow: hidden; }
+    .life i { display: block; height: 100%; background: var(--c, var(--brand)); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 22px 4px; }
+    .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; background: rgba(255,255,255,.04); font-family: "WP Mono"; font-size: 13px; letter-spacing: .08em; color: #c8d3e6; text-transform: uppercase; }
+    .chip b { color: #fff; font-weight: 700; }
+    .chip.hot { background: var(--c); border-color: transparent; color: var(--ci, #fff); }
+    .chip.hot b { color: inherit; }
+    .card dl { margin: 0; padding: 12px 22px 20px; display: grid; grid-template-columns: 104px 1fr; gap: 14px 14px; }
+    .card dt { font-family: "WP Mono"; font-size: 12px; letter-spacing: .18em; color: var(--muted); padding-top: 4px; }
+    .card dd { margin: 0; font-family: "WP Display"; font-size: 22px; line-height: 1.22; text-transform: uppercase; }
+    .card dd.prose { font-family: "WP Sans"; font-size: 17px; line-height: 1.42; text-transform: none; color: #dbe3f0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .rows { padding: 8px 22px 20px; display: grid; gap: 8px; }
+    .rowi { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 9px; background: rgba(255,255,255,.04); }
+    .rowi i { flex: none; width: 12px; height: 12px; border-radius: 3px; background: var(--rc); }
+    .rowi b { font-family: "WP Display"; font-size: 21px; font-weight: 500; text-transform: uppercase; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rowi span { font-family: "WP Mono"; font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .rowi em { font-style: normal; font-family: "WP Display"; font-size: 24px; font-weight: 700; }
+
+    .rp { right: 32px; top: 112px; width: 568px; transform: translateX(112%); transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+    .rp.show { transform: none; }
+    .rp .r1 { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 20px 6px; gap: 12px; }
+    .rp h3 { margin: 0; font-family: "WP Display"; font-size: 34px; font-weight: 700; letter-spacing: .02em; }
+    .rp .clk { font-family: "WP Display"; font-size: 34px; font-weight: 700; white-space: nowrap; }
+    .rp .clk span { color: var(--brand); }
+    .rp .under { height: 3px; width: 120px; margin: 0 20px 10px; background: var(--brand); border-radius: 2px; }
+    .rp .bar { height: 11px; margin: 0 20px; border-radius: 6px; }
+    .rp .lbl { display: flex; justify-content: space-between; padding: 7px 20px 12px; font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); }
+    .rp .r3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 14px; border-top: 1px solid var(--line); font-family: "WP Mono"; font-size: 16px; font-weight: 600; letter-spacing: .06em; }
+    .rp .r3 .st { color: var(--brand); font-family: "WP Display"; font-size: 22px; letter-spacing: .08em; }
+    .ticks { display: flex; gap: 3px; padding: 0 20px 12px; }
+    .ticks i { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); }
+    .ticks i.on { background: rgba(255,255,255,.75); }
+    .ticks i.now { background: var(--brand); }
+
+    .focus { position: absolute; left: 32px; bottom: 164px; z-index: 11; display: none; font-family: "WP Mono"; font-size: 13px; letter-spacing: .16em; padding: 5px 10px; border-radius: 6px; background: #ffd34d; color: #111; }
+    .reportchip { position: absolute; left: 32px; bottom: 104px; z-index: 11; display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 10px; border-radius: 12px; background: var(--glass); border: 1px solid var(--line); font-family: "WP Display"; font-size: 24px; font-weight: 700; }
+    .reportchip svg { color: #ffd34d; }
+    .reportchip small { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); font-weight: 600; }
+    .attrib { position: absolute; right: 300px; bottom: 90px; z-index: 11; font-family: "WP Mono"; font-size: 10px; color: rgba(255,255,255,.45); letter-spacing: .04em; }
+    .sitemark { display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+    .sitemark i { width: 14px; height: 14px; border-radius: 50%; background: #3fb7ff; border: 2px solid #fff; box-shadow: 0 0 0 4px rgba(63,183,255,.25); }
+    .sitemark span { font-family: "WP Mono"; font-size: 11px; font-weight: 700; color: #cfe6ff; text-shadow: 0 1px 2px #000; letter-spacing: .08em; }
+
+    /* ---------- bot ---------- */
+    .bot { position: absolute; right: 20px; bottom: 88px; width: 250px; height: 292px; z-index: 12; transition: transform .5s; }
+    .bot.off { display: none; }
+    .bot svg { width: 100%; height: 100%; overflow: visible; animation: bob 4.5s ease-in-out infinite; filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
+    @keyframes bob { 50% { transform: translateY(-7px); } }
+    .bot .eye { transition: fill .4s; transform-box: fill-box; transform-origin: center; }
+    .bot.blink .eye { transform: scaleY(.12); }
+    .bot .mouth { transform-box: fill-box; transform-origin: center; transform: scaleY(.25); transition: transform .08s; }
+    .bot.talk .mouth { animation: talk .22s ease-in-out infinite alternate; }
+    @keyframes talk { from { transform: scaleY(.25); } to { transform: scaleY(1.15); } }
+    .bot .beacon { transition: fill .3s; }
+    .bot.danger .beacon { animation: beacon .7s steps(2) infinite; }
+    @keyframes beacon { 50% { fill: #300; } }
+    .bubble { position: absolute; right: 262px; bottom: 236px; z-index: 13; max-width: 600px; padding: 16px 20px; border-radius: 16px 16px 4px 16px; background: #f4f8ff; color: #0b1324; font-family: "WP Sans"; font-weight: 600; font-size: 21px; line-height: 1.38; box-shadow: 0 16px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(12px) scale(.96); transform-origin: 100% 100%; transition: opacity .3s, transform .35s; }
+    .bubble.show { opacity: 1; transform: none; }
+    .bubble b { display: block; font-family: "WP Mono"; font-size: 11px; letter-spacing: .2em; color: #2a6fd6; margin-bottom: 4px; }
+
+    /* ---------- bottom bar ---------- */
+    .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; display: flex; background: var(--bar); border-top: 2px solid rgba(255,255,255,.14); z-index: 20; }
+    .clock { flex: none; width: 352px; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: rgba(0,0,0,.28); }
+    .clock img { width: 54px; height: 54px; border-radius: 12px; }
+    .clock b { display: block; font-family: "WP Display"; font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: .02em; white-space: nowrap; }
+    .clock small { display: block; margin-top: 5px; font-family: "WP Mono"; font-size: 12px; letter-spacing: .2em; color: #b9cdf3; }
+    .now { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 24px; border-left: 5px solid var(--c, var(--brand)); }
+    .now .l1 { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .now .l1 .k { flex: none; font-family: "WP Mono"; font-size: 13px; letter-spacing: .2em; padding: 3px 8px; border-radius: 5px; background: var(--c, var(--brand)); color: var(--ci, #fff); }
+    .now .l1 b { font-family: "WP Display"; font-size: 31px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .now .l1 .hz { flex: none; display: flex; gap: 8px; }
+    .now .l1 .hz span { font-family: "WP Mono"; font-size: 14px; padding: 3px 8px; border-radius: 5px; background: rgba(255,255,255,.14); }
+    .now .l2 { display: flex; align-items: center; gap: 18px; font-family: "WP Mono"; font-size: 14px; letter-spacing: .08em; color: #c7d5ef; min-width: 0; }
+    .crawl { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; -webkit-mask-image: linear-gradient(90deg, transparent, #000 2%, #000 96%, transparent); mask-image: linear-gradient(90deg, transparent, #000 2%, #000 96%, transparent); }
+    .crawl span { display: inline-block; will-change: transform; }
+    .now .ppl { flex: none; }
+    .prog { flex: none; width: 150px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.16); overflow: hidden; }
+    .prog i { display: block; height: 100%; width: 0; background: #fff; }
+    .now .cd { flex: none; width: 76px; text-align: right; font-weight: 600; color: #fff; }
+    .brandbox { flex: none; width: 260px; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(0,0,0,.28); }
+    .brandbox img { width: 40px; height: 40px; border-radius: 9px; }
+    .brandbox b { font-family: "WP Display"; font-size: 19px; letter-spacing: .05em; white-space: nowrap; }
+
+    /* ---------- breaking takeover ---------- */
+    .brk { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; background: var(--c, #c00); color: var(--ci, #fff); overflow: hidden; text-align: center; }
+    .brk.show { display: flex; animation: brkIn .45s cubic-bezier(.2,.8,.2,1); }
+    .brk.out { animation: brkOut .5s forwards; }
+    @keyframes brkIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+    @keyframes brkOut { to { clip-path: inset(0 0 0 100%); } }
+    .brk .stripes { position: absolute; left: -200px; top: -200px; right: -200px; bottom: -200px; background: repeating-linear-gradient(45deg, rgba(0,0,0,.16) 0 46px, rgba(0,0,0,0) 46px 92px); animation: stripes 1.6s linear infinite; }
+    @keyframes stripes { to { transform: translateX(130px); } }
+    .brk > *:not(.stripes) { position: relative; }
+    .brk .k { font-family: "WP Mono"; font-size: 30px; font-weight: 700; letter-spacing: .5em; padding: 10px 18px 10px 30px; background: #fff; color: #0a0f1c; animation: flash 1s steps(2) infinite; }
+    @keyframes flash { 50% { background: #0a0f1c; color: #fff; } }
+    .brk h1 { margin: 26px 60px 10px; font-family: "WP Display"; font-size: 156px; font-weight: 700; line-height: .95; text-transform: uppercase; text-shadow: 0 7px 0 rgba(0,0,0,.25); }
+    .brk .p { font-family: "WP Display"; font-size: 58px; font-weight: 700; text-transform: uppercase; max-width: 1600px; }
+    .brk .u { margin-top: 18px; font-family: "WP Mono"; font-size: 28px; letter-spacing: .2em; }
+    .brk .t { margin-top: 18px; display: inline-block; padding: 8px 18px; border-radius: 8px; background: rgba(0,0,0,.3); font-family: "WP Display"; font-size: 30px; letter-spacing: .08em; }
+    .brk .test { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); padding: 8px 18px; border-radius: 8px; background: #ffd34d; color: #111; font-family: "WP Mono"; font-size: 20px; letter-spacing: .2em; }
+
+    .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; border-radius: 12px; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+    .gate[hidden] { display: none; }
+    .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
+    .boot.done { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="map"></div>
+    <div class="shade"></div>
+
+    <header class="top">
+      <div class="tally">
+        <div class="tile" id="t-tor" style="--t:#c4122f"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2"/></svg><span>0</span></div><div class="l">TOR</div></div>
+        <div class="tile" id="t-svr" style="--t:#d0870b"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span>0</span></div><div class="l">SVR</div></div>
+        <div class="tile" id="t-ffw" style="--t:#14894a"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/></svg><span>0</span></div><div class="l">FFW</div></div>
+        <div class="tile" id="t-wch" style="--t:#6b3bd1"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>0</span></div><div class="l">WATCH</div></div>
+      </div>
+      <div class="hl" id="hl"><span class="tag" id="hl-tag">LIVE</span><div class="slot" id="hl-slot"></div></div>
+      <div class="wpi">
+        <div>
+          <div class="meta"><span id="wpi-delta">—</span><span>WPI</span></div>
+          <div class="v" id="wpi-v">0.00</div>
+          <div class="lab" id="wpi-l">QUIET</div>
+        </div>
+        <canvas id="spark" width="352" height="116"></canvas>
+      </div>
+    </header>
+
+    <section class="panel card" id="card"></section>
+    <div class="focus" id="focus"></div>
+
+    <section class="panel rp" id="rp">
+      <div class="r1"><h3 id="rp-title">NATIONAL RADAR</h3><div class="clk" id="rp-clock"></div></div>
+      <div class="under"></div>
+      <div class="bar" id="rp-bar"></div>
+      <div class="lbl" id="rp-lbl"></div>
+      <div class="ticks" id="rp-ticks"></div>
+      <div class="r3"><span id="rp-site">MRMS COMPOSITE</span><span class="st" id="rp-state">CONUS</span></div>
+    </section>
+
+    <div class="reportchip" id="reportchip"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span id="rc-n">0</span><small>STORM REPORTS · 3 HRS</small></div>
+    <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
+
+    <div class="bubble" id="bubble"></div>
+    <div class="bot" id="bot" aria-hidden="true"></div>
+
+    <footer class="bottom">
+      <div class="clock"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><div><b id="clk">--:--:--</b><small id="clk-d"></small></div></div>
+      <div class="now" id="now">
+        <div class="l1"><span class="k" id="now-k">NOW TRACKING</span><b id="now-t">WEATHERPOWER LIVE</b><span class="hz" id="now-hz"></span></div>
+        <div class="l2"><div class="crawl" id="crawl"><span id="crawl-s"></span></div><span class="ppl" id="now-ppl"></span><div class="prog"><i id="prog"></i></div><span class="cd" id="now-cd"></span></div>
+      </div>
+      <div class="brandbox"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><b>WEATHERPOWER.APP</b></div>
+    </footer>
+
+    <div class="brk" id="brk"></div>
+    <div class="boot" id="boot">WEATHERPOWER LIVE · LOADING</div>
+  </div>
+  <button class="gate" id="gate" hidden>🔊 Click to turn on sound and the bot's voice</button>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script>
+  (() => {
+    const BASE = '/warningcenter';
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const P = new URLSearchParams(location.search);
+    const OPT = {
+      state: (P.get('state') || '').toUpperCase(),
+      voice: P.get('voice') !== '0',
+      sound: P.get('sound') !== '0',
+      bot: P.get('bot') !== '0',
+      hat: P.get('hat') !== '0',
+      tips: P.get('tips') !== '0',
+      speed: Math.min(3, Math.max(0.4, Number(P.get('speed')) || 1)),
+      tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone
+    };
+    const STATE_NAMES = {
+      AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'D.C.', FL: 'Florida',
+      GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
+      MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
+      NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania',
+      RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington',
+      WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming', PR: 'Puerto Rico', VI: 'Virgin Islands', GU: 'Guam', AS: 'American Samoa', MP: 'Northern Marianas'
+    };
+    const ICONS = {
+      tornado: '<path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2" stroke-linecap="round"/>',
+      flood: '<path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 13c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 18c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0" stroke-linecap="round"/>',
+      storm: '<path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z" stroke-linejoin="round"/>',
+      winter: '<path d="M12 2v20M3.5 7l17 10M20.5 7l-17 10" stroke-linecap="round"/>',
+      fire: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.6-2.4-5.7-4.2-8.2-.6 2-1.6 3.2-2.8 3.7.3-3.3-1.2-6.4-4-8.7.2 3.6-3 6.3-3 10.9C5 19.6 8 22 12 22z"/>',
+      wind: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8" stroke-linecap="round"/>',
+      tropical: '<circle cx="12" cy="12" r="3"/><path d="M12 9c0-4 3-7 8-7-2 2-3 4-3 6M12 15c0 4-3 7-8 7 2-2 3-4 3-6" stroke-linecap="round"/>',
+      outlook: '<path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5" stroke-linecap="round"/>',
+      radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12 19 5" stroke-linecap="round"/>',
+      reports: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+      alert: '<path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5" stroke-linecap="round"/>'
+    };
+    const icon = (key, size = 28) => '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">' + (ICONS[key] || ICONS.alert) + '</svg>';
+    const ink = (hex) => {
+      const v = String(hex || '#000').replace('#', '');
+      const [r, g, b] = [0, 2, 4].map((o) => parseInt(v.slice(o, o + 2), 16) || 0);
+      return 0.299 * r + 0.587 * g + 0.114 * b > 170 ? '#0b0d12' : '#ffffff';
+    };
+    const LEGENDS = {
+      refl: { bar: 'linear-gradient(90deg,#04e9e7,#019ff4 12%,#02fd02 26%,#01c501 36%,#fdf802 50%,#fd9500 62%,#fd0000 74%,#d40000 82%,#f800fd 92%,#fff)', labels: ['LIGHT', 'MODERATE', 'HEAVY', 'EXTREME'] },
+      vel: { bar: 'linear-gradient(90deg,#7dff9a,#00c040 22%,#0c4a1c 46%,#3a3a3a 50%,#4d0f0f 54%,#d01010 78%,#ff8a8a)', labels: ['TOWARD RADAR', '', '', 'AWAY FROM RADAR'] }
+    };
+    const RISK_NAMES = { TSTM: 'General thunderstorms', MRGL: 'Marginal risk', SLGT: 'Slight risk', ENH: 'Enhanced risk', MDT: 'Moderate risk', HIGH: 'High risk' };
+    const REPORT_COLORS = { Tornado: '#ff2a2a', 'Funnel Cloud': '#ff7a7a', Waterspout: '#ff7a7a', Hail: '#3fa9ff', Wind: '#ffd400', Damage: '#ffd400', 'Marine Wind': '#ffe680', Flood: '#2ee06f', Rain: '#36c3a4', Snow: '#e6f0ff' };
+    const REPORT_UNITS = { Hail: '"', Wind: ' MPH', 'Marine Wind': ' MPH', Rain: '"', Snow: '"' };
+    const reportLabel = (r) => r.type + (r.magnitude ? ' ' + r.magnitude + (REPORT_UNITS[r.type] || '') : '');
+    const TIPS = [
+      'A watch means be prepared. A warning means act now.',
+      'Make a plan: know your safe place before storms hit — lowest floor, interior room, away from windows.',
+      'Turn around, don’t drown. Just 6 inches of moving water can knock you down.',
+      'Have more than one way to get warnings: a weather radio, phone alerts, and WeatherPower.app.',
+      'When thunder roars, go indoors. Lightning can strike 10 miles from a storm.',
+      'Mobile homes are not safe in a tornado. Know where your nearest sturdy shelter is.',
+      'Hail the size of quarters or larger can damage cars and roofs — pull under a sturdy shelter, not an overpass.',
+      'Live warnings, radar and video for every alert: WeatherPower.app'
+    ];
+
+    const S = {
+      alerts: [], live: null, radar: null, sites: [], seen: null, spoken: new Set(), recent: [],
+      cycle: 0, shot: null, shotTimer: null, shotStart: 0, shotDur: 1, breaking: [], fresh: [], inBreaking: false,
+      lastCmd: null, control: { rev: -1, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null },
+      map: null, styleReady: false, step: 0, local: null, localKey: '', velOn: false, siteMarker: null, sel: null,
+      headlines: [], hlIndex: 0, lastRoundup: Date.now(), lastTip: Date.now()
+    };
+
+    /* ---------------- helpers ---------------- */
+    const getJson = async (path) => {
+      const response = await fetch(BASE + path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      if (!response.ok) throw new Error(path + ' ' + response.status);
+      return response.json();
+    };
+    const fmtNum = (n) => Number(n).toLocaleString('en-US');
+    const shortNum = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : fmtNum(n);
+    const tzClock = (tz, opts = {}) => {
+      try { return new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', ...opts }); } catch { return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...opts }); }
+    };
+    const tzAbbr = (tz) => {
+      try { return new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName').value; } catch { return ''; }
+    };
+    const remaining = (iso) => {
+      const ms = Date.parse(iso || '') - Date.now();
+      if (!Number.isFinite(ms)) return '';
+      if (ms <= 0) return 'EXPIRED';
+      const m = Math.floor(ms / 60000);
+      if (m < 60) return m + ' MIN';
+      const h = Math.floor(m / 60);
+      if (h < 48) return h + ' HR' + (h === 1 ? '' : 'S') + ' ' + (m % 60) + ' MIN';
+      return Math.round(h / 24) + ' DAYS';
+    };
+    const countdown = (iso) => {
+      const ms = Date.parse(iso || '') - Date.now();
+      if (!Number.isFinite(ms) || ms <= 0) return '';
+      const s = Math.floor(ms / 1000);
+      const h = Math.floor(s / 3600);
+      const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+      const ss = String(s % 60).padStart(2, '0');
+      return h ? h + ':' + mm + ':' + ss : mm + ':' + ss;
+    };
+    const ago = (iso) => {
+      const m = Math.round((Date.now() - Date.parse(iso || '')) / 60000);
+      if (!Number.isFinite(m)) return '';
+      return m < 1 ? 'NOW' : m < 60 ? m + ' MIN AGO' : Math.floor(m / 60) + ' HR AGO';
+    };
+    const focusState = () => S.control.state || OPT.state;
+    const voiceOn = () => OPT.voice && S.control.voice !== false;
+    const soundOn = () => OPT.sound && S.control.sound !== false;
+    const byKey = (key) => S.alerts.find((a) => a.key === key);
+    const stateLine = (a) => (a.states || []).map((s) => STATE_NAMES[s] || s).join(' & ');
+
+    const eachCoord = (geometry, fn) => {
+      if (!geometry) return;
+      const walk = (c) => { if (typeof c[0] === 'number') fn(c); else c.forEach(walk); };
+      if (geometry.type === 'GeometryCollection') geometry.geometries.forEach((g) => eachCoord(g, fn));
+      else walk(geometry.coordinates);
+    };
+    const bboxOf = (geometry) => {
+      let b = null;
+      eachCoord(geometry, ([x, y]) => {
+        if (!b) b = [x, y, x, y];
+        else { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); }
+      });
+      return b && [[b[0], b[1]], [b[2], b[3]]];
+    };
+    const centerOf = (a) => {
+      if (a.center && Number.isFinite(a.center[0])) return a.center;
+      const b = bboxOf(a.geometry);
+      return b ? [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2] : null;
+    };
+    const inRing = ([x, y], ring) => {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    };
+    const inGeometry = (pt, g) => {
+      if (!g || !pt) return false;
+      if (g.type === 'Polygon') return inRing(pt, g.coordinates[0]);
+      if (g.type === 'MultiPolygon') return g.coordinates.some((poly) => inRing(pt, poly[0]));
+      if (g.type === 'GeometryCollection') return g.geometries.some((x) => inGeometry(pt, x));
+      return false;
+    };
+
+    /* ---------------- stage scaling + clocks ---------------- */
+    const fit = () => {
+      const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+      $('stage').style.transform = 'translate(' + (innerWidth - 1920 * s) / 2 + 'px,' + (innerHeight - 1080 * s) / 2 + 'px) scale(' + s + ')';
+    };
+    addEventListener('resize', fit);
+    fit();
+
+    const tickClock = () => {
+      $('clk').textContent = tzClock(OPT.tz, { second: '2-digit' }) + ' ' + tzAbbr(OPT.tz);
+      $('clk-d').textContent = new Date().toLocaleDateString('en-US', { timeZone: OPT.tz, month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+      const shot = S.shot;
+      const tz = shot?.alert?.timezone || OPT.tz;
+      // The server's own abbreviation (ChST, SST, AST...) beats the browser's "GMT+10" fallback.
+      const ownAbbr = String(shot?.alert?.times?.expires || '').split(' ').pop();
+      $('rp-clock').innerHTML = esc(tzClock(tz)) + ' <span>' + esc(/^[A-Za-z]{2,5}$/.test(ownAbbr) ? ownAbbr : tzAbbr(tz)) + '</span>';
+      if (shot?.alert) {
+        const a = shot.alert;
+        const exp = $('card-exp');
+        if (exp) exp.textContent = 'EXPIRES IN ' + remaining(a.expiresAt) + ' · ' + (a.times?.expires || '');
+        const life = $('card-life');
+        if (life) {
+          const t0 = Date.parse(a.issuedAt), t1 = Date.parse(a.expiresAt);
+          life.style.width = Number.isFinite(t0) && Number.isFinite(t1) && t1 > t0 ? Math.max(0, Math.min(100, ((t1 - Date.now()) / (t1 - t0)) * 100)) + '%' : '100%';
+        }
+        $('now-cd').textContent = countdown(a.expiresAt);
+      } else {
+        $('now-cd').textContent = '';
+      }
+      $('prog').style.width = Math.min(100, ((Date.now() - S.shotStart) / S.shotDur) * 100) + '%';
+    };
+    setInterval(tickClock, 250);
+
+    /* ---------------- sound + voice ---------------- */
+    let actx = null;
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+    const tone = (freq, at, dur, type = 'triangle', peak = 0.16) => {
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(peak, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      osc.connect(gain).connect(actx.destination);
+      osc.start(at);
+      osc.stop(at + dur + 0.05);
+    };
+    // Custom WeatherPower chimes (deliberately not the EAS attention tone).
+    const chime = (kind) => {
+      if (!soundOn() || !actx || actx.state !== 'running') return;
+      const t = actx.currentTime + 0.03;
+      if (kind === 'breaking') {
+        for (const rep of [0, 0.75, 1.5]) [523, 784, 1047].forEach((f, i) => tone(f, t + rep + i * 0.15, 0.3, 'triangle', 0.2));
+      } else if (kind === 'new') {
+        tone(880, t, 0.2); tone(1175, t + 0.15, 0.32);
+      } else {
+        tone(740, t, 0.16, 'sine', 0.08);
+      }
+    };
+
+    let voices = [];
+    const loadVoices = () => { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; };
+    if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+    const pickVoice = () => {
+      const en = voices.filter((v) => /^en[-_]US/i.test(v.lang));
+      return en.find((v) => /natural/i.test(v.name) && /aria|jenny|guy|davis|andrew|emma|brian/i.test(v.name))
+        || en.find((v) => /natural|neural/i.test(v.name))
+        || en.find((v) => /google us english/i.test(v.name))
+        || en.find((v) => /zira|david|samantha|alex/i.test(v.name))
+        || en[0] || voices[0] || null;
+    };
+    const ZONES = { CDT: 'central', CST: 'central', EDT: 'eastern', EST: 'eastern', MDT: 'mountain', MST: 'mountain', PDT: 'pacific', PST: 'pacific', AKDT: 'Alaska', AKST: 'Alaska', HST: 'Hawaii', AST: 'Atlantic', ChST: 'Chamorro', SST: 'Samoa' };
+    const speakable = (text) => String(text || '')
+      .replace(/\b(\d{1,2})(\d{2})\s*(AM|PM)\b/gi, '$1:$2 $3')
+      .replace(/\b(AM|PM)\s+(CDT|CST|EDT|EST|MDT|MST|PDT|PST|AKDT|AKST|HST|AST|ChST|SST)\b/g, (m, ap, z) => ap + ' ' + ZONES[z] + ' time')
+      .replace(/,\s*([A-Z]{2})\b/g, (m, s) => (STATE_NAMES[s] ? ', ' + STATE_NAMES[s] : m))
+      .replace(/\bmph\b/gi, 'miles per hour')
+      .replace(/\bWPI\b/g, 'W P I')
+      .replace(/\bNWS\b/g, 'National Weather Service')
+      .replace(/\bSPC\b/g, 'Storm Prediction Center')
+      .replace(/\+ (\d+) MORE\b/gi, 'and $1 more')
+      .replace(/[A-Z]{3,}(?:\s+[A-Z]{3,})*/g, (m) => (/^(PDS|NWS|SPC|WPI)$/.test(m) ? m : m.toLowerCase()));
+
+    const bot = $('bot');
+    const bubble = $('bubble');
+    let bubbleTimer = null;
+    const showBubble = (text, ms, label = 'WEATHERPOWER BOT') => {
+      clearTimeout(bubbleTimer);
+      bubble.innerHTML = '<b>' + esc(label) + '</b>' + esc(text);
+      bubble.classList.add('show');
+      if (ms) bubbleTimer = setTimeout(() => bubble.classList.remove('show'), ms);
+    };
+    const speech = { queue: [], busy: false, guard: null };
+    const speechWorks = () => window.speechSynthesis && voices.length > 0;
+    const pumpSpeech = () => {
+      if (speech.busy || !speech.queue.length) return;
+      const item = speech.queue.shift();
+      speech.busy = true;
+      const done = () => {
+        clearTimeout(speech.guard);
+        if (!speech.busy) return;
+        speech.busy = false;
+        if (!speech.queue.length) { bot.classList.remove('talk'); bubbleTimer = setTimeout(() => bubble.classList.remove('show'), 2200); }
+        setTimeout(pumpSpeech, 180);
+      };
+      if (item.first) showBubble(item.full, 0, item.label);
+      const utter = new SpeechSynthesisUtterance(item.text);
+      utter.voice = pickVoice();
+      utter.rate = 1.04;
+      utter.pitch = 1.02;
+      utter.onstart = () => bot.classList.add('talk');
+      utter.onend = done;
+      utter.onerror = done;
+      speech.guard = setTimeout(() => { speechSynthesis.cancel(); done(); }, 4000 + item.text.length * 95);
+      speechSynthesis.speak(utter);
+    };
+    // Sentences go out one at a time: Chrome cuts off long single utterances.
+    const say = (text, { label } = {}) => {
+      if (!text) return;
+      if (!voiceOn() || !speechWorks() || (actx && actx.state !== 'running')) {
+        showBubble(text, Math.min(16000, 4000 + text.length * 55), label);
+        bot.classList.add('talk');
+        setTimeout(() => bot.classList.remove('talk'), Math.min(6000, 1200 + text.length * 30));
+        return;
+      }
+      const parts = speakable(text).match(/[^.!?]+[.!?]*/g) || [speakable(text)];
+      parts.map((p) => p.trim()).filter(Boolean).forEach((p, i) => speech.queue.push({ text: p, full: text, first: i === 0, label }));
+      pumpSpeech();
+    };
+
+    const gate = $('gate');
+    const checkAudio = () => {
+      const blocked = actx && actx.state !== 'running';
+      gate.hidden = !(blocked && (OPT.sound || OPT.voice));
+    };
+    gate.addEventListener('click', async () => {
+      try { await actx?.resume(); } catch {}
+      gate.hidden = true;
+      chime('soft');
+      say('Sound is on. I will read out new warnings as they come in.');
+    });
+    actx?.resume?.().catch(() => {});
+    setTimeout(checkAudio, 1200);
+
+    /* ---------------- bot ---------------- */
+    const hatSvg = () => {
+      if (!OPT.hat) return '';
+      const month = new Date().getMonth();
+      if (month === 9) return '<g transform="translate(64 -4)"><path d="M10 74 L62 0 L88 66 Z" fill="#2a1446"/><path d="M33 52 L76 46 L80 58 L30 64 Z" fill="#ff8a1e"/><ellipse cx="60" cy="74" rx="66" ry="11" fill="#1c0d31"/></g>';
+      if (month === 11) return '<g transform="translate(66 -2)"><path d="M14 70 Q50 -10 100 30 L86 72 Z" fill="#d81f2a"/><circle cx="102" cy="32" r="11" fill="#fff"/><rect x="4" y="62" width="106" height="16" rx="8" fill="#fff"/></g>';
+      return '';
+    };
+    bot.innerHTML = '<svg viewBox="0 0 250 292"><defs>'
+      + '<linearGradient id="bshell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f9ff"/><stop offset="1" stop-color="#c9d6ea"/></linearGradient>'
+      + '<linearGradient id="bscreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14254a"/><stop offset="1" stop-color="#07101f"/></linearGradient></defs>'
+      + '<rect x="120" y="22" width="9" height="34" rx="4" fill="#9fb3d1"/>'
+      + '<path class="beacon" d="M127 0 113 22h10l-4 16 16-22h-10l4-16z" fill="#ffd34d"/>'
+      + '<rect x="46" y="54" width="158" height="124" rx="40" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/>'
+      + '<rect x="62" y="72" width="126" height="88" rx="26" fill="url(#bscreen)"/>'
+      + '<rect class="eye" x="88" y="94" width="20" height="34" rx="10" fill="#3fe0ff"/>'
+      + '<rect class="eye" x="142" y="94" width="20" height="34" rx="10" fill="#3fe0ff"/>'
+      + '<rect class="mouth" x="108" y="138" width="34" height="9" rx="4.5" fill="#3fe0ff"/>'
+      + '<circle cx="44" cy="116" r="15" fill="#1a8cff" stroke="#0d4fae" stroke-width="3"/><circle cx="206" cy="116" r="15" fill="#1a8cff" stroke="#0d4fae" stroke-width="3"/>'
+      + '<path d="M206 130 C206 168 180 178 150 176" fill="none" stroke="#38455c" stroke-width="5" stroke-linecap="round"/><circle cx="148" cy="176" r="6" fill="#38455c"/>'
+      + '<rect x="84" y="182" width="82" height="16" rx="6" fill="#9fb3d1"/>'
+      + '<path d="M58 210 Q125 186 192 210 L184 282 Q125 296 66 282 Z" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/>'
+      + '<rect x="98" y="220" width="54" height="44" rx="11" fill="#0b4fc4"/>'
+      + '<text x="125" y="250" text-anchor="middle" font-family="WP Display, Arial Narrow, sans-serif" font-weight="700" font-size="24" fill="#fff">WP</text>'
+      + '<rect x="30" y="214" width="22" height="58" rx="11" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/><rect x="198" y="214" width="22" height="58" rx="11" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/>'
+      + hatSvg() + '</svg>';
+    if (!OPT.bot) { bot.classList.add('off'); bubble.style.right = '32px'; }
+    const setMood = (mood) => {
+      const color = mood === 'danger' ? '#ff4d5e' : mood === 'alert' ? '#ffc23d' : '#3fe0ff';
+      bot.querySelectorAll('.eye, .mouth').forEach((el) => el.setAttribute('fill', color));
+      bot.querySelector('.beacon').setAttribute('fill', mood === 'danger' ? '#ff2a2a' : '#ffd34d');
+      bot.classList.toggle('danger', mood === 'danger');
+    };
+    setInterval(() => { bot.classList.add('blink'); setTimeout(() => bot.classList.remove('blink'), 140); }, 4300);
+
+    /* ---------------- map ---------------- */
+    const firstSymbolId = () => (S.map.getStyle().layers || []).find((l) => l.type === 'symbol')?.id;
+    const alertFC = () => ({
+      type: 'FeatureCollection',
+      features: S.alerts.filter((a) => a.geometry && a.group !== 'forecasts').map((a) => ({
+        type: 'Feature', geometry: a.geometry,
+        properties: { key: a.key, color: a.accent || a.color || '#888', rank: a.rank, group: a.group }
+      })).sort((x, y) => y.properties.rank - x.properties.rank)
+    });
+    const reportFC = () => ({
+      type: 'FeatureCollection',
+      features: (S.live?.reports || []).map((r) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.lon, r.lat] }, properties: { color: REPORT_COLORS[r.type] || '#ffffff' } }))
+    });
+    const installLayers = () => {
+      const map = S.map;
+      const before = firstSymbolId();
+      (S.radar?.reflectivity || []).forEach((f, i) => {
+        map.addSource('rf' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256, maxzoom: 10 });
+        map.addLayer({ id: 'rf' + i, type: 'raster', source: 'rf' + i, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0 } }, before);
+      });
+      map.addSource('alerts', { type: 'geojson', data: alertFC() });
+      map.addLayer({ id: 'o-fill', type: 'fill', source: 'alerts', filter: ['==', ['get', 'group'], 'outlooks'], layout: { visibility: 'none' }, paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.3 } }, before);
+      map.addLayer({ id: 'o-line', type: 'line', source: 'alerts', filter: ['==', ['get', 'group'], 'outlooks'], layout: { visibility: 'none' }, paint: { 'line-color': ['get', 'color'], 'line-width': 2 } }, before);
+      const live = ['in', ['get', 'group'], ['literal', ['warnings', 'statements', 'discussions']]];
+      map.addLayer({ id: 'a-fill', type: 'fill', source: 'alerts', filter: ['any', live, ['==', ['get', 'group'], 'watches']], paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['case', ['==', ['get', 'group'], 'watches'], 0.07, 0.13] } }, before);
+      map.addLayer({ id: 'a-case', type: 'line', source: 'alerts', filter: live, paint: { 'line-color': '#000', 'line-opacity': 0.5, 'line-width': 4.5 } });
+      map.addLayer({ id: 'a-line', type: 'line', source: 'alerts', filter: live, paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['<=', ['get', 'rank'], 3], 3, 2] } });
+      map.addLayer({ id: 'w-line', type: 'line', source: 'alerts', filter: ['==', ['get', 'group'], 'watches'], paint: { 'line-color': ['get', 'color'], 'line-width': 2.2, 'line-dasharray': [3, 2] } });
+      map.addLayer({ id: 'sel-case', type: 'line', source: 'alerts', filter: ['==', ['get', 'key'], ''], paint: { 'line-color': '#000', 'line-opacity': 0.75, 'line-width': 10 } });
+      map.addLayer({ id: 'sel-line', type: 'line', source: 'alerts', filter: ['==', ['get', 'key'], ''], paint: { 'line-color': '#ffffff', 'line-width': 4.5 } });
+      map.addSource('reports', { type: 'geojson', data: reportFC() });
+      map.addLayer({ id: 'reports', type: 'circle', source: 'reports', paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#000' } });
+      S.styleReady = true;
+    };
+    const setSelected = (key) => {
+      S.sel = key || '';
+      if (!S.styleReady) return;
+      S.map.setFilter('sel-case', ['==', ['get', 'key'], S.sel]);
+      S.map.setFilter('sel-line', ['==', ['get', 'key'], S.sel]);
+    };
+    setInterval(() => {
+      if (S.styleReady && S.sel) S.map.setPaintProperty('sel-line', 'line-opacity', 0.55 + 0.45 * Math.abs(Math.sin(Date.now() / 420)));
+    }, 90);
+    const setOutlookVisible = (on) => {
+      if (!S.styleReady) return;
+      ['o-fill', 'o-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
+      ['a-fill', 'a-case', 'a-line', 'w-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', on ? 'none' : 'visible'));
+    };
+
+    const nearestSite = (pt) => {
+      if (!pt || !S.sites.length) return null;
+      let best = null;
+      let bestD = Infinity;
+      const cos = Math.cos((pt[1] * Math.PI) / 180);
+      for (const s of S.sites) {
+        const dx = (s.lon - pt[0]) * cos;
+        const dy = s.lat - pt[1];
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = s; }
+      }
+      return Math.sqrt(bestD) * 111 < 420 ? best : null;
+    };
+    const siteLabel = (s) => (['AK', 'HI', 'GU'].includes(s.state) ? 'P' : s.state === 'PR' ? 'T' : 'K') + s.id;
+    const clearLocal = () => {
+      if (!S.styleReady) return;
+      (S.local?.reflectivity || []).forEach((_, i) => { if (S.map.getLayer('lr' + i)) { S.map.removeLayer('lr' + i); S.map.removeSource('lr' + i); } });
+      if (S.map.getLayer('vel')) { S.map.removeLayer('vel'); S.map.removeSource('vel'); }
+      S.local = null;
+      S.localKey = '';
+      S.velOn = false;
+      S.siteMarker?.remove();
+      S.siteMarker = null;
+    };
+    const loadLocal = async (site) => {
+      if (!site || !S.styleReady) { clearLocal(); return; }
+      if (S.localKey === site.id) return;
+      clearLocal();
+      S.localKey = site.id;
+      let body;
+      try { body = await getJson('/api/v3/live/radar?site=' + encodeURIComponent(site.id)); } catch { body = null; }
+      if (S.localKey !== site.id || !body || !body.reflectivity.length) return;
+      body.reflectivity.forEach((f, i) => {
+        S.map.addSource('lr' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256, maxzoom: 11 });
+        S.map.addLayer({ id: 'lr' + i, type: 'raster', source: 'lr' + i, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0 } }, 'a-fill');
+      });
+      if (body.velocity) {
+        S.map.addSource('vel', { type: 'raster', tiles: [body.velocity.tiles], tileSize: 256, maxzoom: 11 });
+        S.map.addLayer({ id: 'vel', type: 'raster', source: 'vel', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9, 'raster-fade-duration': 0 } }, 'a-fill');
+      }
+      S.local = { ...body, site };
+      const el = document.createElement('div');
+      el.className = 'sitemark';
+      el.innerHTML = '<i></i><span>' + esc(siteLabel(site)) + '</span>';
+      S.siteMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([site.lon, site.lat]).addTo(S.map);
+      renderRadarPanel();
+    };
+    const setVelocity = (on) => {
+      if (!S.local?.velocity || !S.styleReady) return;
+      S.velOn = on;
+      S.map.setLayoutProperty('vel', 'visibility', on ? 'visible' : 'none');
+      renderRadarPanel();
+    };
+
+    /* radar loop: both the national composite and the local site loop step together */
+    const HOLD = 4;
+    const frameAt = (n) => (n ? Math.min(n - 1, S.step % (n + HOLD)) : 0);
+    const animate = () => {
+      S.step += 1;
+      if (!S.styleReady) return;
+      const n = S.radar?.reflectivity.length || 0;
+      const localN = S.local?.reflectivity.length || 0;
+      const fi = frameAt(n);
+      const li = frameAt(localN);
+      const compOpacity = localN ? 0.45 : 0.78;
+      for (let k = 0; k < n; k += 1) S.map.setPaintProperty('rf' + k, 'raster-opacity', k === fi ? compOpacity : 0);
+      for (let k = 0; k < localN; k += 1) S.map.setPaintProperty('lr' + k, 'raster-opacity', !S.velOn && k === li ? 0.88 : 0);
+      const frames = localN ? S.local.reflectivity : S.radar?.reflectivity || [];
+      const idx = localN ? li : fi;
+      $('rp-ticks').innerHTML = frames.map((_, k) => '<i class="' + (k === idx ? 'now' : k < idx ? 'on' : '') + '"></i>').join('');
+      const frame = S.velOn ? S.local.velocity : frames[idx];
+      if (frame) $('rp-site').dataset.time = new Date(frame.time).toLocaleTimeString('en-US', { timeZone: S.shot?.alert?.timezone || OPT.tz, hour: 'numeric', minute: '2-digit' });
+      updateSiteLine();
+    };
+    setInterval(animate, 420);
+
+    const renderRadarPanel = () => {
+      const legend = S.velOn ? LEGENDS.vel : LEGENDS.refl;
+      $('rp-bar').style.background = legend.bar;
+      $('rp-lbl').innerHTML = legend.labels.map((l) => '<span>' + esc(l) + '</span>').join('');
+      if (S.local) {
+        $('rp-title').textContent = S.velOn ? 'STORM VELOCITY' : 'LOCAL RADAR';
+        $('rp-state').textContent = (STATE_NAMES[S.local.site.state] || S.local.site.state || '').toUpperCase();
+      } else {
+        $('rp-title').textContent = 'NATIONAL RADAR';
+        $('rp-state').textContent = focusState() ? (STATE_NAMES[focusState()] || focusState()).toUpperCase() : 'CONUS';
+      }
+      updateSiteLine();
+    };
+    const updateSiteLine = () => {
+      const time = $('rp-site').dataset.time || '';
+      if (S.local) $('rp-site').textContent = siteLabel(S.local.site) + ' • ' + (S.velOn ? 'VELOCITY' : '0.5° SUPER-RES') + (time ? ' • ' + time : '');
+      else $('rp-site').textContent = 'MRMS COMPOSITE' + (time ? ' • ' + time : '');
+    };
+
+    /* ---------------- top bar ---------------- */
+    const setTally = (id, n) => {
+      const tile = $(id);
+      const span = tile.querySelector('.n span');
+      const prev = Number(span.textContent);
+      span.textContent = n;
+      tile.classList.toggle('zero', !n);
+      if (n > prev && S.seen) { tile.classList.remove('bump'); void tile.offsetWidth; tile.classList.add('bump'); }
+    };
+    const WPI_COLORS = { QUIET: '#6fd0ff', ACTIVE: '#7dff9a', BUSY: '#ffd34d', SEVERE: '#ff8a3d', EXTREME: '#ff4d6d' };
+    const drawSpark = (history, color) => {
+      const canvas = $('spark');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const pts = (history || []).slice(-72);
+      if (pts.length < 2) return;
+      const max = Math.max(4, ...pts.map((p) => p[1])) * 1.15;
+      const x = (i) => 6 + (i / (pts.length - 1)) * (canvas.width - 16);
+      const y = (v) => canvas.height - 8 - (v / max) * (canvas.height - 16);
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(x(i), y(p[1])) : ctx.moveTo(x(i), y(p[1]))));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.lineTo(x(pts.length - 1), canvas.height);
+      ctx.lineTo(x(0), canvas.height);
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, color + '66');
+      grad.addColorStop(1, color + '00');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x(pts.length - 1), y(pts[pts.length - 1][1]), 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    };
+    const renderTop = () => {
+      const t = S.live?.tallies || {};
+      setTally('t-tor', t.tor || 0);
+      setTally('t-svr', t.svr || 0);
+      setTally('t-ffw', t.ffw || 0);
+      setTally('t-wch', (t.torWatch || 0) + (t.svrWatch || 0));
+      const idx = S.live?.index;
+      if (idx) {
+        const color = WPI_COLORS[idx.label] || '#6fd0ff';
+        document.querySelector('.wpi').style.setProperty('--wc', color);
+        $('wpi-v').textContent = idx.value.toFixed(2);
+        $('wpi-l').textContent = idx.label;
+        $('wpi-delta').textContent = idx.delta1h == null ? '— 1H' : (idx.delta1h >= 0 ? '▲ ' : '▼ ') + Math.abs(idx.delta1h).toFixed(1) + ' 1H';
+        drawSpark(idx.history, color);
+      }
+      $('rc-n').textContent = (S.live?.reports || []).length;
+    };
+
+    const headlineFor = (a) => (a.eventLabel + ' FOR ' + (a.area || stateLine(a)) + (a.times?.expires ? ' UNTIL ' + a.times.expires : '')).toUpperCase();
+    const buildHeadlines = () => {
+      const st = focusState();
+      const fresh = (a) => Date.now() - Date.parse(a.issuedAt || 0) < 30 * 60 * 1000;
+      const list = S.alerts
+        .filter((a) => ['warnings', 'watches'].includes(a.group) && (a.states || []).length && (!st || a.states.includes(st)))
+        .sort((x, y) => (x.rank - y.rank) || (Date.parse(y.issuedAt || 0) - Date.parse(x.issuedAt || 0)))
+        .slice(0, 8)
+        .map((a) => ({ tag: fresh(a) && a.status === 'NEW' ? 'NEW' : a.rank <= 3 ? 'ALERT' : 'LATEST', text: headlineFor(a), color: a.color }));
+      S.headlines = list.length ? list : [{ tag: 'LIVE', text: 'WEATHERPOWER LIVE · SEVERE WEATHER COVERAGE 24/7', color: null }];
+    };
+    const showHeadline = () => {
+      const items = [...S.headlines];
+      if (S.control.banner) items.splice(S.hlIndex % 2 ? 0 : items.length, 0, { tag: 'WEATHERPOWER', text: S.control.banner.text.toUpperCase(), color: '#1a8cff' });
+      const item = items[S.hlIndex % items.length];
+      S.hlIndex += 1;
+      if (!item) return;
+      const slot = $('hl-slot');
+      slot.querySelectorAll('.txt').forEach((el) => { el.classList.add('leave'); setTimeout(() => el.remove(), 600); });
+      const el = document.createElement('div');
+      el.className = 'txt enter';
+      el.textContent = item.text;
+      slot.appendChild(el);
+      let size = 40;
+      el.style.fontSize = size + 'px';
+      while (el.scrollWidth > el.clientWidth && size > 25) { size -= 1; el.style.fontSize = size + 'px'; }
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('enter')));
+      $('hl-tag').textContent = item.tag;
+      $('hl').style.setProperty('--hc', item.color ? 'linear-gradient(90deg,' + item.color + 'ee,' + item.color + '55)' : 'transparent');
+      $('hl').style.color = item.color ? ink(item.color) : '#fff';
+    };
+    setInterval(showHeadline, 8000);
+
+    /* ---------------- panels ---------------- */
+    const card = $('card');
+    const setCard = (html, color) => {
+      card.style.setProperty('--c', color || '#1a8cff');
+      card.style.setProperty('--ci', ink(color || '#1a8cff'));
+      card.innerHTML = html;
+      card.classList.add('show');
+    };
+    const setNow = ({ k, title, color, hazards = [], crawl = '', people = '' }) => {
+      const now = $('now');
+      now.style.setProperty('--c', color || '#1a8cff');
+      now.style.setProperty('--ci', ink(color || '#1a8cff'));
+      $('now-k').textContent = k;
+      $('now-t').textContent = title;
+      $('now-hz').innerHTML = hazards.slice(0, 3).map((h) => '<span>' + esc(h) + '</span>').join('');
+      $('now-ppl').textContent = people;
+      const span = $('crawl-s');
+      span.getAnimations?.().forEach((an) => an.cancel());
+      span.textContent = crawl;
+      const box = $('crawl');
+      requestAnimationFrame(() => {
+        const w = span.scrollWidth;
+        if (w > box.clientWidth && span.animate) {
+          span.animate([{ transform: 'translateX(' + box.clientWidth + 'px)' }, { transform: 'translateX(-' + w + 'px)' }], { duration: ((w + box.clientWidth) / 85) * 1000, iterations: Infinity });
+        }
+      });
+    };
+
+    const alertCard = (a, shot) => {
+      const watchInside = a.group === 'watches'
+        ? S.alerts.filter((w) => w.group === 'warnings' && inGeometry(centerOf(w), a.geometry)).length
+        : null;
+      const chips = [];
+      if (a.threat) chips.push('<span class="chip hot"><b>' + esc(a.threat) + '</b></span>');
+      if (watchInside != null) chips.push('<span class="chip"><b>' + watchInside + '</b> WARNING' + (watchInside === 1 ? '' : 'S') + ' INSIDE</span>');
+      if (a.people) chips.push('<span class="chip"><b>' + fmtNum(a.people) + '</b> ' + (a.group === 'watches' ? 'IMPACTED' : 'PEOPLE IN WARNING') + '</span>');
+      (a.states || []).slice(0, 3).forEach((s) => chips.push('<span class="chip"><b>' + esc(s) + '</b></span>'));
+      const rows = [];
+      if (a.area) rows.push(['AREAS', '<dd>' + esc(a.area) + '</dd>']);
+      const hz = (a.hazards || []).filter((h) => h.value && !/^(RISK|DAY)$/.test(h.label));
+      if (hz.length) rows.push(['HAZARDS', '<dd>' + hz.map((h) => esc(h.label + ' ' + h.value)).join(' · ') + '</dd>']);
+      if (a.summary) rows.push(['DETAILS', '<dd class="prose">' + esc(a.summary) + '</dd>']);
+      rows.push(['ISSUED', '<dd>' + esc((a.times?.issued || '') + (a.office ? ' · NWS ' + a.office : '')) + '</dd>']);
+      const tag = shot.pinned ? '<span class="status pin">PINNED</span>' : a.status ? '<span class="status">' + esc(a.status) + '</span>' : '';
+      setCard('<div class="head"><div class="ico">' + icon(a.icon, 30) + '</div><div><h2>' + esc(a.eventLabel) + '</h2><div class="sub" id="card-exp"></div></div>' + tag + '</div>'
+        + '<div class="life"><i id="card-life"></i></div>'
+        + (chips.length ? '<div class="chips">' + chips.join('') + '</div>' : '')
+        + '<dl>' + rows.map(([k, v]) => '<dt>' + k + '</dt>' + v).join('') + '</dl>', a.color);
+    };
+
+    /* ---------------- director ---------------- */
+    const OFF_CONUS = ['AK', 'HI', 'GU', 'MP', 'AS', 'PR', 'VI'];
+    const offConus = (a) => (a.states || []).length > 0 && a.states.every((s) => OFF_CONUS.includes(s));
+    const notable = (a) => ['warnings', 'watches', 'discussions'].includes(a.group) && (a.states || []).length > 0;
+    const isBreaking = (a) => a.rank <= 3 || /^tornado watch$/i.test(a.event);
+    const candidates = () => {
+      const st = focusState();
+      const fresh = (a) => Date.now() - Date.parse(a.issuedAt || 0) < 30 * 60 * 1000;
+      return S.alerts
+        .filter((a) => a.geometry && ['warnings', 'watches', 'discussions', 'statements'].includes(a.group) && (!st || (a.states || []).includes(st)))
+        .map((a) => ({ a, score: a.rank * 10 + ((a.states || []).length ? 0 : 45) + (offConus(a) ? 25 : 0) + (/^flood warning$/i.test(a.event) ? 12 : 0) + (a.group === 'statements' ? 20 : 0) - (fresh(a) ? 6 : 0) }))
+        .sort((x, y) => (x.score - y.score) || (Date.parse(y.a.issuedAt || 0) - Date.parse(x.a.issuedAt || 0)))
+        .map((x) => x.a);
+    };
+    const outlooks = () => S.alerts.filter((a) => a.group === 'outlooks' && /day 1/i.test(a.eventLabel || '') && a.geometry);
+    const dwellFor = (shot) => {
+      let s = 15;
+      if (shot.type === 'alert') {
+        const a = shot.alert;
+        s = a.rank <= 2 ? 30 : a.rank <= 3 ? 26 : a.group === 'warnings' && (a.states || []).length ? 20 : 15;
+      } else if (shot.type === 'reports') s = 16;
+      else s = 14;
+      return s * OPT.speed * 1000;
+    };
+
+    const nextShot = () => {
+      clearTimeout(S.shotTimer);
+      if (S.inBreaking) return;
+      let shot = null;
+      if (S.breaking.length) {
+        const b = S.breaking.shift();
+        shot = { type: 'alert', alert: byKey(b.key) || b.alert, breaking: b };
+      } else if (S.fresh.length) {
+        const key = S.fresh.shift();
+        if (byKey(key)) shot = { type: 'alert', alert: byKey(key), fresh: true };
+      }
+      if (!shot && S.control.pin && byKey(S.control.pin)) shot = { type: 'alert', alert: byKey(S.control.pin), pinned: true };
+      if (!shot && S.control.mode && S.control.mode !== 'auto') shot = { type: S.control.mode };
+      if (!shot) {
+        S.cycle += 1;
+        const list = candidates().slice(0, 10);
+        const reports = (S.live?.reports || []).length;
+        if (!list.length) shot = { type: ['national', 'outlook', 'reports'][S.cycle % 3] };
+        else if (S.cycle % 6 === 0) shot = { type: 'national' };
+        else if (S.cycle % 11 === 0 && outlooks().length) shot = { type: 'outlook' };
+        else if (S.cycle % 8 === 0 && reports >= 5) shot = { type: 'reports' };
+        else {
+          const memory = Math.min(list.length - 1, 6);
+          const pick = list.find((a) => !S.recent.slice(-memory).includes(a.key)) || list[0];
+          S.recent = [...S.recent, pick.key].slice(-12);
+          shot = { type: 'alert', alert: pick };
+        }
+      }
+      if (shot.type === 'outlook' && !outlooks().length) shot = { type: 'national' };
+      if (shot.type === 'reports' && !(S.live?.reports || []).length) shot = { type: 'national' };
+      runShot(shot);
+    };
+
+    const CONUS = [[-125, 24.2], [-66.8, 49.6]];
+    const PAD = { top: 150, bottom: 140, left: 600, right: 640 };
+    const runShot = async (shot) => {
+      S.shot = shot;
+      if (shot.breaking) {
+        S.inBreaking = true;
+        await showBreaking(shot.alert, shot.breaking.test);
+        S.inBreaking = false;
+      }
+      S.shotStart = Date.now();
+      S.shotDur = dwellFor(shot);
+      card.classList.remove('show');
+      setTimeout(() => S.shot === shot && stageShot(shot), 380);
+      S.shotTimer = setTimeout(nextShot, S.shotDur);
+    };
+
+    const fly = (bounds, opts = {}) => {
+      if (!S.map || !bounds) return;
+      S.map.stop();
+      // Cross-ocean jumps (Guam, Hawaii) cut instead of flying, so tiles are not loading mid-air.
+      const from = S.map.getCenter();
+      const far = Math.abs(from.lng - (bounds[0][0] + bounds[1][0]) / 2) > 45 || Math.abs(from.lat - (bounds[0][1] + bounds[1][1]) / 2) > 25;
+      S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : 3600, maxZoom: 9.4, essential: true, ...opts });
+      const shot = S.shot;
+      S.map.once('moveend', () => {
+        if (S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
+        S.map.easeTo({ zoom: S.map.getZoom() + 0.3, duration: Math.max(2000, S.shotDur - (Date.now() - S.shotStart) - 600), easing: (t) => t, essential: true });
+      });
+    };
+
+    const stageShot = (shot) => {
+      clearTimeout(S.velTimer);
+      setVelocity(false);
+      if (shot.type === 'alert') {
+        const a = shot.alert;
+        setOutlookVisible(false);
+        setSelected(a.key);
+        alertCard(a, shot);
+        const hz = (a.hazards || []).filter((h) => h.value && !/^(RISK|DAY)$/.test(h.label)).map((h) => h.value);
+        setNow({
+          k: shot.breaking ? 'BREAKING' : shot.fresh ? 'NEW ALERT' : shot.pinned ? 'PINNED' : 'NOW TRACKING',
+          title: a.eventLabel + (stateLine(a) ? ' IN ' + stateLine(a) : a.place ? ' · ' + a.place : ''),
+          color: a.color,
+          hazards: [a.threat, ...hz].filter(Boolean),
+          crawl: (a.areaDesc || a.area || '').toUpperCase().split(/;\s*/).join(' · '),
+          people: a.people ? '~' + shortNum(a.people) + ' IN THE PATH' : ''
+        });
+        fly(bboxOf(a.geometry), { maxZoom: a.group === 'watches' ? 7.4 : 9.4 });
+        loadLocal(nearestSite(centerOf(a)));
+        setMood(a.rank <= 3 ? 'danger' : a.group === 'warnings' ? 'alert' : 'calm');
+        if ((a.family === 'tornado' || /tornado/i.test(a.threat || '')) && a.group === 'warnings') {
+          S.velTimer = setTimeout(() => { if (S.shot === shot) setVelocity(true); }, S.shotDur * 0.5);
+          setTimeout(() => { if (S.shot === shot) setVelocity(false); }, S.shotDur * 0.85);
+        }
+        if (shot.fresh && !S.spoken.has(a.key)) {
+          S.spoken.add(a.key);
+          say(spokenAlert(a, 'New ' + a.event.toLowerCase() + '. '), { label: 'NEW ALERT' });
+        }
+      } else {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(shot.type === 'outlook');
+        setMood('calm');
+        if (shot.type === 'national') nationalShot();
+        else if (shot.type === 'outlook') outlookShot();
+        else reportsShot();
+      }
+      renderRadarPanel();
+      $('rp').classList.add('show');
+    };
+
+    const nationalShot = () => {
+      const st = focusState();
+      const pool = S.alerts.filter((a) => ['warnings', 'watches', 'statements', 'discussions'].includes(a.group) && (!st || (a.states || []).includes(st)));
+      const byEvent = new Map();
+      pool.forEach((a) => { const e = byEvent.get(a.event) || { n: 0, color: a.color, rank: a.rank }; e.n += 1; e.rank = Math.min(e.rank, a.rank); byEvent.set(a.event, e); });
+      const top = [...byEvent.entries()].sort((x, y) => (x[1].rank - y[1].rank) || (y[1].n - x[1].n)).slice(0, 6);
+      const risk = S.live?.index?.spcDay1;
+      setCard('<div class="head"><div class="ico">' + icon('radar', 30) + '</div><div><h2>' + (st ? esc((STATE_NAMES[st] || st).toUpperCase()) + ' OVERVIEW' : 'NATIONAL OVERVIEW') + '</h2><div class="sub">' + pool.length + ' ACTIVE ALERTS · WPI ' + esc(S.live?.index?.label || '') + '</div></div></div>'
+        + '<div class="rows">' + (top.length ? top.map(([event, e]) => '<div class="rowi" style="--rc:' + esc(e.color) + '"><i></i><b>' + esc(event) + '</b><em>' + e.n + '</em></div>').join('') : '<div class="rowi" style="--rc:#3fe0ff"><i></i><b>No active warnings</b></div>')
+        + (risk ? '<div class="rowi" style="--rc:#7dff9a"><i></i><b>SPC Day 1</b><span>' + esc(RISK_NAMES[risk] || risk) + '</span></div>' : '') + '</div>', '#1a8cff');
+      const st2 = focusState();
+      const stBounds = st2 ? bboxOf({ type: 'GeometryCollection', geometries: pool.map((a) => a.geometry).filter(Boolean) }) : null;
+      fly(stBounds || CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 7 });
+      setNow({ k: 'OVERVIEW', title: (st2 ? (STATE_NAMES[st2] || st2) : 'Nationwide') + ': ' + pool.length + ' active alerts', color: '#1a8cff', crawl: top.map(([event, e]) => e.n + ' ' + event).join(' · ') });
+    };
+    const outlookShot = () => {
+      const list = outlooks();
+      const order = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
+      const risks = list.map((a) => ({ a, risk: (a.hazards || []).find((h) => h.label === 'RISK')?.value })).filter((r) => r.risk).sort((x, y) => order.indexOf(y.risk) - order.indexOf(x.risk));
+      const top = risks[0];
+      setCard('<div class="head"><div class="ico">' + icon('outlook', 30) + '</div><div><h2>SPC DAY 1 OUTLOOK</h2><div class="sub">VALID UNTIL ' + esc(top?.a.times?.expires || '') + '</div></div></div>'
+        + '<div class="rows">' + risks.map((r) => '<div class="rowi" style="--rc:' + esc(r.a.accent || r.a.color) + '"><i></i><b>' + esc(RISK_NAMES[r.risk] || r.risk) + '</b><span>' + esc(r.risk) + '</span></div>').join('') + '</div>', top?.a.color || '#55bb55');
+      fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 6 });
+      setNow({ k: 'OUTLOOK', title: 'Storm Prediction Center: ' + (RISK_NAMES[top?.risk] || 'Day 1 outlook'), color: top?.a.color || '#55bb55', crawl: risks.map((r) => RISK_NAMES[r.risk] || r.risk).join(' · ') });
+    };
+    const reportsShot = () => {
+      const reports = [...(S.live?.reports || [])].sort((x, y) => Date.parse(y.time) - Date.parse(x.time));
+      const latest = reports.slice(0, 7);
+      setCard('<div class="head"><div class="ico">' + icon('reports', 30) + '</div><div><h2>STORM REPORTS</h2><div class="sub">LAST 3 HOURS · ' + reports.length + ' REPORTS</div></div></div>'
+        + '<div class="rows">' + latest.map((r) => '<div class="rowi" style="--rc:' + (REPORT_COLORS[r.type] || '#fff') + '"><i></i><b>' + esc(reportLabel(r) + ' · ' + r.city + ', ' + r.state) + '</b><span>' + esc(ago(r.time)) + '</span></div>').join('') + '</div>', '#ffd34d');
+      const b = bboxOf({ type: 'MultiPoint', coordinates: reports.map((r) => [r.lon, r.lat]) });
+      fly(b, { padding: { top: 160, bottom: 150, left: 620, right: 640 }, maxZoom: 7 });
+      setNow({ k: 'REPORTS', title: reports.length + ' storm reports in the last 3 hours', color: '#ffd34d', crawl: latest.map((r) => r.type + ' · ' + r.city + ', ' + r.state + (r.remark ? ' — ' + r.remark : '')).join('   ◆   ') });
+    };
+
+    /* ---------------- breaking + speech text ---------------- */
+    const article = (word) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+    const spokenAlert = (a, lead) => {
+      const place = (a.area || stateLine(a) || a.place || '')
+        .replace(/,\s*([A-Z]{2})\b/g, (m, st) => ', ' + (STATE_NAMES[st] || st))
+        .replace(/\b[A-Z][A-Z']+\b/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+      const until = a.times?.expires ? ' until ' + a.times.expires : '';
+      let text = lead + article(a.event) + ' ' + a.event.toLowerCase() + ' is in effect for ' + place + until + '.';
+      if (a.summary) text += ' ' + a.summary;
+      if (a.people) text += ' About ' + shortNum(a.people).replace('K', ' thousand').replace('M', ' million') + ' people are in the warning.';
+      if (a.rank <= 2) text += ' If you are in this area, take shelter now.';
+      return text;
+    };
+    const showBreaking = (a, test) => new Promise((resolve) => {
+      const brk = $('brk');
+      brk.style.setProperty('--c', a.color || '#c00');
+      brk.style.setProperty('--ci', ink(a.color || '#c00'));
+      brk.innerHTML = '<div class="stripes"></div>' + (test ? '<div class="test">TEST · NOT A NEW ALERT</div>' : '')
+        + '<div class="k">BREAKING</div><h1>' + esc(a.eventLabel) + '</h1>'
+        + '<div class="p">' + esc(a.area || stateLine(a)) + '</div>'
+        + '<div class="u">UNTIL ' + esc(a.times?.expires || '') + (a.people ? ' · ~' + esc(shortNum(a.people)) + ' PEOPLE' : '') + '</div>'
+        + (a.threat ? '<div class="t">' + esc(a.threat) + '</div>' : '');
+      brk.classList.remove('out');
+      brk.classList.add('show');
+      chime('breaking');
+      setMood('danger');
+      S.spoken.add(a.key);
+      say(spokenAlert(a, test ? 'This is a test of the WeatherPower alert system. ' : 'Breaking. '), { label: test ? 'TEST ALERT' : 'BREAKING' });
+      setTimeout(() => {
+        brk.classList.add('out');
+        setTimeout(() => { brk.classList.remove('show', 'out'); resolve(); }, 520);
+      }, 5600);
+    });
+
+    /* ---------------- data ---------------- */
+    const loadAlerts = async () => {
+      const body = await getJson('/api/v3/alerts');
+      S.alerts = body.alerts || [];
+      if (S.styleReady) S.map.getSource('alerts')?.setData(alertFC());
+      const keys = new Set(S.alerts.map((a) => a.key));
+      if (!S.seen) {
+        S.seen = keys;
+      } else {
+        const st = focusState();
+        const fresh = S.alerts.filter((a) => !S.seen.has(a.key) && notable(a) && (!st || a.states.includes(st)));
+        fresh.forEach((a) => S.seen.add(a.key));
+        keys.forEach((k) => S.seen.add(k));
+        const breaking = fresh.filter(isBreaking).sort((x, y) => x.rank - y.rank);
+        const others = fresh.filter((a) => !isBreaking(a) && a.group === 'warnings' && !/^flood warning$/i.test(a.event)).slice(0, 4);
+        if (others.length) { chime('new'); S.fresh.push(...others.map((a) => a.key)); }
+        if (breaking.length) {
+          S.breaking.push(...breaking.map((a) => ({ key: a.key, alert: a })));
+          if (!S.inBreaking && !S.shot?.breaking) nextShot();
+        }
+      }
+      if (S.shot?.alert) {
+        const updated = byKey(S.shot.alert.key);
+        if (updated) S.shot.alert = updated;
+      }
+      buildHeadlines();
+    };
+    const loadLive = async () => {
+      const body = await getJson('/api/v3/live');
+      const prevRev = S.control.rev;
+      const prevCtl = S.control;
+      S.live = body;
+      S.control = body.control || S.control;
+      renderTop();
+      if (S.styleReady) S.map.getSource('reports')?.setData(reportFC());
+      const st = focusState();
+      $('focus').style.display = st ? 'block' : 'none';
+      $('focus').textContent = st ? 'FOCUS · ' + (STATE_NAMES[st] || st).toUpperCase() : '';
+      if (S.lastCmd == null) {
+        S.lastCmd = Math.max(0, ...(S.control.commands || []).map((c) => c.id));
+      } else {
+        for (const cmd of (S.control.commands || []).filter((c) => c.id > S.lastCmd)) {
+          S.lastCmd = cmd.id;
+          if (cmd.type === 'say') say(cmd.text);
+          else if (cmd.type === 'next') nextShot();
+          else if (cmd.type === 'reload') location.reload();
+          else if (cmd.type === 'test-breaking') {
+            const a = (cmd.key && byKey(cmd.key)) || candidates()[0];
+            if (a) { S.breaking.unshift({ key: a.key, alert: a, test: true }); if (!S.inBreaking) nextShot(); }
+          }
+        }
+      }
+      if (prevRev >= 0 && prevRev !== S.control.rev && (prevCtl.pin !== S.control.pin || prevCtl.mode !== S.control.mode || prevCtl.state !== S.control.state)) {
+        S.recent = [];
+        buildHeadlines();
+        nextShot();
+      }
+    };
+    const loadRadar = async () => {
+      const radar = await getJson('/api/v3/radar');
+      if (S.radar && S.radar.validAt === radar.validAt) return;
+      const first = !S.radar;
+      S.radar = radar;
+      if (!first && S.styleReady) radar.reflectivity.forEach((f, i) => S.map.getSource('rf' + i)?.setTiles?.([f.tiles]));
+    };
+    const poll = (fn, ms) => { const run = () => fn().catch((e) => console.warn(e.message)).finally(() => setTimeout(run, ms)); setTimeout(run, ms); };
+
+    const roundup = () => {
+      if (S.inBreaking || speech.busy) return;
+      const t = S.live?.tallies || {};
+      const idx = S.live?.index;
+      const parts = [];
+      if (t.tor) parts.push(t.tor + ' tornado warning' + (t.tor === 1 ? '' : 's'));
+      if (t.svr) parts.push(t.svr + ' severe thunderstorm warning' + (t.svr === 1 ? '' : 's'));
+      if (t.ffw) parts.push(t.ffw + ' flash flood warning' + (t.ffw === 1 ? '' : 's'));
+      const watches = (t.torWatch || 0) + (t.svrWatch || 0);
+      let text = 'WeatherPower update. ';
+      text += parts.length ? 'Right now there ' + (parts.length === 1 && /^1 /.test(parts[0]) ? 'is ' : 'are ') + parts.join(', ') + ' across the country.' : 'No tornado, severe thunderstorm or flash flood warnings are in effect right now.';
+      if (watches) text += ' ' + watches + ' severe weather watch' + (watches === 1 ? ' is' : 'es are') + ' active.';
+      if (idx) text += ' The WeatherPower Index is ' + idx.value.toFixed(1) + ', ' + idx.label.toLowerCase() + '.';
+      say(text, { label: 'UPDATE' });
+    };
+    setInterval(() => {
+      if (Date.now() - S.lastRoundup > 20 * 60 * 1000) { S.lastRoundup = Date.now(); roundup(); }
+      else if (OPT.tips && Date.now() - S.lastTip > 4 * 60 * 1000 && !speech.busy && !S.inBreaking && !bubble.classList.contains('show') && (S.live?.tallies?.tor || 0) === 0) {
+        S.lastTip = Date.now();
+        showBubble(TIPS[Math.floor(Math.random() * TIPS.length)], 10000, 'SAFETY TIP');
+      }
+    }, 15000);
+
+    /* ---------------- boot ---------------- */
+    const boot = async () => {
+      const [config, radar, sites] = await Promise.all([
+        getJson('/api/v3/config'),
+        getJson('/api/v3/radar').catch(() => null),
+        getJson('/api/v3/nexrad').catch(() => ({ sites: [] }))
+      ]);
+      S.radar = radar;
+      S.sites = sites.sites || [];
+      await Promise.all([loadAlerts(), loadLive()]).catch((e) => console.warn(e.message));
+      S.map = new maplibregl.Map({
+        container: 'map', style: config.darkStyleUrl, center: [-96, 38.6], zoom: 4.1,
+        interactive: false, attributionControl: false, fadeDuration: 0
+      });
+      S.map.once('style.load', () => {
+        installLayers();
+        showHeadline();
+        $('boot').classList.add('done');
+        nextShot();
+      });
+      poll(loadAlerts, 20000);
+      poll(loadLive, 6000);
+      poll(loadRadar, 120000);
+      setTimeout(() => say('WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.'), 2500);
+    };
+    boot().catch((error) => { $('boot').textContent = 'WEATHERPOWER LIVE · RECONNECTING…'; console.error(error); setTimeout(() => location.reload(), 15000); });
+    // Long-running stream: a reload every 6 hours keeps browser memory in check.
+    setTimeout(() => location.reload(), 6 * 60 * 60 * 1000);
+  })();
+  </script>
+</body>
+</html>
