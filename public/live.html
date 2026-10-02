@@ -12,102 +12,104 @@
     @font-face { font-family: "WP Display"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 400 700; }
     @font-face { font-family: "WP Sans"; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 400 900; }
     @font-face { font-family: "WP Mono"; src: url("/warningcenter/public/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 400 700; }
+    /* Ryan Hall-style stream look: violet bars, dark navy panels with cyan corner accents, spaced mono labels. */
     :root {
-      --brand: #1a8cff; --ink: #eef3fb; --muted: #97a6bd; --line: rgba(255,255,255,.11);
-      --glass: rgba(8,13,25,.9); --bar: linear-gradient(90deg, #0a1736 0%, #102c69 55%, #1747a6 100%);
+      --ink: #f4f6fb; --muted: #8f9bb3; --line: rgba(255,255,255,.12); --edge: #33d4ff; --brand: #33d4ff;
+      --violet: linear-gradient(180deg, #7457ec 0%, #5b3fd3 100%); --violet-dark: #3e2a9c; --violet-deep: #2c1e74;
+      --panel: rgba(9,16,30,.93); --panel-solid: #0a1222;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #0a0f18; color: var(--ink); font-family: "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
     #map { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
-    .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.42), rgba(0,0,0,0) 15%, rgba(0,0,0,0) 80%, rgba(0,0,0,.5)); }
-    .mono { font-family: "WP Mono", ui-monospace, monospace; }
+    .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,0) 12%, rgba(0,0,0,0) 86%, rgba(0,0,0,.35)); }
 
     /* ---------- top bar ---------- */
-    .top { position: absolute; left: 0; right: 0; top: 0; height: 84px; display: flex; background: var(--bar); border-bottom: 2px solid rgba(255,255,255,.14); box-shadow: 0 6px 26px rgba(0,0,0,.45); z-index: 20; }
+    .top { position: absolute; left: 0; right: 0; top: 0; height: 80px; display: flex; background: var(--violet); z-index: 20; }
     .tally { display: flex; flex: none; }
-    .tile { width: 98px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--t); position: relative; }
-    .tile + .tile { border-left: 1px solid rgba(0,0,0,.25); }
-    .tile .n { display: flex; align-items: center; gap: 6px; font-family: "WP Display"; font-weight: 700; font-size: 38px; line-height: 1; }
-    .tile .n svg { opacity: .9; }
-    .tile .l { font-family: "WP Mono"; font-size: 12px; letter-spacing: .22em; opacity: .9; }
-    .tile.zero { filter: saturate(.25) brightness(.62); }
-    .tile.bump { animation: bump 1.4s ease-out; }
-    @keyframes bump { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,.9); } 20% { transform: scale(1.12); } 100% { transform: scale(1); box-shadow: 0 0 0 18px rgba(255,255,255,0); } }
-    .hl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 18px; padding: 0 26px; background: var(--hc, transparent); transition: background .6s; overflow: hidden; }
-    .hl .tag { flex: none; font-family: "WP Display"; font-weight: 700; font-size: 21px; letter-spacing: .08em; padding: 5px 12px; border-radius: 6px; background: #fff; color: #0a1020; }
-    .hl .slot { position: relative; flex: 1; min-width: 0; height: 84px; }
-    .hl .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); font-family: "WP Display"; font-weight: 700; font-size: 40px; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0,0,0,.3); transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s; }
-    .hl .txt.enter { transform: translateY(40%); opacity: 0; }
-    .hl .txt.leave { transform: translateY(-140%); opacity: 0; }
-    .wpi { flex: none; width: 372px; display: flex; align-items: center; gap: 14px; padding: 0 18px; background: rgba(0,0,0,.28); border-left: 1px solid rgba(255,255,255,.14); }
-    .wpi .meta { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: #b9cdf3; display: flex; gap: 8px; }
-    .wpi .v { font-family: "WP Display"; font-size: 40px; font-weight: 700; line-height: 1; color: var(--wc, #6fd0ff); }
-    .wpi .lab { font-family: "WP Mono"; font-size: 11px; letter-spacing: .3em; color: var(--wc, #6fd0ff); }
-    .wpi canvas { width: 176px; height: 58px; margin-left: auto; }
+    .tile { width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--t); border-right: 1px solid rgba(0,0,0,.35); }
+    .tile .n { display: flex; align-items: center; gap: 7px; font-family: "WP Display"; font-weight: 700; font-size: 36px; line-height: 1; color: #fff; }
+    .tile .n svg { opacity: .75; }
+    .tile .l { font-family: "WP Mono"; font-size: 12px; letter-spacing: .24em; color: rgba(255,255,255,.75); }
+    .tile.zero .n span { opacity: .55; }
+    .tile.bump { animation: bump 1.2s ease-out; }
+    @keyframes bump { 0%, 40% { filter: brightness(1.9); } 100% { filter: none; } }
+    .hl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0 26px; background: var(--hc, transparent); transition: background .6s; overflow: hidden; }
+    .hl .tag { flex: none; font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .2em; padding: 6px 10px; border: 1px solid rgba(255,255,255,.55); color: #fff; }
+    .hl .slot { position: relative; flex: 1; min-width: 0; height: 80px; }
+    .hl .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); font-family: "WP Display"; font-weight: 700; font-size: 40px; letter-spacing: .01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; transition: transform .45s ease, opacity .3s; }
+    .hl .txt.enter { transform: translateY(30%); opacity: 0; }
+    .hl .txt.leave { transform: translateY(-130%); opacity: 0; }
+    .wpi { flex: none; width: 360px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: #141d47; border-left: 2px solid rgba(255,255,255,.12); }
+    .wpi .meta { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: #9fb3e6; display: flex; gap: 8px; }
+    .wpi .v { font-family: "WP Display"; font-size: 38px; font-weight: 700; line-height: 1; color: var(--wc, #4fb4ff); }
+    .wpi .lab { font-family: "WP Mono"; font-size: 11px; letter-spacing: .3em; color: var(--wc, #4fb4ff); }
+    .wpi canvas { width: 176px; height: 56px; margin-left: auto; }
 
-    /* ---------- panels ---------- */
-    .panel { position: absolute; background: var(--glass); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 22px 50px rgba(0,0,0,.5); z-index: 10; }
-    .card { left: 32px; top: 112px; width: 528px; transform: translateX(-112%); opacity: 0; transition: transform .6s cubic-bezier(.2,.8,.2,1), opacity .4s; }
-    .card.show { transform: none; opacity: 1; }
-    .card .head { display: flex; align-items: center; gap: 16px; padding: 18px 22px 14px; border-top: 6px solid var(--c, var(--brand)); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)); }
-    .card .ico { flex: none; width: 54px; height: 54px; border-radius: 13px; display: grid; place-items: center; background: var(--c, var(--brand)); color: var(--ci, #fff); }
-    .card h2 { margin: 0; font-family: "WP Display"; font-size: 38px; font-weight: 700; line-height: 1.02; text-transform: uppercase; letter-spacing: .01em; }
-    .card .sub { margin-top: 6px; font-family: "WP Mono"; font-size: 14px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
-    .card .status { margin-left: auto; align-self: flex-start; flex: none; font-family: "WP Display"; font-weight: 700; font-size: 17px; letter-spacing: .1em; padding: 4px 10px; border-radius: 6px; background: #fff; color: #0a1020; }
-    .card .status.pin { background: #ffd34d; }
-    .life { height: 4px; margin: 0 22px; background: rgba(255,255,255,.09); border-radius: 2px; overflow: hidden; }
-    .life i { display: block; height: 100%; background: var(--c, var(--brand)); }
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 22px 4px; }
-    .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; background: rgba(255,255,255,.04); font-family: "WP Mono"; font-size: 13px; letter-spacing: .08em; color: #c8d3e6; text-transform: uppercase; }
+    /* ---------- panels: dark navy, thin edge, cyan bracket top-left, cut corner bottom-right ---------- */
+    .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); z-index: 10;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%); }
+    .panel::before { content: ""; position: absolute; left: -1px; top: -1px; width: 26px; height: 26px; border-left: 3px solid var(--edge); border-top: 3px solid var(--edge); pointer-events: none; }
+    .panel::after { content: ""; position: absolute; right: 0; bottom: 0; width: 26px; height: 26px; background: linear-gradient(135deg, transparent 45%, var(--edge) 45%, var(--edge) 58%, transparent 58%); pointer-events: none; }
+    .card { left: 32px; top: 104px; width: 500px; transform: translateX(-112%); transition: transform .5s cubic-bezier(.3,.8,.3,1); }
+    .card.show { transform: none; }
+    .card .head { display: flex; align-items: flex-start; gap: 14px; padding: 22px 26px 12px; }
+    .card .ico { display: none; }
+    .card h2 { margin: 0; font-family: "WP Display"; font-size: 40px; font-weight: 700; line-height: 1; text-transform: uppercase; color: #fff; }
+    .card .sub { margin-top: 8px; font-family: "WP Mono"; font-size: 14px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+    .card .status { margin-left: auto; flex: none; font-family: "WP Mono"; font-weight: 700; font-size: 12px; letter-spacing: .16em; padding: 5px 8px; border: 1px solid var(--c, var(--edge)); color: #fff; }
+    .card .status.pin { border-color: #ffd34d; color: #ffd34d; }
+    .life { height: 3px; width: 150px; margin: 0 26px; background: rgba(255,255,255,.1); }
+    .life i { display: block; height: 100%; background: var(--c, var(--edge)); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 26px 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.035); font-family: "WP Mono"; font-size: 13px; letter-spacing: .1em; color: #b8c2d6; text-transform: uppercase; }
     .chip b { color: #fff; font-weight: 700; }
-    .chip.hot { background: var(--c); border-color: transparent; color: var(--ci, #fff); }
-    .chip.hot b { color: inherit; }
-    .card dl { margin: 0; padding: 12px 22px 20px; display: grid; grid-template-columns: 104px 1fr; gap: 14px 14px; }
-    .card dt { font-family: "WP Mono"; font-size: 12px; letter-spacing: .18em; color: var(--muted); padding-top: 4px; }
-    .card dd { margin: 0; font-family: "WP Display"; font-size: 22px; line-height: 1.22; text-transform: uppercase; }
-    .card dd.prose { font-family: "WP Sans"; font-size: 17px; line-height: 1.42; text-transform: none; color: #dbe3f0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-    .rows { padding: 8px 22px 20px; display: grid; gap: 8px; }
-    .rowi { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 9px; background: rgba(255,255,255,.04); }
-    .rowi i { flex: none; width: 12px; height: 12px; border-radius: 3px; background: var(--rc); }
-    .rowi b { font-family: "WP Display"; font-size: 21px; font-weight: 500; text-transform: uppercase; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rowi span { font-family: "WP Mono"; font-size: 14px; color: var(--muted); white-space: nowrap; }
-    .rowi em { font-style: normal; font-family: "WP Display"; font-size: 24px; font-weight: 700; }
+    .chip.hot { border-color: var(--c); color: #fff; }
+    .card dl { margin: 0; padding: 8px 26px 26px; display: grid; grid-template-columns: 110px 1fr; }
+    .card dt, .card dd { padding: 13px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .card dt { font-family: "WP Mono"; font-size: 12px; letter-spacing: .18em; color: var(--muted); line-height: 1.9; }
+    .card dd { margin: 0; text-align: right; font-family: "WP Display"; font-size: 21px; line-height: 1.25; text-transform: uppercase; color: #fff; }
+    .card dd.prose { font-family: "WP Sans"; font-size: 17px; font-weight: 500; line-height: 1.42; text-transform: none; color: #e3e8f1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .rows { padding: 6px 26px 26px; }
+    .rowi { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .rowi i { flex: none; width: 10px; height: 10px; background: var(--rc); }
+    .rowi b { font-family: "WP Display"; font-size: 22px; font-weight: 500; text-transform: uppercase; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rowi span { font-family: "WP Mono"; font-size: 13px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; text-transform: uppercase; }
+    .rowi em { font-style: normal; font-family: "WP Display"; font-size: 25px; font-weight: 700; }
 
-    .rp { right: 32px; top: 112px; width: 568px; transform: translateX(112%); transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+    .rp { right: 32px; top: 104px; width: 560px; background: rgba(5,9,18,.94); transform: translateX(112%); transition: transform .5s cubic-bezier(.3,.8,.3,1); }
     .rp.show { transform: none; }
-    .rp .r1 { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 20px 6px; gap: 12px; }
-    .rp h3 { margin: 0; font-family: "WP Display"; font-size: 34px; font-weight: 700; letter-spacing: .02em; }
-    .rp .clk { font-family: "WP Display"; font-size: 34px; font-weight: 700; white-space: nowrap; }
-    .rp .clk span { color: var(--brand); }
-    .rp .under { height: 3px; width: 120px; margin: 0 20px 10px; background: var(--brand); border-radius: 2px; }
-    .rp .bar { height: 11px; margin: 0 20px; border-radius: 6px; }
-    .rp .lbl { display: flex; justify-content: space-between; padding: 7px 20px 12px; font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); }
-    .rp .r3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 14px; border-top: 1px solid var(--line); font-family: "WP Mono"; font-size: 16px; font-weight: 600; letter-spacing: .06em; }
-    .rp .r3 .st { color: var(--brand); font-family: "WP Display"; font-size: 22px; letter-spacing: .08em; }
-    .ticks { display: flex; gap: 3px; padding: 0 20px 12px; }
-    .ticks i { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); }
-    .ticks i.on { background: rgba(255,255,255,.75); }
-    .ticks i.now { background: var(--brand); }
+    .rp .r1 { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 22px 8px; gap: 12px; }
+    .rp h3 { margin: 0; min-width: 0; font-family: "WP Display"; font-size: 34px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rp .clk { flex: none; font-family: "WP Display"; font-size: 34px; font-weight: 700; white-space: nowrap; }
+    .rp .clk span { color: #3fa2ff; }
+    .rp .under { height: 3px; width: 116px; margin: 0 22px 14px; background: var(--edge); }
+    .rp .bar { height: 10px; margin: 0 22px; }
+    .rp .lbl { display: flex; justify-content: space-between; padding: 8px 22px 12px; font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); }
+    .rp .r3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px 16px; border-top: 1px solid var(--line); font-family: "WP Mono"; font-size: 16px; font-weight: 700; letter-spacing: .08em; }
+    .rp .r3 .st { color: var(--edge); font-family: "WP Display"; font-size: 24px; letter-spacing: .06em; }
+    .ticks { display: flex; gap: 3px; padding: 0 22px 12px; }
+    .ticks i { flex: 1; height: 3px; background: rgba(255,255,255,.14); }
+    .ticks i.on { background: rgba(255,255,255,.6); }
+    .ticks i.now { background: var(--edge); }
 
-    .focus { position: absolute; left: 32px; bottom: 164px; z-index: 11; display: none; font-family: "WP Mono"; font-size: 13px; letter-spacing: .16em; padding: 5px 10px; border-radius: 6px; background: #ffd34d; color: #111; }
-    .reportchip { position: absolute; left: 32px; bottom: 104px; z-index: 11; display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 10px; border-radius: 12px; background: var(--glass); border: 1px solid var(--line); font-family: "WP Display"; font-size: 24px; font-weight: 700; }
-    .reportchip svg { color: #ffd34d; }
+    .focus { position: absolute; left: 32px; bottom: 156px; z-index: 11; display: none; font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .16em; padding: 7px 10px; background: #ffd34d; color: #111; }
+    .reportchip { position: absolute; left: 32px; bottom: 100px; z-index: 11; display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--edge); font-family: "WP Display"; font-size: 24px; font-weight: 700; color: #fff; }
+    .reportchip svg { color: #ffc23d; }
     .reportchip small { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); font-weight: 600; }
-    .attrib { position: absolute; right: 300px; bottom: 90px; z-index: 11; font-family: "WP Mono"; font-size: 10px; color: rgba(255,255,255,.45); letter-spacing: .04em; }
-    .sitemark { display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
-    .sitemark i { width: 14px; height: 14px; border-radius: 50%; background: #3fb7ff; border: 2px solid #fff; box-shadow: 0 0 0 4px rgba(63,183,255,.25); }
+    .attrib { position: absolute; right: 300px; bottom: 86px; z-index: 11; font-family: "WP Mono"; font-size: 10px; color: rgba(255,255,255,.45); letter-spacing: .04em; }
+    .sitemark { display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
+    .sitemark i { width: 13px; height: 13px; border-radius: 50%; background: #3fb7ff; border: 2px solid #fff; }
     .sitemark span { font-family: "WP Mono"; font-size: 11px; font-weight: 700; color: #cfe6ff; text-shadow: 0 1px 2px #000; letter-spacing: .08em; }
 
-    /* ---------- bot ---------- */
-    /* WeBot: the artwork, with live eyes and a visor rim drawn over it in the same 384x393 space. */
-    .bot { position: absolute; right: 22px; bottom: 92px; width: 250px; height: 256px; z-index: 12; --eye: #5ff2ff; }
+    /* ---------- WeBot: the artwork, with live eyes and a visor rim drawn over it in the same 384x393 space ---------- */
+    .bot { position: absolute; right: 22px; bottom: 88px; width: 250px; height: 256px; z-index: 12; --eye: #5ff2ff; }
     .bot.off { display: none; }
     .bot .rig { position: absolute; left: 0; top: 0; width: 100%; height: 100%; animation: bob 4.5s ease-in-out infinite; }
     .bot .rig img, .bot .rig svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
-    .bot .rig img { filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
-    @keyframes bob { 50% { transform: translateY(-7px); } }
-    .bot .eye { fill: var(--eye); transition: fill .4s, transform .09s; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 7px var(--eye)); }
+    .bot .rig img { filter: drop-shadow(0 12px 18px rgba(0,0,0,.55)); }
+    @keyframes bob { 50% { transform: translateY(-6px); } }
+    .bot .eye { fill: var(--eye); transition: fill .4s, transform .09s; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 6px var(--eye)); }
     .bot.blink .eye { transform: scaleY(.12); }
     .bot.talk .eye { animation: talk .2s ease-in-out infinite alternate; }
     .bot.talk .eye + .eye { animation-delay: .1s; }
@@ -116,64 +118,53 @@
     .bot.alert .rim { opacity: .9; }
     .bot.danger .rim { opacity: 1; animation: rim .7s steps(2) infinite; }
     @keyframes rim { 50% { opacity: .15; } }
-    .bubble { position: absolute; right: 262px; bottom: 214px; z-index: 13; max-width: 600px; padding: 16px 20px; border-radius: 16px 16px 4px 16px; background: #f4f8ff; color: #0b1324; font-family: "WP Sans"; font-weight: 600; font-size: 21px; line-height: 1.38; box-shadow: 0 16px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(12px) scale(.96); transform-origin: 100% 100%; transition: opacity .3s, transform .35s; }
-    .bubble.show { opacity: 1; transform: none; }
-    /* WeBot thinking: eyes glance around, thought dots float over its head. */
+    /* Thinking: only the eyes glance around. No bubbles anywhere. */
     .bot.think .eye { animation: look 2.6s ease-in-out infinite; }
     @keyframes look { 0%, 100% { transform: translate(0, 0); } 22% { transform: translate(-10px, -5px); } 30% { transform: translate(-10px, -5px) scaleY(.15); } 38% { transform: translate(-10px, -5px); } 65% { transform: translate(10px, -5px); } 82% { transform: translate(10px, -5px); } }
-    .thought { position: absolute; right: 196px; bottom: 352px; z-index: 13; display: flex; gap: 10px; padding: 16px 20px; border-radius: 999px; background: rgba(244,248,255,.96); box-shadow: 0 12px 30px rgba(0,0,0,.4); opacity: 0; transform: translateY(10px) scale(.85); transform-origin: 80% 100%; transition: opacity .35s, transform .35s; }
-    .thought.show { opacity: 1; transform: none; }
-    .thought i { width: 14px; height: 14px; border-radius: 50%; background: #2a6fd6; animation: dot 1.2s ease-in-out infinite; }
-    .thought i:nth-child(2) { animation-delay: .2s; }
-    .thought i:nth-child(3) { animation-delay: .4s; }
-    .thought b, .thought em { position: absolute; border-radius: 50%; background: rgba(244,248,255,.96); }
-    .thought b { width: 16px; height: 16px; right: 12px; bottom: -20px; }
-    .thought em { width: 9px; height: 9px; right: 2px; bottom: -34px; }
-    @keyframes dot { 0%, 80%, 100% { transform: translateY(0); opacity: .35; } 40% { transform: translateY(-7px); opacity: 1; } }
-    .card .skewt { display: block; width: calc(100% - 44px); margin: 0 22px 18px; border-radius: 10px; background: #fff; }
-    .bubble b { display: block; font-family: "WP Mono"; font-size: 11px; letter-spacing: .2em; color: #2a6fd6; margin-bottom: 4px; }
+    .card .skewt { display: block; width: calc(100% - 52px); margin: 0 26px 26px; background: #fff; }
 
     /* ---------- bottom bar ---------- */
-    .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; display: flex; background: var(--bar); border-top: 2px solid rgba(255,255,255,.14); z-index: 20; }
-    .clock { flex: none; width: 352px; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: rgba(0,0,0,.28); }
-    .clock img { width: 54px; height: 54px; border-radius: 12px; }
-    .clock b { display: block; font-family: "WP Display"; font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: .02em; white-space: nowrap; }
-    .clock small { display: block; margin-top: 5px; font-family: "WP Mono"; font-size: 12px; letter-spacing: .2em; color: #b9cdf3; }
-    .now { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 24px; border-left: 5px solid var(--c, var(--brand)); }
+    .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; display: flex; background: var(--violet); z-index: 20; }
+    .clock { flex: none; width: 350px; display: flex; align-items: center; gap: 16px; padding: 0 22px; background: var(--violet-dark); }
+    .clock img { width: 50px; height: 50px; }
+    .clock b { display: block; font-family: "WP Display"; font-size: 31px; font-weight: 700; line-height: 1; white-space: nowrap; }
+    .clock small { display: block; margin-top: 6px; font-family: "WP Mono"; font-size: 12px; letter-spacing: .2em; color: #c9bff5; }
+    .now { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 26px; }
     .now .l1 { display: flex; align-items: center; gap: 12px; min-width: 0; }
-    .now .l1 .k { flex: none; font-family: "WP Mono"; font-size: 13px; letter-spacing: .2em; padding: 3px 8px; border-radius: 5px; background: var(--c, var(--brand)); color: var(--ci, #fff); }
-    .now .l1 b { font-family: "WP Display"; font-size: 31px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .now .l1 .k { flex: none; font-family: "WP Display"; font-size: 31px; font-weight: 700; color: #fff; }
+    .now .l1 .k::after { content: ":"; }
+    .now .l1 b { font-family: "WP Display"; font-size: 31px; font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .now .l1 .hz { flex: none; display: flex; gap: 8px; }
-    .now .l1 .hz span { font-family: "WP Mono"; font-size: 14px; padding: 3px 8px; border-radius: 5px; background: rgba(255,255,255,.14); }
-    .now .l2 { display: flex; align-items: center; gap: 18px; font-family: "WP Mono"; font-size: 14px; letter-spacing: .08em; color: #c7d5ef; min-width: 0; }
-    .crawl { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; -webkit-mask-image: linear-gradient(90deg, transparent, #000 2%, #000 96%, transparent); mask-image: linear-gradient(90deg, transparent, #000 2%, #000 96%, transparent); }
+    .now .l1 .hz span { font-family: "WP Mono"; font-size: 14px; font-weight: 700; padding: 4px 8px; background: rgba(10,10,40,.45); border: 1px solid rgba(255,255,255,.2); }
+    .now .l2 { display: flex; align-items: center; gap: 18px; font-family: "WP Mono"; font-size: 14px; letter-spacing: .1em; color: #e0dafc; min-width: 0; }
+    .crawl { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-transform: uppercase; }
     .crawl span { display: inline-block; will-change: transform; }
     .now .ppl { flex: none; }
-    .prog { flex: none; width: 150px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.16); overflow: hidden; }
+    .prog { flex: none; width: 150px; height: 6px; background: rgba(0,0,0,.3); overflow: hidden; }
     .prog i { display: block; height: 100%; width: 0; background: #fff; }
-    .now .cd { flex: none; width: 76px; text-align: right; font-weight: 600; color: #fff; }
-    .brandbox { flex: none; width: 260px; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(0,0,0,.28); }
-    .brandbox img { width: 40px; height: 40px; border-radius: 9px; }
-    .brandbox b { font-family: "WP Display"; font-size: 19px; letter-spacing: .05em; white-space: nowrap; }
+    .now .cd { flex: none; width: 76px; text-align: right; font-weight: 700; color: #fff; }
+    .brandbox { flex: none; width: 250px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--violet-dark); }
+    .brandbox img { width: 40px; height: 40px; }
+    .brandbox b { font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .14em; white-space: nowrap; }
 
     /* ---------- breaking takeover ---------- */
     .brk { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; background: var(--c, #c00); color: var(--ci, #fff); overflow: hidden; text-align: center; }
-    .brk.show { display: flex; animation: brkIn .45s cubic-bezier(.2,.8,.2,1); }
-    .brk.out { animation: brkOut .5s forwards; }
+    .brk.show { display: flex; animation: brkIn .4s ease-out; }
+    .brk.out { animation: brkOut .45s forwards; }
     @keyframes brkIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
     @keyframes brkOut { to { clip-path: inset(0 0 0 100%); } }
-    .brk .stripes { position: absolute; left: -200px; top: -200px; right: -200px; bottom: -200px; background: repeating-linear-gradient(45deg, rgba(0,0,0,.16) 0 46px, rgba(0,0,0,0) 46px 92px); animation: stripes 1.6s linear infinite; }
+    .brk .stripes { position: absolute; left: -200px; top: -200px; right: -200px; bottom: -200px; background: repeating-linear-gradient(45deg, rgba(0,0,0,.14) 0 46px, rgba(0,0,0,0) 46px 92px); animation: stripes 1.6s linear infinite; }
     @keyframes stripes { to { transform: translateX(130px); } }
     .brk > *:not(.stripes) { position: relative; }
     .brk .k { font-family: "WP Mono"; font-size: 30px; font-weight: 700; letter-spacing: .5em; padding: 10px 18px 10px 30px; background: #fff; color: #0a0f1c; animation: flash 1s steps(2) infinite; }
     @keyframes flash { 50% { background: #0a0f1c; color: #fff; } }
-    .brk h1 { margin: 26px 60px 10px; font-family: "WP Display"; font-size: 156px; font-weight: 700; line-height: .95; text-transform: uppercase; text-shadow: 0 7px 0 rgba(0,0,0,.25); }
+    .brk h1 { margin: 24px 60px 10px; font-family: "WP Display"; font-size: 156px; font-weight: 700; line-height: .95; text-transform: uppercase; }
     .brk .p { font-family: "WP Display"; font-size: 58px; font-weight: 700; text-transform: uppercase; max-width: 1600px; }
-    .brk .u { margin-top: 18px; font-family: "WP Mono"; font-size: 28px; letter-spacing: .2em; }
-    .brk .t { margin-top: 18px; display: inline-block; padding: 8px 18px; border-radius: 8px; background: rgba(0,0,0,.3); font-family: "WP Display"; font-size: 30px; letter-spacing: .08em; }
-    .brk .test { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); padding: 8px 18px; border-radius: 8px; background: #ffd34d; color: #111; font-family: "WP Mono"; font-size: 20px; letter-spacing: .2em; }
+    .brk .u { margin-top: 16px; font-family: "WP Mono"; font-size: 28px; letter-spacing: .2em; }
+    .brk .t { margin-top: 16px; display: inline-block; padding: 8px 18px; background: rgba(0,0,0,.3); font-family: "WP Display"; font-size: 30px; letter-spacing: .06em; }
+    .brk .test { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: #ffd34d; color: #111; font-family: "WP Mono"; font-size: 20px; letter-spacing: .2em; }
 
-    .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; border-radius: 12px; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+    .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
     .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
     .boot.done { opacity: 0; pointer-events: none; }
@@ -186,10 +177,10 @@
 
     <header class="top">
       <div class="tally">
-        <div class="tile" id="t-tor" style="--t:#c4122f"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2"/></svg><span>0</span></div><div class="l">TOR</div></div>
-        <div class="tile" id="t-svr" style="--t:#d0870b"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span>0</span></div><div class="l">SVR</div></div>
-        <div class="tile" id="t-ffw" style="--t:#14894a"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/></svg><span>0</span></div><div class="l">FFW</div></div>
-        <div class="tile" id="t-wch" style="--t:#6b3bd1"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>0</span></div><div class="l">WATCH</div></div>
+        <div class="tile" id="t-tor" style="--t:#7a1c2a"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2"/></svg><span>0</span></div><div class="l">TOR</div></div>
+        <div class="tile" id="t-svr" style="--t:#7c5517"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span>0</span></div><div class="l">SVR</div></div>
+        <div class="tile" id="t-ffw" style="--t:#245a2f"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/></svg><span>0</span></div><div class="l">FFW</div></div>
+        <div class="tile" id="t-wch" style="--t:#46308f"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>0</span></div><div class="l">WATCH</div></div>
       </div>
       <div class="hl" id="hl"><span class="tag" id="hl-tag">LIVE</span><div class="slot" id="hl-slot"></div></div>
       <div class="wpi">
@@ -217,8 +208,6 @@
     <div class="reportchip" id="reportchip"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span id="rc-n">0</span><small>STORM REPORTS · 3 HRS</small></div>
     <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
 
-    <div class="bubble" id="bubble"></div>
-    <div class="thought" id="thought" aria-hidden="true"><i></i><i></i><i></i><b></b><em></em></div>
     <div class="bot" id="bot" aria-hidden="true"></div>
 
     <footer class="bottom">
@@ -231,7 +220,7 @@
     </footer>
 
     <div class="brk" id="brk"></div>
-    <div class="boot" id="boot">WEATHERPOWER LIVE · LOADING</div>
+    <div class="boot" id="boot">WEATHERPOWER LIVE</div>
   </div>
   <button class="gate" id="gate" hidden>🔊 Click to turn on sound and the bot's voice</button>
 
@@ -482,14 +471,8 @@
       .replace(/[A-Z]{3,}(?:\s+[A-Z]{3,})*/g, (m) => (/^(PDS|NWS|SPC|WPI)$/.test(m) ? m : m.toLowerCase()));
 
     const bot = $('bot');
-    const bubble = $('bubble');
-    let bubbleTimer = null;
-    const showBubble = (text, ms, label = 'WEBOT') => {
-      clearTimeout(bubbleTimer);
-      bubble.innerHTML = '<b>' + esc(label) + '</b>' + esc(text);
-      bubble.classList.add('show');
-      if (ms) bubbleTimer = setTimeout(() => bubble.classList.remove('show'), ms);
-    };
+    // WeBot never shows text bubbles; it only talks. With voice off it just animates.
+    const showBubble = () => {};
     const speech = { queue: [], busy: false, guard: null };
     const speechWorks = () => window.speechSynthesis && voices.length > 0;
     const pumpSpeech = () => {
@@ -503,8 +486,7 @@
         if (!speech.queue.length) bot.classList.remove('talk');
         setTimeout(pumpSpeech, 180);
       };
-      // Spoken lines get no caption bubble; the bubble is only the fallback when WeBot can't talk.
-      if (item.first) bubble.classList.remove('show');
+      // Spoken lines never get a caption.
       const utter = new SpeechSynthesisUtterance(item.text);
       utter.voice = pickVoice();
       utter.rate = 1.04;
@@ -559,7 +541,7 @@
       + '<rect class="eye" x="127" y="101" width="26" height="60" rx="13"/>'
       + '<rect class="eye" x="210" y="101" width="26" height="60" rx="13"/>'
       + hatSvg() + '</svg></div>';
-    if (!OPT.bot) { bot.classList.add('off'); bubble.style.right = '32px'; }
+    if (!OPT.bot) bot.classList.add('off');
     const setMood = (mood) => {
       bot.style.setProperty('--eye', mood === 'danger' ? '#ff4d5e' : mood === 'alert' ? '#ffc23d' : '#5ff2ff');
       bot.classList.toggle('danger', mood === 'danger');
@@ -785,6 +767,7 @@
     const showHeadline = () => {
       const items = [...S.headlines];
       if (S.control.banner) items.splice(S.hlIndex % 2 ? 0 : items.length, 0, { tag: 'WEATHERPOWER', text: S.control.banner.text.toUpperCase(), color: '#1a8cff' });
+      if (S.tip) { items.splice(0, 0, { tag: 'SAFETY TIP', text: S.tip.toUpperCase() }); S.tip = null; S.hlIndex = 0; }
       const item = items[S.hlIndex % items.length];
       S.hlIndex += 1;
       if (!item) return;
@@ -799,8 +782,7 @@
       while (el.scrollWidth > el.clientWidth && size > 25) { size -= 1; el.style.fontSize = size + 'px'; }
       requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('enter')));
       $('hl-tag').textContent = item.tag;
-      $('hl').style.setProperty('--hc', item.color ? 'linear-gradient(90deg,' + item.color + 'ee,' + item.color + '55)' : 'transparent');
-      $('hl').style.color = item.color ? ink(item.color) : '#fff';
+      $('hl').style.setProperty('--hc', 'transparent');
     };
     setInterval(showHeadline, 8000);
 
@@ -937,14 +919,13 @@
     };
     const setThinking = (on) => {
       bot.classList.toggle('think', on);
-      $('thought').classList.toggle('show', on);
     };
     const thinkShot = () => {
       setThinking(true);
       setMood('calm');
       card.classList.remove('show');
       fly(CONUS, { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: 5, duration: 5200 });
-      setNow({ k: 'WEBOT', title: 'WeBot is checking the models…', color: '#1a8cff', crawl: 'HRRR · NAM 3KM · GFS · ECMWF · WEATHERPOWER MODEL STUDIO · SIMULATED RADAR · CAPE · RAIN · TEMPERATURE · WIND' });
+      setNow({ k: 'WEBOT', title: 'Checking the models', color: '#1a8cff', crawl: 'HRRR · NAM 3KM · GFS · ECMWF · WEATHERPOWER MODEL STUDIO · SIMULATED RADAR · CAPE · RAIN · TEMPERATURE · WIND' });
       S.pendingModel = null;
       S.modelRequestPending = true;
       loadModelSegment()
@@ -958,7 +939,7 @@
       const picks = [0, Math.round((legend.length - 1) / 3), Math.round(((legend.length - 1) * 2) / 3), legend.length - 1];
       return picks.map((i, k) => legend[i].v + (k === 3 ? ' ' + units : ''));
     };
-    const SHORT_FIELD = { refc: 'SIMULATED RADAR', ptype: 'PRECIP TYPE', cape: 'CAPE', uh: 'UPDRAFT HELICITY', t2m: 'TEMPERATURE', td2m: 'DEW POINT', gust: 'WIND GUSTS', wind10: 'WIND', qpf: 'TOTAL RAIN', pwat: 'PRECIP WATER', snow: 'TOTAL SNOW', snod: 'SNOW DEPTH' };
+    const SHORT_FIELD = { refc: 'SIMULATED RADAR', ptype: 'PRECIP TYPE', cape: 'CAPE', uh: 'HELICITY', t2m: 'TEMPERATURE', td2m: 'DEW POINT', gust: 'WIND GUSTS', wind10: 'WIND', qpf: 'RAIN', pwat: 'PRECIP WATER', snow: 'SNOW', snod: 'SNOW DEPTH' };
     const hideModels = () => {
       S.modelOn = false;
       S.modelValid = null;
@@ -1001,7 +982,7 @@
       setCard('<div class="head"><div class="ico">' + icon('outlook', 30) + '</div><div><h2>Model check</h2><div class="sub">' + esc(f.name.replace(/ \(.*\)$/, '').toUpperCase()) + ' · ' + horizon + '</div></div><span class="status">' + esc(seg.modelName.replace(' 3km', '')) + '</span></div>'
         + '<dl><dt>WHERE</dt><dd>' + esc(seg.place) + '</dd></dl>'
         + '<div class="rows">' + rows + '</div>' + skewt, '#1a8cff');
-      setNow({ k: 'MODELS', title: "WeBot's model check: " + seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name).toLowerCase(), color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
+      setNow({ k: 'MODELS', title: seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name) + ' · ' + horizon, color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
       fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 5.2, duration: 2400 });
       // Loop through the frames that have finished loading; hold on the last one.
       let i = 0;
@@ -1121,7 +1102,7 @@
         alertCard(a, shot);
         const hz = (a.hazards || []).filter((h) => h.value && !/^(RISK|DAY)$/.test(h.label)).map((h) => h.value);
         setNow({
-          k: shot.breaking ? 'BREAKING' : shot.fresh ? 'NEW ALERT' : shot.pinned ? 'PINNED' : 'NOW TRACKING',
+          k: shot.breaking ? 'BREAKING' : shot.fresh ? 'NEW ALERT' : shot.pinned ? 'PINNED' : 'TOP ALERT',
           title: a.eventLabel + (stateLine(a) ? ' IN ' + stateLine(a) : a.place ? ' · ' + a.place : ''),
           color: a.color,
           hazards: [a.threat, ...hz].filter(Boolean),
@@ -1305,9 +1286,9 @@
     };
     setInterval(() => {
       if (Date.now() - S.lastRoundup > 20 * 60 * 1000) { S.lastRoundup = Date.now(); roundup(); }
-      else if (OPT.tips && Date.now() - S.lastTip > 4 * 60 * 1000 && !speech.busy && !S.inBreaking && !bubble.classList.contains('show') && (S.live?.tallies?.tor || 0) === 0) {
+      else if (OPT.tips && Date.now() - S.lastTip > 4 * 60 * 1000 && (S.live?.tallies?.tor || 0) === 0) {
         S.lastTip = Date.now();
-        showBubble(TIPS[Math.floor(Math.random() * TIPS.length)], 10000, 'SAFETY TIP');
+        S.tip = TIPS[Math.floor(Math.random() * TIPS.length)];
       }
     }, 15000);
 
