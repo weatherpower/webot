@@ -328,12 +328,13 @@ API: `GET /api/v3/live/music`; control actions `music` (`on`, `volume`, `source`
 
 | Engine | Cost | How |
 | --- | --- | --- |
-| Free neural voice (default) | Free | [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0) runs inside the stream page via `kokoro-js` in a Web Worker. First start downloads ~90 MB from jsDelivr/Hugging Face, then it is cached. Works in an OBS browser source. Voices include Michael, Fenrir, Puck, Heart (best quality), Bella, George… |
+| OpenAI via Puter.js (default, voice **Alloy**) | Puter's "user pays" model: billed to the Puter account signed in on the stream page, which gets a free monthly allowance | The stream loads `https://js.puter.com/v2/` and calls `puter.ai.txt2speech` (OpenAI `gpt-4o-mini-tts`). First run shows a **Sign in to Puter** button: in OBS right-click the source → Interact and click it once; the sign-in is remembered. Signed out or allowance used up → computer voice. |
+| Free neural voice | Free | [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0) runs inside the stream page via `kokoro-js` in a Web Worker. First start downloads ~90 MB from jsDelivr/Hugging Face, then it is cached. Works in an OBS browser source. Voices include Michael, Fenrir, Puck, Heart (best quality), Bella, George… |
 | OpenAI voice | Paid by OpenAI (gpt-4o-mini-tts is roughly $0.015/min) | Set `OPENAI_API_KEY`. Optional `OPENAI_TTS_MODEL` (default `gpt-4o-mini-tts`), `OPENAI_TTS_VOICE` (`onyx`), `OPENAI_TTS_INSTRUCTIONS`, `OPENAI_TTS_DAILY_CHARS` (default 150000/day budget). |
 | Self-hosted, OpenAI-compatible | Free | Point `OPENAI_TTS_BASE_URL` at any server with OpenAI's `/v1/audio/speech` API (for example Kokoro-FastAPI on your PC), no key needed. |
 | Computer voice | Free | The browser's speech voices. Used as the fallback while the neural voice loads or if it fails. |
 
-There is no free way to use OpenAI's own voices; Kokoro is the free model that sounds closest.
-Control panel → **WeBot**: engine, voice, speed and a Test button. URL: `?tts=browser|neural|openai`.
+Kokoro's `af_alloy` is a free voice in the same style as OpenAI's Alloy if Puter's allowance isn't enough.
+Control panel → **WeBot**: engine, voice, speed and a Test button. URL: `?tts=puter|openai|neural|browser`.
 API: `GET /api/v3/live/voice`, `GET /api/v3/live/tts?text=&voice=` (OpenAI-compatible engine only,
 rate-limited to 40 lines a minute plus the daily character budget).

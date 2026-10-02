@@ -142,7 +142,7 @@ export const config = {
     key: process.env.OPENAI_API_KEY || '',
     baseUrl: process.env.OPENAI_TTS_BASE_URL || 'https://api.openai.com/v1',
     model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
-    voice: process.env.OPENAI_TTS_VOICE || 'onyx',
+    voice: process.env.OPENAI_TTS_VOICE || 'alloy',
     instructions: process.env.OPENAI_TTS_INSTRUCTIONS || 'You are WeBot, a friendly robot weather broadcaster on a live stream. Speak clearly and calmly, upbeat but serious about dangerous weather.',
     dailyChars: Math.round(Math.max(0, number(process.env.OPENAI_TTS_DAILY_CHARS, 150000)))
   },

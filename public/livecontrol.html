@@ -111,8 +111,9 @@
         <div class="row">
           <label for="tts-engine" class="status">VOICE</label>
           <select id="tts-engine" class="grow">
-            <option value="neural">Free neural voice (Kokoro)</option>
+            <option value="puter">OpenAI voice via Puter.js</option>
             <option value="openai">OpenAI voice (needs server key)</option>
+            <option value="neural">Free neural voice (Kokoro)</option>
             <option value="browser">Computer voice</option>
           </select>
         </div>
@@ -183,7 +184,7 @@
       <ol>
         <li>In OBS add a <b>Browser</b> source. URL: <code id="obs-url"></code>, width <b>1920</b>, height <b>1080</b>.</li>
         <li>Tick <b>Control audio via OBS</b> so the music, chimes and WeBot's voice all go to the stream.</li>
-        <li>The free neural voice runs inside the stream page, so it works right in OBS. The first start downloads it (about 90 MB), then it's cached. Until it's ready WeBot uses the computer voice.</li>
+        <li>WeBot's voice is OpenAI <b>Alloy</b> through Puter.js. The first time, the stream shows a <b>Sign in to Puter</b> button: in OBS right-click the source → <b>Interact</b> and click it. Puter remembers the sign-in. Usage counts against that Puter account (it has a free monthly allowance). Until you sign in, or if the allowance runs out, WeBot uses the computer voice.</li>
         <li>URL options: <code>?state=OK</code> focus one state · <code>?voice=0</code> · <code>?sound=0</code> · <code>?music=0</code> · <code>?tts=browser</code> computer voice · <code>?bot=0</code> · <code>?tips=0</code> · <code>?speed=1.5</code> slower shots · <code>?tz=America/Chicago</code> clock zone.</li>
       </ol>
     </section>
@@ -203,7 +204,7 @@
     let alerts = [];
     let voices = { neural: [], openai: { available: false, voices: [] } };
     const VOICE_KINDS = { af: 'US female', am: 'US male', bf: 'British female', bm: 'British male' };
-    const VOICE_NOTES = { af_heart: ' ★ best', af_bella: ' ★', am_michael: ' (default)', am_fenrir: ' (deep)', am_puck: ' (bright)' };
+    const VOICE_NOTES = { af_heart: ' ★ best', af_bella: ' ★', af_alloy: ' (sounds like Alloy)', am_fenrir: ' (deep)', am_puck: ' (bright)' };
     const voiceLabel = (id) => { const [p, n] = id.split('_'); return n.charAt(0).toUpperCase() + n.slice(1) + ' — ' + (VOICE_KINDS[p] || p) + (VOICE_NOTES[id] || ''); };
 
     const streamUrl = location.origin + BASE + '/live';
@@ -280,8 +281,9 @@
 
     const fillVoices = () => {
       const engine = $('tts-engine').value;
-      const list = engine === 'openai' ? voices.openai.voices : engine === 'neural' ? voices.neural : [];
-      const want = engine === 'openai' ? control?.tts?.openaiVoice : control?.tts?.voice;
+      const openaiStyle = engine === 'openai' || engine === 'puter';
+      const list = openaiStyle ? voices.openai.voices : engine === 'neural' ? voices.neural : [];
+      const want = openaiStyle ? control?.tts?.openaiVoice : control?.tts?.voice;
       const key = engine + '|' + list.join();
       if ($('tts-voice').dataset.key !== key) {
         $('tts-voice').dataset.key = key;
@@ -328,11 +330,11 @@
     $('tts-engine').addEventListener('change', () => {
       const engine = $('tts-engine').value;
       if (engine === 'openai' && !voices.openai.available) toast('Add OPENAI_API_KEY to the server .env first');
-      act({ action: 'tts', engine }, 'Voice: ' + $('tts-engine').selectedOptions[0].textContent);
+      act({ action: 'tts', engine }, engine === 'puter' ? 'Puter voice on. Sign in on the stream if it asks.' : 'Voice: ' + $('tts-engine').selectedOptions[0].textContent);
     });
     $('tts-voice').addEventListener('change', () => {
       const v = $('tts-voice').value;
-      act($('tts-engine').value === 'openai' ? { action: 'tts', openaiVoice: v } : { action: 'tts', voice: v }, 'WeBot voice changed');
+      act(['openai', 'puter'].includes($('tts-engine').value) ? { action: 'tts', openaiVoice: v } : { action: 'tts', voice: v }, 'WeBot voice changed');
     });
     $('tts-speed').addEventListener('input', () => { $('tts-speed-n').textContent = Number($('tts-speed').value).toFixed(2) + '×'; });
     $('tts-speed').addEventListener('change', () => act({ action: 'tts', speed: Number($('tts-speed').value) }));

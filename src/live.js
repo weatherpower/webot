@@ -223,17 +223,18 @@ export const siteRadar = async (siteInput) => {
 
 export const MUSIC_SOURCES = ['auto', 'radio', 'files'];
 export const MUSIC_MOODS = ['auto', 'calm', 'chill', 'tense'];
-export const TTS_ENGINES = ['neural', 'openai', 'browser'];
+export const TTS_ENGINES = ['puter', 'openai', 'neural', 'browser'];
 // Kokoro voices (free, run inside the stream page). The af_/am_ ones are American, bf_/bm_ British.
 export const NEURAL_VOICES = [
-  'am_michael', 'am_fenrir', 'am_puck', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'am_adam',
-  'af_heart', 'af_bella', 'af_nicole', 'af_aoede', 'af_kore', 'af_sarah', 'af_nova', 'af_sky', 'af_alloy', 'af_jessica', 'af_river',
+  'af_alloy', 'am_michael', 'am_fenrir', 'am_puck', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'am_adam',
+  'af_heart', 'af_bella', 'af_nicole', 'af_aoede', 'af_kore', 'af_sarah', 'af_nova', 'af_sky', 'af_jessica', 'af_river',
   'bm_george', 'bm_fable', 'bm_lewis', 'bm_daniel', 'bf_emma', 'bf_isabella', 'bf_alice', 'bf_lily'
 ];
-export const OPENAI_VOICES = ['onyx', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'sage', 'shimmer', 'alloy', 'verse'];
+export const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse'];
 
 const DEFAULT_MUSIC = { on: true, volume: 35, source: 'auto', mood: 'auto', duck: true };
-const DEFAULT_TTS = { engine: 'neural', voice: 'am_michael', openaiVoice: 'onyx', speed: 1 };
+// OpenAI Alloy through Puter.js by default (billed to the Puter account signed in on the stream page).
+const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', speed: 1 };
 const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, commands: [] };
 let control = null;
 
