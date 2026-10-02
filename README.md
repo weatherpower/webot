@@ -230,3 +230,15 @@ If `CONTROLLER_TOKEN` is set, send it as `x-controller-token` or `?token=...` on
   "postText": "Tornado Warning in Wisconsin until 4:15 PM CDT. Take shelter now."
 }
 ```
+
+## Warning Center v3 (October 2026)
+
+- **Cards** are now 1600×900 broadcast graphics (`src/cardHtml.js`); the previous template is kept in `src/cardHtmlLegacy.js`.
+- **Warning shorts**: 15-second radar + polygon videos (`src/shortVideo.js`, `src/shortHtml.js`). Vertical 1080×1920 by default (`SHORTS_FORMAT=square` for 1080×1080). Flood products switch to the 24-hour rain estimate halfway through; tornado and severe thunderstorm warnings switch to nearest-site velocity.
+  - Auto-rendered for `SHORTS_AUTO_EVENTS` (default: tornado, severe thunderstorm, flash flood, hurricane, extreme wind, storm surge warnings, plus any emergency/PDS/destructive alert), at most `SHORTS_AUTO_MAX_PER_CYCLE` new videos per cycle, one render at a time.
+  - Anyone can request a video for an active alert from the Warning Center (rate limited by `SHORTS_PUBLIC_REQUESTS_PER_WINDOW` per 10 minutes, queue capped by `SHORTS_MAX_QUEUE`).
+  - Files live in `cards/shorts/` and are deleted `SHORTS_RETENTION_HOURS` after the alert ends.
+  - Needs ffmpeg: the `ffmpeg-static` package, `FFMPEG_PATH`, or `ffmpeg` on PATH.
+  - Preview locally: `node scripts/render-short.js [--event "Tornado Warning"] [--format square]`.
+- **Public API v3** (all under `/warningcenter/api/v3`): `GET alerts?group=&state=&q=`, `GET alerts.geojson`, `GET alert?key=`, `GET radar`, `GET config`, `GET shorts`, `GET short?key=`, `POST short/request?key=` (public, rate limited), `POST short/render?key=` (controller token). Keys go in the query string because Apache rejects encoded slashes in paths.
+- `bash scripts/dev-safe.sh` runs a local server on :8899 that never posts to Discord/X.

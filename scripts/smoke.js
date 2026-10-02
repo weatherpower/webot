@@ -9,6 +9,10 @@ import { publicWarningCenterFeed } from '../src/publicFeed.js';
 import { displayTimes, normalizeWarning } from '../src/warning.js';
 import { fetchDailyForecastCards } from '../src/dailyForecasts.js';
 import { forecastSearchQuery } from '../src/forecastSearch.js';
+import { areaLineFor, headlineFor, statusTagFor } from '../src/broadcast.js';
+import { warningShortHtml } from '../src/shortHtml.js';
+import { toV3Alert } from '../src/apiV3.js';
+import { formatAlertTime } from '../src/warning.js';
 
 const health = readiness();
 assert.equal(health.ok, true);
@@ -24,14 +28,13 @@ const html = warningCardHtml({
 });
 
 assert.match(html, /TORNADO WARNING IN WISCONSIN/);
-assert.match(html, /weatherpower\.app\/warningcenter/);
+assert.match(html, /See on <strong>WEATHERPOWER\.APP/);
 assert.match(html, /maplibre-gl/);
 assert.match(html, /WeatherPower Tornado ID/);
 assert.match(html, /Rotation detection/);
-assert.match(html, /fitCardTitle/);
-assert.match(html, /title\.dataset\.fitMode/);
-assert.match(html, /class="title-subline"/);
-assert.match(html, /Affected area/);
+assert.match(html, /fitTitle/);
+assert.match(html, /class="sub"/);
+assert.match(html, /Tornado AI/);
 
 const warningWithoutPopulation = normalizeWarning({
   key: 'test:no-population',
@@ -66,8 +69,8 @@ const censusHtml = warningCardHtml({
   warning: censusWarning,
   mapConfig: { styleUrl: health.maps.styleUrl }
 });
-assert.match(censusHtml, /63,439 PEOPLE/);
-assert.match(censusHtml, /27,377 HOMES/);
+assert.match(censusHtml, /<strong>63,439<\/strong>/);
+assert.match(censusHtml, /27,377 homes/);
 assert.match(censusHtml, /2020 CENSUS ESTIMATE/);
 
 const censusWatchClassification = classifyAlert({ event: 'Tornado Watch' });
@@ -81,7 +84,7 @@ const censusWatchHtml = warningCardHtml({
   },
   mapConfig: { styleUrl: health.maps.styleUrl }
 });
-assert.match(censusWatchHtml, /63,439 PEOPLE/);
+assert.match(censusWatchHtml, /<strong>63,439<\/strong>/);
 assert.match(censusWatchHtml, /2020 CENSUS ESTIMATE/);
 
 const fontHtml = warningCardHtml({
@@ -92,7 +95,7 @@ const fontHtml = warningCardHtml({
     inter: 'data:font/woff2;base64,dGVzdA=='
   }
 });
-assert.match(fontHtml, /font-family: "Avenir Next Condensed"/);
+assert.match(fontHtml, /font-family: "WP Display"/);
 assert.match(fontHtml, /data:font\/woff2;base64,dGVzdA==/);
 
 const publicFeed = publicWarningCenterFeed({
@@ -129,8 +132,8 @@ const forecastWarning = normalizeWarning({
 });
 assert.equal(forecastWarning.classification.isForecast, true);
 const forecastHtml = warningCardHtml({ warning: forecastWarning, mapConfig: { styleUrl: health.maps.styleUrl } });
-assert.match(forecastHtml, /DAILY FORECAST CARD/);
-assert.match(forecastHtml, /Forecast Details/);
+assert.match(forecastHtml, /data-layout="forecast"/);
+assert.match(forecastHtml, /Partly Sunny/);
 assert.match(forecastHtml, /Rain chance/);
 const forecastFeed = publicWarningCenterFeed({ items: [forecastWarning] });
 assert.equal(forecastFeed.items[0].cardLayout, 'forecast');
@@ -284,12 +287,12 @@ const tropicalHtml = warningCardHtml({
     styleUrl: health.maps.styleUrl
   }
 });
-assert.match(tropicalHtml, /Official NHC Storm/);
+assert.match(tropicalHtml, /NHC (advisory|latest advisory)/);
 assert.match(tropicalHtml, /Hurricane Bertha/);
 assert.match(tropicalHtml, /nhc-cone/);
 assert.match(tropicalHtml, /nhc-model-tracks/);
 assert.match(tropicalHtml, /Dangerous impacts can occur outside the cone/);
-assert.match(tropicalHtml, /TROPICAL WARNING CARD/);
+assert.match(tropicalHtml, /data-layout="tropical"/);
 
 assert.equal(hasPdsWatchTag('...THIS IS A PARTICULARLY DANGEROUS SITUATION...'), true);
 assert.equal(hasPdsWatchTag('Storm Prediction Center PDS Tornado Watch 189'), true);
@@ -317,6 +320,7 @@ const pdsWatchHtml = warningCardHtml({
     ...sampleWarning,
     event: 'Tornado Watch',
     title: 'PDS Tornado Watch in Oklahoma and Texas',
+    state: 'OK AND TX',
     description: 'THIS IS A PARTICULARLY DANGEROUS SITUATION',
     classification: pdsWatchClassification,
     theme: pdsWatchClassification.theme,
@@ -335,10 +339,34 @@ const pdsWatchHtml = warningCardHtml({
     styleUrl: health.maps.styleUrl
   }
 });
-assert.match(pdsWatchHtml, /PDS TORNADO WATCH IN OKLAHOMA AND TEXAS/);
-assert.match(pdsWatchHtml, /PDS WATCH/);
-assert.match(pdsWatchHtml, /Particularly Dangerous Situation/);
+assert.match(pdsWatchHtml, /PDS TORNADO WATCH IN OKLAHOMA &amp; TEXAS/);
+assert.match(pdsWatchHtml, /PARTICULARLY DANGEROUS SITUATION/);
 assert.match(pdsWatchHtml, /is-pds/);
 assert.doesNotMatch(pdsWatchHtml, /PDS EMERGENCY/);
+
+// Broadcast text shared by cards and shorts.
+const kansasFlood = normalizeWarning({
+  event: 'Flash Flood Warning', areaDesc: 'Ford, KS', stateCodes: ['KS'], ugc: ['KSC057'], vtecAction: 'NEW',
+  classification: classifyAlert({ event: 'Flash Flood Warning', description: 'FLASH FLOOD EMERGENCY' })
+});
+assert.equal(headlineFor(kansasFlood).full, 'FLASH FLOOD EMERGENCY IN KANSAS');
+assert.equal(areaLineFor(kansasFlood), 'FORD COUNTY, KS');
+assert.equal(areaLineFor({ areaDesc: 'Bosque, TX; Hill, TX', ugc: ['TXC035', 'TXC217'] }), 'BOSQUE & HILL COUNTIES, TX');
+assert.equal(statusTagFor(kansasFlood), 'NEW');
+assert.match(formatAlertTime('2026-10-03T02:45:00Z', 'Pacific/Guam'), /ChST$/);
+
+const shortHtml = warningShortHtml({
+  warning: kansasFlood,
+  radarPlan: { valid: Date.now(), segments: [{ kind: 'reflectivity', legend: 'reflectivity', title: 'RADAR', start: 0, frames: [{ id: 'f0', url: 'x/{z}/{x}/{y}.png', time: Date.now() }], step: 0.3, hold: 1, opacity: 0.8 }] }
+});
+assert.match(shortHtml, /window\.__seek/);
+assert.match(shortHtml, /WEATHERPOWER\.APP/);
+assert.match(shortHtml, /FLASH FLOOD EMERGENCY IN<br>KANSAS/);
+
+const v3 = toV3Alert({ ...kansasFlood, key: 'k1', impacts: { people: 27604, homes: 11000 } });
+assert.equal(v3.group, 'warnings');
+assert.equal(v3.people, 27604);
+assert.equal(v3.headline, 'FLASH FLOOD EMERGENCY IN KANSAS');
+assert.equal(v3.whatToDo, undefined);
 
 console.log('Smoke checks passed.');

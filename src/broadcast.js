@@ -47,6 +47,7 @@ export const placeFor = (warning = {}) => {
   if (codes.length === 1) return STATE_NAMES[codes[0]].toUpperCase();
   if (codes.length === 2) return `${STATE_NAMES[codes[0]]} & ${STATE_NAMES[codes[1]]}`.toUpperCase();
   if (codes.length > 2) return `${codes.length} STATES`;
+  if (warning.state && !/your area/i.test(warning.state)) return String(warning.state).toUpperCase();
   const firstArea = String(warning.areaDesc || '').split(';')[0].trim();
   return firstArea ? firstArea.toUpperCase() : 'YOUR AREA';
 };
@@ -56,6 +57,7 @@ export const eventLabelFor = (warning = {}) => {
   const event = String(warning.event || warning.title || 'Weather Alert');
   if (classification.isEmergency && /tornado/i.test(event)) return 'TORNADO EMERGENCY';
   if (classification.isEmergency && /flood/i.test(event)) return 'FLASH FLOOD EMERGENCY';
+  if (classification.isPds && classification.isWatch && !/^pds/i.test(event)) return `PDS ${event}`.toUpperCase();
   return event.toUpperCase();
 };
 

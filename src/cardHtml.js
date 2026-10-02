@@ -59,7 +59,7 @@ const panelFor = ({ warning, layout, times, people }) => {
       ${(warning.hazardStats || []).slice(0, 3).map((stat) => row(stat.label, stat.value, 'hazard')).join('')}
       ${row('Guidance', t.modelCount ? `${t.modelCount} model tracks` : 'Official cone')}
       ${action}
-      <p class="note">The cone shows the likely path of the center, not the size of the storm.</p>`;
+      <p class="note">The cone shows the likely path of the center, not the size of the storm. Dangerous impacts can occur outside the cone.</p>`;
   }
   if (layout === 'watch') {
     const groups = (warning.watchDetails?.probabilities || []).reduce((acc, item) => {
@@ -85,7 +85,17 @@ const panelFor = ({ warning, layout, times, people }) => {
       ${o.labelText ? `<p class="note">${escapeHtml(o.labelText)}</p>` : ''}
       ${action}`;
   }
-  return `${expires}${impact}${hazardRows}${action}`;
+  const tornadoId = warning.tornadoId?.experimental ? warning.tornadoId : null;
+  const tornadoIdBlock = tornadoId
+    ? `<div class="tid" style="--tid:${escapeHtml(tornadoId.color || '#70d7ff')}">
+        <span>WeatherPower Tornado ID · experimental</span>
+        <div class="tid-grid">
+          <div><b>Rotation detection</b><strong>${escapeHtml(tornadoId.rotation)}<small>/100</small></strong><i>${escapeHtml(tornadoId.rotationLabel)}</i></div>
+          <div><b>Tornado AI</b><strong>${escapeHtml(tornadoId.tornadoSignal)}<small>%</small></strong><i>${escapeHtml(tornadoId.tornadoSignalLabel)}</i></div>
+        </div>
+      </div>`
+    : '';
+  return `${expires}${impact}${hazardRows}${tornadoIdBlock}${action}`;
 };
 
 export const warningCardHtml = ({ warning: rawWarning, mapConfig = {}, logoDataUrl = '', fontDataUrls = {}, staticMapDataUrl = '' }) => {
@@ -206,6 +216,13 @@ body { font-family: "WP Display", "Arial Narrow", sans-serif; color: #fff; -webk
 .probs i { font-style: normal; font-size: 16px; color: #dfe4ec; align-self: center; }
 .action { padding: 14px 20px; flex: 0 1 auto; min-height: 0; overflow: hidden; }
 .action p { margin: 8px 0 0; font-family: "WP Sans", sans-serif; font-size: 19px; line-height: 1.38; font-weight: 600; color: #eef1f6; }
+.tid { padding: 12px 20px; border-left: 6px solid var(--tid); }
+.tid > span { display: block; font-family: "WP Mono", monospace; font-size: 13px; letter-spacing: .08em; color: #a9b1c0; text-transform: uppercase; }
+.tid-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+.tid-grid b { display: block; font-family: "WP Sans", sans-serif; font-size: 13px; color: #cfd5df; font-weight: 600; }
+.tid-grid strong { display: block; font-size: 34px; line-height: 1.05; color: var(--tid); }
+.tid-grid strong small { font-size: 18px; color: #cfd5df; }
+.tid-grid i { font-style: normal; font-family: "WP Mono", monospace; font-size: 13px; text-transform: uppercase; color: #fff; }
 .note { margin: 0; padding: 12px 20px; font-family: "WP Sans", sans-serif; font-size: 14px; line-height: 1.4; color: #b9c0cd; }
 .locator { flex: 0 0 150px; margin-top: auto; position: relative; overflow: hidden; }
 #overview { position: absolute; inset: 0; }
@@ -223,7 +240,7 @@ body { font-family: "WP Display", "Arial Narrow", sans-serif; color: #fff; -webk
 </style>
 </head>
 <body>
-<div id="card" data-layout="${layout}">
+<div id="card" class="${classification.isPds ? 'is-pds' : ''}" data-layout="${layout}">
   ${staticMapDataUrl ? `<img class="static-map" src="${escapeHtml(staticMapDataUrl)}" alt=""><span class="forecast-pin"></span>` : '<div id="map"></div>'}
   <div class="shade"></div>
   <header class="header">
