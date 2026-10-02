@@ -454,3 +454,84 @@ export const enrichWarningTropical = async (warning) => {
     };
   }
 };
+
+/* ---------------- tropics overview for WeatherPower Live ---------------- */
+
+const BASINS = { AT: 'Atlantic', EP: 'eastern Pacific', CP: 'central Pacific' };
+let overviewCache = null;
+let pastTrackLayers = null;
+
+// Saffir-Simpson category from sustained wind in mph (null below hurricane strength).
+export const hurricaneCategory = (mph) => {
+  if (!Number.isFinite(mph) || mph < 74) return null;
+  return mph >= 157 ? 5 : mph >= 130 ? 4 : mph >= 111 ? 3 : mph >= 96 ? 2 : 1;
+};
+
+const pastTrackLayerFor = async (bin) => {
+  if (!pastTrackLayers) {
+    const body = await fetchJson(`${NHC_MAP_SERVICE_URL}?f=pjson`);
+    pastTrackLayers = new Map((body.layers || [])
+      .map((layer) => String(layer.name || '').match(/^([A-Z]{2}\d+)\s+Past Track$/i) && [layer.name.slice(0, 3).toUpperCase(), layer.id])
+      .filter(Boolean));
+  }
+  return pastTrackLayers.get(bin);
+};
+
+const roundCoords = (c) => (typeof c[0] === 'number' ? [Math.round(c[0] * 1000) / 1000, Math.round(c[1] * 1000) / 1000] : c.map(roundCoords));
+const roundGeo = (fc) => ({
+  type: 'FeatureCollection',
+  features: (fc?.features || []).map((f) => ({ type: 'Feature', properties: f.properties || {}, geometry: f.geometry && f.geometry.coordinates ? { type: f.geometry.type, coordinates: roundCoords(f.geometry.coordinates) } : f.geometry }))
+});
+const recentOnly = (fc) => {
+  const cutoff = Date.now() - 12 * 60 * 60 * 1000;
+  return roundGeo({ features: (fc?.features || []).filter((f) => !f.properties?.idp_filedate || f.properties.idp_filedate > cutoff) });
+};
+
+// Every active storm with its cone, forecast track and points, coastal watches/warnings, past track and
+// model tracks, plus the NHC 7-day outlook areas. Cached for 3 minutes.
+export const tropicalOverview = async () => {
+  if (overviewCache && Date.now() - overviewCache.at < CACHE_MS) return overviewCache.body;
+  const [storms, areas] = await Promise.all([
+    fetchCurrentTropicalStorms(),
+    queryGeoJsonLayer(3).catch(() => emptyFeatureCollection())
+  ]);
+  const detailed = await Promise.all(storms.map(async (storm) => {
+    const [geometry, models, pastTrack] = await Promise.all([
+      fetchTropicalGeometry(storm).catch(() => null),
+      fetchAidDeck(storm.id).catch(() => emptyFeatureCollection()),
+      pastTrackLayerFor(storm.binNumber).then((id) => queryGeoJsonLayer(id)).catch(() => emptyFeatureCollection())
+    ]);
+    return {
+      ...storm,
+      basin: BASINS[storm.binNumber.slice(0, 2)] || 'tropics',
+      category: hurricaneCategory(storm.intensityMph),
+      cone: roundGeo(geometry?.cone),
+      track: roundGeo(geometry?.forecastTrack),
+      points: roundGeo(geometry?.forecastPoints),
+      // The map service can keep watch/warning lines from old advisories; only recent ones are shown.
+      watchWarning: recentOnly(geometry?.watchWarning),
+      pastTrack: roundGeo(pastTrack),
+      models: roundGeo(models)
+    };
+  }));
+  const body = {
+    updatedAt: new Date().toISOString(),
+    storms: detailed,
+    outlook: {
+      type: 'FeatureCollection',
+      features: areas.features.map((f) => ({
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: {
+          basin: f.properties?.basin || '',
+          prob2day: f.properties?.prob2day || '',
+          prob7day: f.properties?.prob7day || '',
+          risk7day: f.properties?.risk7day || ''
+        }
+      }))
+    },
+    source: 'NOAA / National Hurricane Center'
+  };
+  overviewCache = { at: Date.now(), body };
+  return body;
+};

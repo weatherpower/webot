@@ -338,3 +338,25 @@ Kokoro's `af_alloy` is a free voice in the same style as OpenAI's Alloy if Puter
 Control panel → **WeBot**: engine, voice, speed and a Test button. URL: `?tts=puter|openai|neural|browser`.
 API: `GET /api/v3/live/voice`, `GET /api/v3/live/tts?text=&voice=` (OpenAI-compatible engine only,
 rate-limited to 40 lines a minute plus the daily character budget).
+
+### Weather Intensity Score (WIS), shared by the WIS page and the stream
+
+`src/wis.js` is the scoring engine from the WeatherPower WIS page (same alert sources, scoring,
+caps, labels and 30-minute projection). The server runs it once a minute on every active NWS alert
+plus active WeWatch alerts (public Firebase `wewatches`), and keeps real per-minute history for 24 h
+in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
+
+- The stream's top-right box shows WIS (score, level, 30-minute change, last hour).
+- The WIS page is served at `/warningcenter/wis` (`public/wis.html`). It takes its score and history
+  from `/warningcenter/api/v3/wis`, so both always match; if the feed is unreachable it scores in the
+  browser as before.
+
+### Show rotation, national model checks and the tropics
+
+- The stream no longer follows a fixed playlist: each segment is a weighted random pick (alerts most
+  often when it's active), and non-alert segments don't repeat back to back.
+- Model checks are national: WeBot scans 23 cities across the lower 48 with the lead model, names the
+  top spots (card + map markers) and compares every model at the top spot.
+- **Tropics** (`GET /api/v3/tropics`, NOAA NHC): every active storm with its cone, forecast track and
+  points, past track, model spaghetti tracks and coastal watches/warnings; WeBot reads each storm once
+  per advisory. With no storms it shows the NHC 7-day outlook areas. Control panel: **Tropics** mode.

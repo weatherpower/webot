@@ -17,6 +17,7 @@ import { fetchActiveMesoscaleDiscussions } from './spc.js';
 import { fetchActiveSpcOutlooks } from './spcOutlooks.js';
 import { fetchActiveCustomProducts } from './customProducts.js';
 import { getRenderedState, getRenderedWarning, refreshRenderedWarnings, startAutoRenderer } from './autoRenderer.js';
+import { startWis } from './wis.js';
 import { fetchLocalWeather, fetchStormReports } from './localWeather.js';
 import { deleteWeWatch, listWeWatches, saveWeWatch } from './weWatchStore.js';
 import { publicWarningCenterFeed } from './publicFeed.js';
@@ -33,7 +34,7 @@ app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
-  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|favicon\.ico)\b/.test(req.url)) {
+  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|wis|favicon\.ico)\b/.test(req.url)) {
     req.url = req.url.replace(/^\/warningcenter/, '');
   }
   if (/^\/dashboard\/(api|public|cards|controller|warningcenter|warningdetail|weatherspace)\b/.test(req.url)) {
@@ -65,6 +66,7 @@ app.use((req, res, next) => {
     '/warningcenter',
     '/warningdetail',
     '/live',
+    '/wis',
     '/live/control',
     '/favicon.ico',
     '/api/health',
@@ -133,6 +135,12 @@ app.get('/weatherspace', (req, res) => {
 
 app.get('/warningdetail', (req, res) => {
   res.sendFile(path.join(publicDir, 'warningdetail.html'));
+});
+
+// Weather Intensity Score page: the same live WIS the stream shows (GET /api/v3/wis).
+app.get('/wis', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(publicDir, 'wis.html'));
 });
 
 app.get('/live', (req, res) => {
@@ -593,6 +601,7 @@ const startServer = async () => {
     console.log(`Controller: ${config.publicBaseUrl}/controller`);
     console.log(`Warning Center: ${config.publicBaseUrl}/warningcenter`);
     startAutoRenderer();
+    startWis().catch((error) => console.error('WIS', error.message));
   });
 
   let shuttingDown = false;

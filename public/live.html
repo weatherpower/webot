@@ -72,6 +72,15 @@
     .card dd.prose { font-family: "WP Sans"; font-size: 17px; font-weight: 500; line-height: 1.42; text-transform: none; color: #e3e8f1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
     .rows { padding: 6px 26px 26px; }
     .rowi { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .tcmk { display: flex; align-items: center; gap: 10px; pointer-events: none; }
+    .tcmk i { display: grid; place-items: center; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; background: var(--tc, #ff9f2a); color: #111; font: 700 20px "WP Display"; font-style: normal; border: 3px solid #fff; box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 0 24px var(--tc, #ff9f2a); animation: tcspin 3s linear infinite; }
+    .tcmk i b { animation: tcspin 3s linear infinite reverse; }
+    .tcmk span { font-family: "WP Display"; font-size: 24px; font-weight: 700; color: #fff; background: rgba(9,16,30,.86); padding: 4px 12px; border-left: 4px solid var(--tc, #ff9f2a); text-transform: uppercase; white-space: nowrap; }
+    @keyframes tcspin { to { transform: rotate(360deg); } }
+    .spotmk { display: flex; align-items: center; gap: 8px; pointer-events: none; }
+    .spotmk i { width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #c99a3c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(0,0,0,.45); }
+    .spotmk.top i { background: #ffd34d; width: 18px; height: 18px; margin-left: -9px; }
+    .spotmk span { font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .1em; color: #fff; background: rgba(9,16,30,.86); padding: 4px 8px; border-left: 3px solid #ffd34d; white-space: nowrap; }
     .rowi i { flex: none; width: 10px; height: 10px; background: var(--rc); }
     .rowi b { font-family: "WP Display"; font-size: 22px; font-weight: 500; text-transform: uppercase; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .rowi span { font-family: "WP Mono"; font-size: 13px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; text-transform: uppercase; }
@@ -187,9 +196,9 @@
       <div class="hl" id="hl"><span class="tag" id="hl-tag">LIVE</span><div class="slot" id="hl-slot"></div></div>
       <div class="wpi">
         <div>
-          <div class="meta"><span id="wpi-delta">—</span><span>WPI</span></div>
-          <div class="v" id="wpi-v">0.00</div>
-          <div class="lab" id="wpi-l">QUIET</div>
+          <div class="meta"><span id="wpi-delta">—</span><span>WIS</span></div>
+          <div class="v" id="wpi-v">—</div>
+          <div class="lab" id="wpi-l">LOADING</div>
         </div>
         <canvas id="spark" width="352" height="116"></canvas>
       </div>
@@ -974,9 +983,9 @@
     const M = { bus: null, duck: null, radio: null, timer: null, el: null, files: [], filesAt: 0, order: [], idx: -1, playing: '', mode: '', mood: '', fading: false, fails: 0 };
     const autoMood = () => {
       const t = S.live?.tallies || {};
-      const label = S.live?.index?.label || '';
-      if (S.inBreaking || t.tor || /SEVERE|EXTREME/.test(label)) return 'tense';
-      if (/BUSY/.test(label) || (t.svr || 0) + (t.ffw || 0) >= 8) return 'chill';
+      const level = S.live?.wis?.level || '';
+      if (S.inBreaking || t.tor || ['active', 'intense', 'extreme'].includes(level)) return 'tense';
+      if (level === 'elevated' || (t.svr || 0) + (t.ffw || 0) >= 8) return 'chill';
       return 'calm';
     };
     const loadMusicFiles = async () => {
@@ -1251,16 +1260,17 @@
       tile.classList.toggle('zero', !n);
       if (n > prev && S.seen) { tile.classList.remove('bump'); void tile.offsetWidth; tile.classList.add('bump'); }
     };
-    const WPI_COLORS = { QUIET: '#6fd0ff', ACTIVE: '#7dff9a', BUSY: '#ffd34d', SEVERE: '#ff8a3d', EXTREME: '#ff4d6d' };
-    const drawSpark = (history, color) => {
+    // Weather Intensity Score colors by level (the same levels as the WIS page).
+    const WIS_COLORS = { quiet: '#6fd0ff', low: '#7dff9a', elevated: '#ffd34d', active: '#ff8a3d', intense: '#ff4d6d', extreme: '#ff3df0' };
+    const drawSpark = (history, color, floor = 0) => {
       const canvas = $('spark');
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const pts = (history || []).slice(-72);
       if (pts.length < 2) return;
-      const max = Math.max(4, ...pts.map((p) => p[1])) * 1.15;
+      const max = Math.max(floor + 10, ...pts.map((p) => p[1])) * 1.1;
       const x = (i) => 6 + (i / (pts.length - 1)) * (canvas.width - 16);
-      const y = (v) => canvas.height - 8 - (v / max) * (canvas.height - 16);
+      const y = (v) => canvas.height - 8 - ((v - floor) / (max - floor)) * (canvas.height - 16);
       ctx.beginPath();
       pts.forEach((p, i) => (i ? ctx.lineTo(x(i), y(p[1])) : ctx.moveTo(x(i), y(p[1]))));
       ctx.strokeStyle = color;
@@ -1285,14 +1295,15 @@
       setTally('t-svr', t.svr || 0);
       setTally('t-ffw', t.ffw || 0);
       setTally('t-wch', (t.torWatch || 0) + (t.svrWatch || 0));
-      const idx = S.live?.index;
-      if (idx) {
-        const color = WPI_COLORS[idx.label] || '#6fd0ff';
+      const wis = S.live?.wis;
+      if (wis?.loaded) {
+        const color = WIS_COLORS[wis.level] || '#6fd0ff';
         document.querySelector('.wpi').style.setProperty('--wc', color);
-        $('wpi-v').textContent = idx.value.toFixed(2);
-        $('wpi-l').textContent = idx.label;
-        $('wpi-delta').textContent = idx.delta1h == null ? '— 1H' : (idx.delta1h >= 0 ? '▲ ' : '▼ ') + Math.abs(idx.delta1h).toFixed(1) + ' 1H';
-        drawSpark(idx.history, color);
+        $('wpi-v').textContent = wis.score.toFixed(1);
+        $('wpi-l').textContent = wis.label.toUpperCase();
+        const d30 = wis.ago30 == null ? null : wis.score - wis.ago30;
+        $('wpi-delta').textContent = d30 == null ? '— 30M' : (d30 >= 0 ? '▲ ' : '▼ ') + Math.abs(d30).toFixed(1) + ' 30M';
+        drawSpark((wis.history || []).map((p) => [p.t, p.v]), color, 20);
       }
       $('rc-n').textContent = (S.live?.reports || []).length;
     };
@@ -1403,6 +1414,7 @@
       } else if (shot.type === 'reports') s = 16;
       else if (shot.type === 'think') s = 13;
       else if (shot.type === 'models') s = 32;
+      else if (shot.type === 'tropics') s = 26;
       else s = 14;
       return s * OPT.speed * 1000;
     };
@@ -1422,33 +1434,14 @@
       S.modelIdx = (S.modelIdx || 0) + 1;
       return list[S.modelIdx % list.length];
     };
-    const niceArea = (text) => String(text || '')
-      .replace(/,\s*([A-Z]{2})\b/g, (m, st) => ', ' + (STATE_NAMES[st] || st))
-      .replace(/\b[A-Z][A-Z']+\b/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
-    // Where WeBot looks: the top CONUS warning, else the highest SPC risk, else home (Idabel).
-    const hotSpot = () => {
-      const top = candidates().find((a) => a.group !== 'statements' && !/marine/i.test(a.event) && !offConus(a) && (a.states || []).length);
-      if (top && top.rank <= 6) {
-        const c = centerOf(top);
-        if (c) return { lat: c[1], lon: c[0], place: (top.area || '').length <= 40 ? niceArea(top.area) : stateLine(top) };
-      }
-      const order = ['MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
-      const risky = outlooks().map((a) => ({ a, r: order.indexOf((a.hazards || []).find((h) => h.label === 'RISK')?.value) })).filter((x) => x.r >= 0).sort((x, y) => y.r - x.r)[0];
-      if (risky) {
-        const c = centerOf(risky.a);
-        if (c) return { lat: c[1], lon: c[0], place: 'the SPC ' + (RISK_NAMES[order[risky.r]] || 'risk').toLowerCase() + ' area' };
-      }
-      return S.home || { lat: 33.8957, lon: -94.8263, place: 'Idabel, Oklahoma' };
-    };
     const frameUrl = (frame) => location.origin + BASE + frame.path;
     // Frames load one at a time while WeBot thinks, so the render service is never flooded.
     const loadModelSegment = async () => {
+      // National check: the server scans cities across the lower 48 and ranks them.
       const [model, field] = nextModelPick();
-      const spot = hotSpot();
-      const q = '?model=' + model + '&field=' + field + '&lat=' + spot.lat.toFixed(3) + '&lon=' + spot.lon.toFixed(3) + '&place=' + encodeURIComponent(spot.place);
-      const seg = await getJson('/api/v3/models/segment' + q);
+      const seg = await getJson('/api/v3/models/segment?model=' + model + '&field=' + field);
       seg.ready = new Set();
-      seg.spot = spot;
+      seg.spot = seg.point;
       S.loadingSeg = seg;
       (async () => {
         for (let i = 0; i < seg.frames.length; i += 1) {
@@ -1484,7 +1477,19 @@
       return picks.map((i, k) => legend[i].v + (k === 3 ? ' ' + units : ''));
     };
     const SHORT_FIELD = { refc: 'SIMULATED RADAR', ptype: 'PRECIP TYPE', cape: 'CAPE', uh: 'HELICITY', t2m: 'TEMPERATURE', td2m: 'DEW POINT', gust: 'WIND GUSTS', wind10: 'WIND', qpf: 'RAIN', pwat: 'PRECIP WATER', snow: 'SNOW', snod: 'SNOW DEPTH' };
+    // Hot-spot markers for national model checks.
+    const showSpotMarkers = (seg) => {
+      (S.spotMarkers || []).forEach((m) => m.remove());
+      S.spotMarkers = (seg.spots || []).slice(0, 4).map((sp, k) => {
+        const el = document.createElement('div');
+        el.className = 'spotmk' + (k === 0 ? ' top' : '');
+        el.innerHTML = '<i></i><span>' + esc(sp.place.split(',')[0].toUpperCase()) + ' · ' + esc(sp.display) + '</span>';
+        return new maplibregl.Marker({ element: el, anchor: 'left' }).setLngLat([sp.lon, sp.lat]).addTo(S.map);
+      });
+    };
     const hideModels = () => {
+      (S.spotMarkers || []).forEach((m) => m.remove());
+      S.spotMarkers = [];
       S.modelOn = false;
       S.modelValid = null;
       clearInterval(S.modelTimer);
@@ -1519,13 +1524,19 @@
       $('rp-bar').style.background = legendCss(f.legend || []);
       $('rp-lbl').innerHTML = legendLabels(f.legend || [], f.units).map((l) => '<span>' + esc(String(l).toUpperCase()) + '</span>').join('');
       $('rp-state').textContent = 'MODEL STUDIO';
+      const shortPlace = (p) => String(p || '').replace(/, ([A-Za-z .]+)$/, (m, st) => ', ' + (Object.keys(STATE_NAMES).find((k) => STATE_NAMES[k] === st) || st));
+      const spotRows = (seg.spots || []).slice(0, 4).map((sp, k) => '<div class="rowi" style="--rc:' + (k === 0 ? '#ffd34d' : '#8a6a2a') + '"><i></i><b>' + esc(shortPlace(sp.place)) + '</b><em>' + esc(sp.display) + '</em></div>').join('');
       const rows = seg.compare.map((c) => '<div class="rowi" style="--rc:' + (c.model === seg.model ? '#1a8cff' : '#5d6f8d') + '"><i></i><b>' + esc(c.name) + '</b>' + (c.value == null ? '<span>' + esc(c.note || 'n/a') + '</span>' : '<em>' + esc(c.display) + '</em>') + '</div>').join('');
       const horizon = seg.horizonH <= 24 ? 'NEXT ' + seg.horizonH + ' HRS' : 'NEXT ' + Math.round(seg.horizonH / 24) + ' DAYS';
       const skewt = S.soundings && ['cape', 'refc', 'uh'].includes(f.key) && seg.spot
         ? '<img class="skewt" alt="" src="' + BASE + '/api/v3/models/sounding.png?lat=' + seg.spot.lat.toFixed(2) + '&lon=' + seg.spot.lon.toFixed(2) + '&fhr=3" onerror="this.remove()">' : '';
       setCard('<div class="head"><div class="ico">' + icon('outlook', 30) + '</div><div><h2>Model check</h2><div class="sub">' + esc(f.name.replace(/ \(.*\)$/, '').toUpperCase()) + ' · ' + horizon + '</div></div><span class="status">' + esc(seg.modelName.replace(' 3km', '')) + '</span></div>'
-        + '<dl><dt>WHERE</dt><dd>' + esc(seg.place) + '</dd></dl>'
+        + (spotRows
+          ? '<dl><dt>WHOLE COUNTRY</dt><dd>' + esc(seg.modelName.replace(' 3km', '')) + ' TOP SPOTS</dd></dl><div class="rows">' + spotRows + '</div>'
+            + '<dl><dt>EVERY MODEL</dt><dd>NEAR ' + esc(shortPlace(seg.topPlace || seg.place).toUpperCase()) + '</dd></dl>'
+          : '<dl><dt>WHERE</dt><dd>' + esc(seg.place) + '</dd></dl>')
         + '<div class="rows">' + rows + '</div>' + skewt, '#1a8cff');
+      showSpotMarkers(seg);
       setNow({ k: 'MODELS', title: seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name) + ' · ' + horizon, color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
       fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 5.2, duration: 2400 });
       // Loop through the frames that have finished loading; hold on the last one.
@@ -1572,12 +1583,10 @@
       if (!shot && S.control.mode === 'models') shot = { type: 'think' };
       else if (!shot && S.control.mode && S.control.mode !== 'auto') shot = { type: S.control.mode };
       if (!shot) {
-        // Not only warnings: WeBot regularly zooms out to think and check the models.
-        const PATTERN = ['alert', 'alert', 'think', 'alert', 'national', 'alert', 'think', 'outlook', 'alert', 'reports'];
         S.cycle += 1;
         const list = candidates().slice(0, 10);
-        let kind = PATTERN[S.cycle % PATTERN.length];
-        if (kind === 'alert' && !list.length) kind = ['think', 'national', 'outlook', 'reports'][S.cycle % 4];
+        const kind = pickKind(list);
+        S.kinds = [...(S.kinds || []), kind].slice(-6);
         if (kind === 'alert') {
           const memory = Math.min(list.length - 1, 6);
           const pick = list.find((a) => !S.recent.slice(-memory).includes(a.key)) || list[0];
@@ -1587,7 +1596,32 @@
       }
       if (shot.type === 'outlook' && !outlooks().length) shot = { type: 'national' };
       if (shot.type === 'reports' && (S.live?.reports || []).length < 5) shot = { type: 'national' };
+      if (shot.type === 'tropics' && !tropicsActive()) shot = { type: 'national' };
       runShot(shot);
+    };
+
+    // The show mixes itself up: weighted random segments. Alerts come up most when it's active,
+    // nothing non-alert repeats back to back, and the tropics join in whenever NHC has something.
+    const tropicsActive = () => Boolean(S.tropics && (S.tropics.storms.length || S.tropics.outlook.features.some((a) => parseInt(a.properties.prob7day, 10) >= 30)));
+    const pickKind = (list) => {
+      const t = S.live?.tallies || {};
+      const busy = (t.tor || 0) * 3 + (t.svr || 0) + (t.ffw || 0);
+      const w = {
+        alert: list.length ? (busy >= 10 ? 7 : busy ? 5 : 3) : 0,
+        think: 2.2,
+        national: 1.2,
+        outlook: outlooks().length ? 1 : 0,
+        reports: (S.live?.reports || []).length >= 5 ? 1.2 : 0,
+        tropics: tropicsActive() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0
+      };
+      const recent = S.kinds || [];
+      Object.keys(w).forEach((k) => { if (k !== 'alert' && recent.slice(-3).includes(k)) w[k] *= k === recent[recent.length - 1] ? 0 : 0.25; });
+      if (recent.length >= 2 && recent.slice(-2).every((k) => k === 'alert')) w.alert *= 0.3;
+      const total = Object.values(w).reduce((a, b) => a + b, 0);
+      if (!total) return 'national';
+      let r = Math.random() * total;
+      for (const [k, v] of Object.entries(w)) { if ((r -= v) <= 0) return k; }
+      return 'national';
     };
 
     const CONUS = [[-125, 24.2], [-66.8, 49.6]];
@@ -1625,6 +1659,15 @@
       setVelocity(false);
       if (shot.type !== 'think') setThinking(false);
       if (shot.type !== 'models') hideModels();
+      if (shot.type !== 'tropics') hideTropics();
+      if (shot.type === 'tropics') {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(false);
+        $('rp').classList.remove('show');
+        tropicsShot();
+        return;
+      }
       if (shot.type === 'think') {
         setSelected('');
         clearLocal();
@@ -1684,7 +1727,7 @@
       pool.forEach((a) => { const e = byEvent.get(a.event) || { n: 0, color: a.color, rank: a.rank }; e.n += 1; e.rank = Math.min(e.rank, a.rank); byEvent.set(a.event, e); });
       const top = [...byEvent.entries()].sort((x, y) => (x[1].rank - y[1].rank) || (y[1].n - x[1].n)).slice(0, 6);
       const risk = S.live?.index?.spcDay1;
-      setCard('<div class="head"><div class="ico">' + icon('radar', 30) + '</div><div><h2>' + (st ? esc((STATE_NAMES[st] || st).toUpperCase()) + ' OVERVIEW' : 'NATIONAL OVERVIEW') + '</h2><div class="sub">' + pool.length + ' ACTIVE ALERTS · WPI ' + esc(S.live?.index?.label || '') + '</div></div></div>'
+      setCard('<div class="head"><div class="ico">' + icon('radar', 30) + '</div><div><h2>' + (st ? esc((STATE_NAMES[st] || st).toUpperCase()) + ' OVERVIEW' : 'NATIONAL OVERVIEW') + '</h2><div class="sub">' + pool.length + ' ACTIVE ALERTS · WIS ' + esc(S.live?.wis?.loaded ? S.live.wis.scoreText + ' ' + S.live.wis.label.toUpperCase() : '') + '</div></div></div>'
         + '<div class="rows">' + (top.length ? top.map(([event, e]) => '<div class="rowi" style="--rc:' + esc(e.color) + '"><i></i><b>' + esc(event) + '</b><em>' + e.n + '</em></div>').join('') : '<div class="rowi" style="--rc:#3fe0ff"><i></i><b>No active warnings</b></div>')
         + (risk ? '<div class="rowi" style="--rc:#7dff9a"><i></i><b>SPC Day 1</b><span>' + esc(RISK_NAMES[risk] || risk) + '</span></div>' : '') + '</div>', '#1a8cff');
       const st2 = focusState();
@@ -1710,6 +1753,124 @@
       const b = bboxOf({ type: 'MultiPoint', coordinates: reports.map((r) => [r.lon, r.lat]) });
       fly(b, { padding: { top: 160, bottom: 150, left: 620, right: 640 }, maxZoom: 7 });
       setNow({ k: 'REPORTS', title: reports.length + ' storm reports in the last 3 hours', color: '#ffd34d', crawl: latest.map((r) => r.type + ' · ' + r.city + ', ' + r.state + (r.remark ? ' — ' + r.remark : '')).join('   ◆   ') });
+    };
+
+    /* ---------------- tropics (NOAA National Hurricane Center) ---------------- */
+    const TC_COLORS = { TD: '#5fd3ff', SD: '#5fd3ff', TS: '#3fa9ff', SS: '#3fa9ff', 1: '#ffd34d', 2: '#ff9f2a', 3: '#ff5a2a', 4: '#ff2a5f', 5: '#d23cff' };
+    const WW_NAMES = { HWR: 'Hurricane warning', HWA: 'Hurricane watch', TWR: 'Tropical storm warning', TWA: 'Tropical storm watch' };
+    // NHC rounds winds to the nearest 5 mph.
+    const ktToMph = (kt) => (Number.isFinite(kt) ? Math.round((kt * 1.15078) / 5) * 5 : null);
+    const loadTropics = async () => { S.tropics = await getJson('/api/v3/tropics'); };
+    const TC_LAYERS = ['tc-outlook-fill', 'tc-outlook-line', 'tc-cone-fill', 'tc-cone-line', 'tc-models', 'tc-past', 'tc-track', 'tc-ww', 'tc-points'];
+    const ensureTropicsLayers = () => {
+      const map = S.map;
+      if (map.getSource('tc-cone')) return;
+      const empty = { type: 'FeatureCollection', features: [] };
+      ['tc-outlook', 'tc-cone', 'tc-models', 'tc-past', 'tc-track', 'tc-ww', 'tc-points'].forEach((id) => map.addSource(id, { type: 'geojson', data: empty }));
+      const before = 'a-case';
+      const risk = ['match', ['get', 'risk7day'], 'High', '#ff3b3b', 'Medium', '#ff9f2a', '#ffd34d'];
+      map.addLayer({ id: 'tc-outlook-fill', type: 'fill', source: 'tc-outlook', paint: { 'fill-color': risk, 'fill-opacity': 0.28 } }, before);
+      map.addLayer({ id: 'tc-outlook-line', type: 'line', source: 'tc-outlook', paint: { 'line-color': risk, 'line-width': 3 } }, before);
+      map.addLayer({ id: 'tc-cone-fill', type: 'fill', source: 'tc-cone', paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.16 } }, before);
+      map.addLayer({ id: 'tc-cone-line', type: 'line', source: 'tc-cone', paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.85 } }, before);
+      map.addLayer({ id: 'tc-models', type: 'line', source: 'tc-models', paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-opacity': 0.75 } }, before);
+      map.addLayer({ id: 'tc-past', type: 'line', source: 'tc-past', paint: { 'line-color': '#cfd6e6', 'line-width': 3, 'line-dasharray': [1.5, 1.5] } }, before);
+      map.addLayer({ id: 'tc-track', type: 'line', source: 'tc-track', paint: { 'line-color': '#ffffff', 'line-width': 3.5 } }, before);
+      map.addLayer({ id: 'tc-ww', type: 'line', source: 'tc-ww', paint: { 'line-color': ['match', ['get', 'tcww'], 'HWR', '#ff1f1f', 'HWA', '#ff9ad5', 'TWR', '#2f6bff', 'TWA', '#ffe14d', '#ffffff'], 'line-width': 8 } }, before);
+      map.addLayer({ id: 'tc-points', type: 'circle', source: 'tc-points', paint: { 'circle-radius': 7, 'circle-color': ['match', ['get', 'dvlbl'], 'M', '#ff2a5f', 'H', '#ff9f2a', 'S', '#3fa9ff', 'D', '#5fd3ff', '#ffffff'], 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } }, before);
+    };
+    const hideTropics = () => {
+      (S.tcMarkers || []).forEach((m) => m.remove());
+      S.tcMarkers = [];
+      if (!S.styleReady || !S.map.getSource('tc-cone')) return;
+      TC_LAYERS.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+    };
+    const setTropicsData = (storm, outlook) => {
+      ensureTropicsLayers();
+      const empty = { type: 'FeatureCollection', features: [] };
+      S.map.getSource('tc-outlook').setData(outlook || empty);
+      S.map.getSource('tc-cone').setData(storm?.cone || empty);
+      S.map.getSource('tc-models').setData(storm?.models || empty);
+      S.map.getSource('tc-past').setData(storm?.pastTrack || empty);
+      S.map.getSource('tc-track').setData(storm?.track || empty);
+      S.map.getSource('tc-ww').setData(storm?.watchWarning || empty);
+      S.map.getSource('tc-points').setData(storm?.points || empty);
+      TC_LAYERS.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'visible'));
+      ['a-fill', 'a-case', 'a-line', 'w-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+    };
+    const tcMarker = (lon, lat, label, color, badge) => {
+      const el = document.createElement('div');
+      el.className = 'tcmk';
+      el.style.setProperty('--tc', color);
+      el.innerHTML = '<i><b>' + esc(badge) + '</b></i><span>' + esc(label) + '</span>';
+      return new maplibregl.Marker({ element: el, anchor: 'left' }).setLngLat([lon, lat]).addTo(S.map);
+    };
+    const stormTitle = (st) => (st.classificationLabel + ' ' + st.name).trim();
+    const tropicsShot = () => {
+      const tr = S.tropics;
+      setMood('calm');
+      if (tr.storms.length) {
+        S.tcIdx = ((S.tcIdx ?? -1) + 1) % tr.storms.length;
+        const st = tr.storms[S.tcIdx];
+        const mph = ktToMph(st.intensityKt) ?? st.intensityMph;
+        const color = TC_COLORS[st.category] || TC_COLORS[st.classification] || '#ff9f2a';
+        const peakKt = Math.max(st.intensityKt || 0, ...st.points.features.map((p) => Number(p.properties.maxwind) || 0));
+        const peak = ktToMph(peakKt);
+        const wwTypes = [...new Set(st.watchWarning.features.map((w) => w.properties.tcww).filter((k) => WW_NAMES[k]))];
+        const others = tr.storms.filter((x) => x !== st);
+        setTropicsData(st, null);
+        S.tcMarkers = [tcMarker(st.longitude, st.latitude, stormTitle(st), color, st.category ? String(st.category) : st.classification)];
+        const rows = [
+          ['MAX WINDS', '<dd>' + (mph != null ? mph + ' MPH' : 'n/a') + '</dd>'],
+          ['PRESSURE', '<dd>' + (st.pressureMb ? st.pressureMb + ' MB' : 'n/a') + '</dd>'],
+          ['MOVING', '<dd>' + (st.movementCompass ? esc(st.movementCompass) + ' AT ' + st.movementSpeedMph + ' MPH' : 'STATIONARY') + '</dd>'],
+          ['FORECAST PEAK', '<dd>' + (peak ? peak + ' MPH' : 'n/a') + '</dd>'],
+          ['COAST', '<dd>' + (wwTypes.length ? esc(wwTypes.map((k) => WW_NAMES[k].toUpperCase()).join(' · ')) : 'NO WATCHES OR WARNINGS') + '</dd>'],
+          ['NHC', '<dd>ADVISORY ' + esc(String(Number(st.advisoryNumber) || st.advisoryNumber || '')) + (st.models.features.length ? ' · ' + st.models.features.length + ' MODEL TRACKS' : '') + '</dd>']
+        ];
+        setCard('<div class="head"><div class="ico">' + icon('tropical', 30) + '</div><div><h2>' + esc(stormTitle(st)) + '</h2><div class="sub">' + esc((st.category ? 'CATEGORY ' + st.category + ' · ' : '') + st.basin.toUpperCase()) + '</div></div>'
+          + (tr.storms.length > 1 ? '<span class="status">' + (S.tcIdx + 1) + ' OF ' + tr.storms.length + '</span>' : '') + '</div>'
+          + '<dl>' + rows.map(([k, v]) => '<dt>' + k + '</dt>' + v).join('') + '</dl>', color);
+        const geo = { type: 'GeometryCollection', geometries: [...st.cone.features, ...st.pastTrack.features, ...st.points.features].map((x) => x.geometry).filter(Boolean) };
+        const b = bboxOf(geo) || [[st.longitude - 8, st.latitude - 6], [st.longitude + 8, st.latitude + 6]];
+        fly(b, { padding: { top: 140, bottom: 140, left: 620, right: 360 }, maxZoom: 6.2 });
+        setNow({
+          k: 'TROPICS',
+          title: stormTitle(st) + (st.category ? ' · Category ' + st.category : '') + (mph != null ? ' · ' + mph + ' mph' : ''),
+          color,
+          crawl: [st.basin.toUpperCase(), Math.abs(st.latitude).toFixed(1) + (st.latitude >= 0 ? 'N' : 'S') + ' ' + Math.abs(st.longitude).toFixed(1) + (st.longitude < 0 ? 'W' : 'E'),
+            st.movementCompass ? 'MOVING ' + st.movementCompass + ' AT ' + st.movementSpeedMph + ' MPH' : '', st.pressureMb ? st.pressureMb + ' MB' : '',
+            'NHC ADVISORY ' + (Number(st.advisoryNumber) || ''), ...others.map((o) => 'ALSO ACTIVE: ' + stormTitle(o).toUpperCase() + ' (' + o.basin.toUpperCase() + ')')].filter(Boolean).join(' · ')
+        });
+        // Talk about each storm once per advisory.
+        const said = st.id + ':' + st.advisoryNumber;
+        if (!S.spoken.has(said)) {
+          S.spoken.add(said);
+          let text = (S.tcIdx === 0 ? 'Let’s check the tropics. ' : 'Next up in the tropics. ') + stormTitle(st) + ' is ' + (st.category ? article(String(st.category)) + ' category ' + st.category + ' hurricane' : 'a ' + st.classificationLabel.toLowerCase()) + ' in the ' + st.basin + (mph != null ? ', with maximum sustained winds of ' + mph + ' miles per hour' : '') + '.';
+          if (st.movementCompass) text += ' It is moving ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' }[st.movementCompass] || st.movementCompass.split('').map((c) => ({ N: 'north', S: 'south', E: 'east', W: 'west' })[c]).join(' ')) + ' at ' + st.movementSpeedMph + ' miles per hour.';
+          if (peak && mph != null && peak >= mph + 10) text += ' The National Hurricane Center forecasts it to strengthen, peaking near ' + peak + ' miles per hour.';
+          else if (peak && mph != null && peak <= mph) text += ' The National Hurricane Center forecasts it to hold steady or weaken.';
+          if (wwTypes.length) text += ' ' + wwTypes.map((k) => WW_NAMES[k] + 's').join(' and ') + ' are in effect along the coast.';
+          if (S.tcIdx === 0 && others.length) text += ' We are also tracking ' + others.map(stormTitle).join(' and ') + '.';
+          say(text);
+        }
+        return;
+      }
+      // No storms: the NHC 7-day outlook areas.
+      const areas = tr.outlook.features.slice().sort((a, b) => parseInt(b.properties.prob7day, 10) - parseInt(a.properties.prob7day, 10));
+      setTropicsData(null, tr.outlook);
+      const color = '#ff9f2a';
+      setCard('<div class="head"><div class="ico">' + icon('tropical', 30) + '</div><div><h2>TROPICAL OUTLOOK</h2><div class="sub">NHC · NEXT 7 DAYS</div></div></div>'
+        + '<div class="rows">' + areas.map((a) => '<div class="rowi" style="--rc:' + ({ High: '#ff3b3b', Medium: '#ff9f2a' }[a.properties.risk7day] || '#ffd34d') + '"><i></i><b>' + esc(a.properties.basin) + '</b><em>' + esc(a.properties.prob7day) + '</em></div>').join('') + '</div>', color);
+      const b = bboxOf({ type: 'GeometryCollection', geometries: areas.map((a) => a.geometry).filter(Boolean) });
+      fly(b, { padding: { top: 160, bottom: 160, left: 640, right: 380 }, maxZoom: 5 });
+      setNow({ k: 'TROPICS', title: 'No named storms · ' + areas.length + ' area' + (areas.length === 1 ? '' : 's') + ' to watch', color, crawl: areas.map((a) => a.properties.basin.toUpperCase() + ': ' + a.properties.prob2day + ' IN 2 DAYS, ' + a.properties.prob7day + ' IN 7 DAYS').join(' · ') });
+      const said = 'outlook:' + areas.map((a) => a.properties.basin + a.properties.prob7day).join();
+      if (!S.spoken.has(said) && areas.length) {
+        S.spoken.add(said);
+        const top = areas[0].properties;
+        say('Let’s check the tropics. There are no named storms right now. The National Hurricane Center is watching ' + areas.length + ' area' + (areas.length === 1 ? '' : 's') + '. The best chance is in the ' + top.basin + ', with a ' + parseInt(top.prob7day, 10) + ' percent chance of development over the next 7 days.');
+      }
     };
 
     /* ---------------- breaking + speech text ---------------- */
@@ -1822,7 +1983,7 @@
     const roundup = () => {
       if (S.inBreaking || speech.busy) return;
       const t = S.live?.tallies || {};
-      const idx = S.live?.index;
+      const wis = S.live?.wis;
       const parts = [];
       if (t.tor) parts.push(t.tor + ' tornado warning' + (t.tor === 1 ? '' : 's'));
       if (t.svr) parts.push(t.svr + ' severe thunderstorm warning' + (t.svr === 1 ? '' : 's'));
@@ -1831,7 +1992,7 @@
       let text = 'WeatherPower update. ';
       text += parts.length ? 'Right now there ' + (parts.length === 1 && /^1 /.test(parts[0]) ? 'is ' : 'are ') + parts.join(', ') + ' across the country.' : 'No tornado, severe thunderstorm or flash flood warnings are in effect right now.';
       if (watches) text += ' ' + watches + ' severe weather watch' + (watches === 1 ? ' is' : 'es are') + ' active.';
-      if (idx) text += ' The WeatherPower Index is ' + idx.value.toFixed(1) + ', ' + idx.label.toLowerCase() + '.';
+      if (wis?.loaded) text += ' The Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.';
       say(text, { label: 'UPDATE' });
     };
     setInterval(() => {
@@ -1868,6 +2029,8 @@
       poll(loadAlerts, 20000);
       poll(loadLive, 6000);
       poll(loadRadar, 120000);
+      loadTropics().catch(() => {});
+      poll(loadTropics, 5 * 60 * 1000);
       // Give the neural voice a moment to load so the first line is in WeBot's real voice.
       const hello = Date.now();
       const intro = () => {

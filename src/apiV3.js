@@ -14,6 +14,8 @@ import {
   recentReports, requireLiveToken, siteRadar, talliesFor
 } from './live.js';
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
+import { wisSummary } from './wis.js';
+import { tropicalOverview } from './nhc.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -293,7 +295,7 @@ export const apiV3Router = () => {
       const { alerts } = await currentAlerts();
       const [index, control, reports] = await Promise.all([indexSummary(alerts), liveControl(), recentReports()]);
       res.set('Cache-Control', 'no-store');
-      res.json({ generatedAt: new Date().toISOString(), tallies: talliesFor(alerts), index, control, reports });
+      res.json({ generatedAt: new Date().toISOString(), tallies: talliesFor(alerts), index, wis: wisSummary(), control, reports });
     } catch (error) {
       next(error);
     }
@@ -306,6 +308,22 @@ export const apiV3Router = () => {
     } catch (error) {
       next(error);
     }
+  });
+
+  // Active hurricanes/tropical storms (cone, tracks, models, watches) plus the NHC 7-day outlook.
+  router.get('/tropics', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=120');
+      res.json(await tropicalOverview());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Weather Intensity Score shared by the WIS page and the live stream. ?alerts=N adds the top N alerts.
+  router.get('/wis', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(wisSummary({ alerts: Math.min(50, Math.max(0, Number(req.query.alerts) || 0)) }));
   });
 
   router.get('/live/music', async (req, res, next) => {
