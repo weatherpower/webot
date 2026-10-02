@@ -513,7 +513,7 @@
       .replace(/\bJ\/kg\b/g, 'joules per kilogram')
       .replace(/\bdBZ\b/g, 'D B Z')
       .replace(/\b(\d+)°F?/g, '$1 degrees')
-      .replace(/\b(HRRR|NAM|GFS|ECMWF|ICON)\b/g, (m) => ({ HRRR: 'H triple R', NAM: 'NAM', GFS: 'G F S', ECMWF: 'European model', ICON: 'ICON' })[m])
+      .replace(/\b(HRRR|NAM|GFS|ECMWF|ICON)\b/g, (m) => ({ HRRR: 'H triple R', NAM: 'N A M', GFS: 'G F S', ECMWF: 'European model', ICON: 'ICON' })[m])
       .replace(/\bWPI\b/g, 'W P I')
       .replace(/\bNWS\b/g, 'National Weather Service')
       .replace(/\bSPC\b/g, 'Storm Prediction Center')
@@ -1468,7 +1468,7 @@
         $('wpi-delta').textContent = d30 == null ? '— 30M' : (d30 >= 0 ? '▲ ' : '▼ ') + Math.abs(d30).toFixed(1) + ' 30M';
         drawSpark((wis.history || []).map((p) => [p.t, p.v]), color, 20);
       }
-      $('rc-n').textContent = (S.live?.reports || []).length;
+      $('rc-n').textContent = shotReports().length;
     };
 
     const headlineFor = (a) => (a.eventLabel + ' FOR ' + (a.area || stateLine(a)) + (a.times?.expires ? ' UNTIL ' + a.times.expires : '')).toUpperCase();
@@ -1559,6 +1559,55 @@
     const offConus = (a) => (a.states || []).length > 0 && a.states.every((s) => OFF_CONUS.includes(s));
     const notable = (a) => ['warnings', 'watches', 'discussions'].includes(a.group) && (a.states || []).length > 0;
     const isBreaking = (a) => a.rank <= 3 || /^tornado watch$/i.test(a.event);
+    /* ---------------- state focus: zoom to the focused state and talk about it ---------------- */
+    const focusName = () => STATE_NAMES[focusState()] || focusState();
+    const focusGeo = () => (focusState() ? SHAPES.byName.get(STATE_NAMES[focusState()]) || null : null);
+    const focusBounds = () => { const g = focusGeo(); return g ? bboxOf(g) : null; };
+    // Where wide shots point: the focused state's outline, or the lower 48.
+    const viewBounds = () => focusBounds() || CONUS;
+    const inFocus = (lon, lat) => { const g = focusGeo(); return g ? inGeometry([lon, lat], g) : true; };
+    // "southeastern", "northern", "central"… by position inside the state's box.
+    const regionWord = (lon, lat, b) => {
+      const fx = (lon - b[0][0]) / (b[1][0] - b[0][0]);
+      const fy = (lat - b[0][1]) / (b[1][1] - b[0][1]);
+      const ns = fy > 0.66 ? 'north' : fy < 0.34 ? 'south' : '';
+      const ew = fx > 0.66 ? 'east' : fx < 0.34 ? 'west' : '';
+      return ns + ew ? ns + ew + 'ern' : 'central';
+    };
+    // Sample points inside the state for model checks, labeled by area ("southeastern Oklahoma").
+    let focusPointCache = { key: '', list: [] };
+    const focusPoints = () => {
+      const st = focusState();
+      const g = focusGeo();
+      if (!st || !g) return [];
+      if (focusPointCache.key === st) return focusPointCache.list;
+      const b = bboxOf(g);
+      const list = [];
+      for (let i = 0; i < 7; i += 1) {
+        for (let j = 0; j < 7; j += 1) {
+          const lon = b[0][0] + ((b[1][0] - b[0][0]) * (i + 0.5)) / 7;
+          const lat = b[0][1] + ((b[1][1] - b[0][1]) * (j + 0.5)) / 7;
+          if (inGeometry([lon, lat], g)) list.push({ lon, lat, place: regionWord(lon, lat, b) + ' ' + focusName() });
+        }
+      }
+      focusPointCache = { key: st, list: list.slice(0, 40) };
+      return focusPointCache.list;
+    };
+    // Model-check spots for the card and map: top four, leaving out zeros when anything real shows up.
+    const topSpots = (seg) => {
+      const spots = seg.spots || [];
+      const real = spots.filter((sp) => Number(sp.value) > 0);
+      return (real.length ? real : spots).slice(0, 4);
+    };
+    const shotReports = () => (S.live?.reports || []).filter((r) => !focusState() || r.state === focusState());
+    const enoughReports = () => shotReports().length >= (focusState() ? 1 : 5);
+    const tropicsHere = () => !focusState() || S.alerts.some((a) => (a.states || []).includes(focusState()) && /hurricane|tropical storm|storm surge/i.test(a.event || ''));
+    const stateTallies = (st) => {
+      const here = S.alerts.filter((a) => (a.states || []).includes(st));
+      const n = (re) => here.filter((a) => re.test(a.event || '')).length;
+      return { tor: n(/^tornado warning$/i), svr: n(/^severe thunderstorm warning$/i), ffw: n(/^flash flood warning$/i), torWatch: n(/^tornado watch$/i), svrWatch: n(/^severe thunderstorm watch$/i) };
+    };
+
     const candidates = () => {
       const st = focusState();
       const fresh = (a) => Date.now() - Date.parse(a.issuedAt || 0) < 30 * 60 * 1000;
@@ -1608,7 +1657,9 @@
     const loadModelSegment = async () => {
       // National check: the server scans cities across the lower 48 and ranks them.
       const [model, field] = nextModelPick();
-      const seg = await getJson('/api/v3/models/segment?model=' + model + '&field=' + field);
+      const pts = focusPoints();
+      const region = pts.length ? '&region=' + encodeURIComponent(focusName()) + '&points=' + encodeURIComponent(pts.map((p) => p.lat.toFixed(3) + ',' + p.lon.toFixed(3) + ',' + p.place).join(';')) : '';
+      const seg = await getJson('/api/v3/models/segment?model=' + model + '&field=' + field + region);
       seg.ready = new Set();
       seg.spot = seg.point;
       S.loadingSeg = seg;
@@ -1630,7 +1681,7 @@
       setThinking(true);
       setMood('calm');
       card.classList.remove('show');
-      fly(CONUS, { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: 5, duration: 5200 });
+      fly(viewBounds(), { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: focusState() ? 7 : 5, duration: 5200 });
       chatter(pick(['Let me zoom out and think for a second.', 'Hang on, let me see what the models are saying.', 'Let me pull up the models real quick.', 'Time to check in on the computer models.']));
       setNow({ k: 'WEBOT', title: 'Checking the models', color: '#1a8cff', crawl: 'HRRR · NAM 3KM · GFS · ECMWF · WEATHERPOWER MODEL STUDIO · SIMULATED RADAR · CAPE · RAIN · TEMPERATURE · WIND' });
       S.pendingModel = null;
@@ -1650,7 +1701,7 @@
     // Hot-spot markers for national model checks.
     const showSpotMarkers = (seg) => {
       (S.spotMarkers || []).forEach((m) => m.remove());
-      S.spotMarkers = (seg.spots || []).slice(0, 4).map((sp, k) => {
+      S.spotMarkers = topSpots(seg).map((sp, k) => {
         // Numbered pins match the numbered rows on the card, so labels never pile up on the map.
         const el = document.createElement('div');
         el.className = 'spotpin' + (k === 0 ? ' lead' : '');
@@ -1696,20 +1747,20 @@
       $('rp-lbl').innerHTML = legendLabels(f.legend || [], f.units).map((l) => '<span>' + esc(String(l).toUpperCase()) + '</span>').join('');
       setRpState('MODEL STUDIO', '');
       const shortPlace = (p) => String(p || '').replace(/, ([A-Za-z .]+)$/, (m, st) => ', ' + (Object.keys(STATE_NAMES).find((k) => STATE_NAMES[k] === st) || st));
-      const spotRows = (seg.spots || []).slice(0, 4).map((sp, k) => '<div class="rowi" style="--rc:' + (k === 0 ? '#ffd34d' : '#c99a3c') + '"><span class="n">' + (k + 1) + '</span><b>' + esc(shortPlace(sp.place)) + '</b><em>' + esc(sp.display) + '</em></div>').join('');
+      const spotRows = topSpots(seg).map((sp, k) => '<div class="rowi" style="--rc:' + (k === 0 ? '#ffd34d' : '#c99a3c') + '"><span class="n">' + (k + 1) + '</span><b>' + esc(shortPlace(sp.place)) + '</b><em>' + esc(sp.display) + '</em></div>').join('');
       const rows = seg.compare.map((c) => '<div class="rowi" style="--rc:' + (c.model === seg.model ? '#1a8cff' : '#5d6f8d') + '"><i></i><b>' + esc(c.name) + '</b>' + (c.value == null ? '<span>' + esc(c.note || 'n/a') + '</span>' : '<em>' + esc(c.display) + '</em>') + '</div>').join('');
       const horizon = seg.horizonH <= 24 ? 'NEXT ' + seg.horizonH + ' HRS' : 'NEXT ' + Math.round(seg.horizonH / 24) + ' DAYS';
       const skewt = S.soundings && ['cape', 'refc', 'uh'].includes(f.key) && seg.spot
         ? '<img class="skewt" alt="" src="' + BASE + '/api/v3/models/sounding.png?lat=' + seg.spot.lat.toFixed(2) + '&lon=' + seg.spot.lon.toFixed(2) + '&fhr=3" onerror="this.remove()">' : '';
       setCard('<div class="head"><div class="ico">' + icon('outlook', 30) + '</div><div><h2>Model check</h2><div class="sub">' + esc(f.name.replace(/ \(.*\)$/, '').toUpperCase()) + ' · ' + horizon + '</div></div><span class="status">' + esc(seg.modelName.replace(' 3km', '')) + '</span></div>'
         + (spotRows
-          ? '<dl><dt>WHOLE COUNTRY</dt><dd>' + esc(seg.modelName.replace(' 3km', '')) + ' TOP SPOTS</dd></dl><div class="rows">' + spotRows + '</div>'
-            + '<dl><dt>EVERY MODEL</dt><dd>NEAR ' + esc(shortPlace(seg.topPlace || seg.place).toUpperCase()) + '</dd></dl>'
+          ? '<dl><dt>' + (seg.region ? esc(seg.region.toUpperCase()) : 'WHOLE COUNTRY') + '</dt><dd>' + esc(seg.modelName.replace(' 3km', '')) + ' TOP SPOTS</dd></dl><div class="rows">' + spotRows + '</div>'
+            + '<dl><dt>EVERY MODEL</dt><dd>' + (seg.region ? 'IN ' : 'NEAR ') + esc(shortPlace(seg.topPlace || seg.place).toUpperCase()) + '</dd></dl>'
           : '<dl><dt>WHERE</dt><dd>' + esc(seg.place) + '</dd></dl>')
         + '<div class="rows">' + rows + '</div>' + skewt, '#1a8cff');
       showSpotMarkers(seg);
       setNow({ k: 'MODELS', title: seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name) + ' · ' + horizon, color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
-      fly(CONUS, { padding: { top: 120, bottom: 130, left: 580, right: 300 }, maxZoom: 5.2, duration: 2400 });
+      fly(viewBounds(), { padding: { top: 120, bottom: 130, left: 580, right: 300 }, maxZoom: focusState() ? 7 : 5.2, duration: 2400 });
       // Loop through the frames that have finished loading; hold on the last one.
       let i = 0;
       let hold = 0;
@@ -1773,8 +1824,8 @@
         } else shot = { type: kind };
       }
       if (shot.type === 'outlook' && !outlooks().length) shot = { type: 'national' };
-      if (shot.type === 'reports' && (S.live?.reports || []).length < 5) shot = { type: 'national' };
-      if (shot.type === 'tropics' && !tropicsActive()) shot = { type: 'national' };
+      if (shot.type === 'reports' && !enoughReports()) shot = { type: 'national' };
+      if (shot.type === 'tropics' && !(tropicsActive() && tropicsHere())) shot = { type: 'national' };
       if (shot.type === 'surface' && !S.surface) shot = { type: 'national' };
       runShot(shot);
     };
@@ -1790,8 +1841,9 @@
         think: 2.2,
         national: 1.2,
         outlook: outlooks().length ? 1 : 0,
-        reports: (S.live?.reports || []).length >= 5 ? 1.2 : 0,
-        tropics: tropicsActive() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
+        reports: enoughReports() ? 1.2 : 0,
+        // Focused on a state: the tropics only come up if that state has tropical alerts.
+        tropics: tropicsActive() && tropicsHere() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
         // The national radar + surface map is the quiet-day staple (like Ryan's).
         surface: S.surface ? (busy ? 0.8 : 2) : 0
       };
@@ -1937,37 +1989,44 @@
         + '<div class="rows">' + (top.length ? top.map(([event, e]) => '<div class="rowi" style="--rc:' + esc(e.color) + '"><i></i><b>' + esc(event) + '</b><em>' + e.n + '</em></div>').join('') : '<div class="rowi" style="--rc:#3fe0ff"><i></i><b>No active warnings</b></div>')
         + (risk ? '<div class="rowi" style="--rc:#7dff9a"><i></i><b>SPC Day 1</b><span>' + esc(RISK_NAMES[risk] || risk) + '</span></div>' : '') + '</div>', '#1a8cff');
       const st2 = focusState();
-      const stBounds = st2 ? bboxOf({ type: 'GeometryCollection', geometries: pool.map((a) => a.geometry).filter(Boolean) }) : null;
+      const stBounds = st2 ? focusBounds() || bboxOf({ type: 'GeometryCollection', geometries: pool.map((a) => a.geometry).filter(Boolean) }) : null;
       fly(stBounds || CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 7 });
       setNow({ k: 'OVERVIEW', title: (st2 ? (STATE_NAMES[st2] || st2) : 'Nationwide') + ': ' + pool.length + ' active alerts', color: '#1a8cff', crawl: top.map(([event, e]) => e.n + ' ' + event).join(' · ') });
       const common = [...byEvent.entries()].sort((x, y) => y[1].n - x[1].n).slice(0, 3).map(([event, e]) => e.n + ' ' + (e.n === 1 ? event.toLowerCase() : plural(event.toLowerCase())));
       const wis = S.live?.wis;
-      chatter(pick(['Here’s the big picture.', 'Let’s zoom out and look at the whole country.', 'Time for a look across the country.']) + ' There are ' + pool.length + ' active alerts' + (st2 ? ' in ' + (STATE_NAMES[st2] || st2) : ' nationwide') + '.'
+      const opener = st2 ? pick(['Here’s the big picture in ' + focusName() + '.', 'Let’s look across ' + focusName() + '.']) : pick(['Here’s the big picture.', 'Let’s zoom out and look at the whole country.', 'Time for a look across the country.']);
+      const count = pool.length ? ' There ' + (pool.length === 1 ? 'is one active alert' : 'are ' + pool.length + ' active alerts') : ' There are no active alerts';
+      chatter(opener + count + (st2 ? ' in ' + focusName() : ' nationwide') + (pool.length ? '.' : ' right now.')
         + (common.length ? ' The most common: ' + listWords(common) + '.' : '')
-        + (wis?.loaded && Math.random() < 0.5 ? ' The Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.' : ''));
+        + (wis?.loaded && Math.random() < 0.5 ? (st2 ? ' Nationally, the' : ' The') + ' Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.' : ''));
     };
     const outlookShot = () => {
       const list = outlooks();
       const order = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
-      const risks = list.map((a) => ({ a, risk: (a.hazards || []).find((h) => h.label === 'RISK')?.value })).filter((r) => r.risk).sort((x, y) => order.indexOf(y.risk) - order.indexOf(x.risk));
+      const pts = focusPoints();
+      const inState = (r) => !pts.length || pts.some((p) => inGeometry([p.lon, p.lat], r.a.geometry));
+      const risks = list.map((a) => ({ a, risk: (a.hazards || []).find((h) => h.label === 'RISK')?.value })).filter((r) => r.risk && inState(r)).sort((x, y) => order.indexOf(y.risk) - order.indexOf(x.risk));
       const top = risks[0];
       setCard('<div class="head"><div class="ico">' + icon('outlook', 30) + '</div><div><h2>SPC DAY 1 OUTLOOK</h2><div class="sub">VALID UNTIL ' + esc(top?.a.times?.expires || '') + '</div></div></div>'
         + '<div class="rows">' + risks.map((r) => '<div class="rowi" style="--rc:' + esc(r.a.accent || r.a.color) + '"><i></i><b>' + esc(RISK_NAMES[r.risk] || r.risk) + '</b><span>' + esc(r.risk) + '</span></div>').join('') + '</div>', top?.a.color || '#55bb55');
-      fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 6 });
+      fly(viewBounds(), { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: focusState() ? 7 : 6 });
       setNow({ k: 'OUTLOOK', title: 'Storm Prediction Center: ' + (RISK_NAMES[top?.risk] || 'Day 1 outlook'), color: top?.a.color || '#55bb55', crawl: risks.map((r) => RISK_NAMES[r.risk] || r.risk).join(' · ') });
       if (top) {
         const risk = (RISK_NAMES[top.risk] || top.risk).toLowerCase();
-        chatter('Here’s the Storm Prediction Center’s day one outlook. ' + (top.risk === 'TSTM' ? 'Just general thunderstorms today, nothing organized.' : 'The highest risk today is ' + article(risk) + ' ' + risk + ' for severe storms.'));
+        const where = focusState() ? ' in ' + focusName() : '';
+        chatter('Here’s the Storm Prediction Center’s day one outlook' + (where ? ' for ' + focusName() : '') + '. ' + (top.risk === 'TSTM' ? 'Just general thunderstorms' + where + ' today, nothing organized.' : 'The highest risk' + where + ' today is ' + article(risk) + ' ' + risk + ' for severe storms.'));
+      } else if (focusState()) {
+        chatter('The Storm Prediction Center has no thunderstorm risk for ' + focusName() + ' today.');
       }
     };
     const reportsShot = () => {
-      const reports = [...(S.live?.reports || [])].sort((x, y) => Date.parse(y.time) - Date.parse(x.time));
+      const reports = [...shotReports()].sort((x, y) => Date.parse(y.time) - Date.parse(x.time));
       const latest = reports.slice(0, 7);
       setCard('<div class="head"><div class="ico">' + icon('reports', 30) + '</div><div><h2>STORM REPORTS</h2><div class="sub">LAST 3 HOURS · ' + reports.length + ' REPORTS</div></div></div>'
         + '<div class="rows">' + latest.map((r) => '<div class="rowi" style="--rc:' + (REPORT_COLORS[r.type] || '#fff') + '"><i></i><b>' + esc(reportLabel(r) + ' · ' + r.city + ', ' + r.state) + '</b><span>' + esc(ago(r.time)) + '</span></div>').join('') + '</div>', '#ffd34d');
       const b = bboxOf({ type: 'MultiPoint', coordinates: reports.map((r) => [r.lon, r.lat]) });
-      fly(b, { padding: { top: 160, bottom: 150, left: 620, right: 640 }, maxZoom: 7 });
-      if (reports[0]) chatter(pick(['Let’s look at storm reports.', 'Here are the latest storm reports.']) + ' There ' + (reports.length === 1 ? 'has been one' : 'have been ' + reports.length) + ' in the last three hours. The most recent: ' + reportWords(reports[0]) + ' near ' + reportCity(reports[0]) + ', ' + (STATE_NAMES[reports[0].state] || reports[0].state) + ', ' + agoWords(reports[0].time) + '.');
+      fly(focusState() ? viewBounds() : b, { padding: { top: 160, bottom: 150, left: 620, right: 640 }, maxZoom: 7 });
+      if (reports[0]) chatter(pick(['Let’s look at storm reports.', 'Here are the latest storm reports.']) + ' There ' + (reports.length === 1 ? 'has been one' : 'have been ' + reports.length) + (focusState() ? ' in ' + focusName() : '') + ' in the last three hours. The most recent: ' + reportWords(reports[0]) + ' near ' + reportCity(reports[0]) + ', ' + (STATE_NAMES[reports[0].state] || reports[0].state) + ', ' + agoWords(reports[0].time) + '.');
       setNow({ k: 'REPORTS', title: reports.length + ' storm reports in the last 3 hours', color: '#ffd34d', crawl: latest.map((r) => r.type + ' · ' + r.city + ', ' + r.state + (r.remark ? ' — ' + r.remark : '')).join('   ◆   ') });
     };
 
@@ -2366,7 +2425,7 @@
         el.innerHTML = '<b>' + kind.toUpperCase() + '</b><small>' + p.mb + ' mb</small>';
         return new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([p.lon, p.lat]).addTo(S.map);
       });
-      fly(CONUS, { padding: { top: 110, bottom: 110, left: 140, right: 300 }, maxZoom: 5 });
+      fly(viewBounds(), { padding: { top: 110, bottom: 110, left: 140, right: 300 }, maxZoom: focusState() ? 7 : 5 });
       // Bottom line: what's playing (like Ryan's quiet-mode bar), or the surface map itself.
       const wisMode = S.live?.wis?.loaded ? S.live.wis.label.toUpperCase() : 'LIVE';
       if (M.mode && M.playing) {
@@ -2374,6 +2433,22 @@
         setNow({ k: 'NOW PLAYING', title: song, color: '#1a8cff', crawl: 'ARTIST NAME · ' + (artist || 'WEBOT RADIO').toUpperCase() + '      ◆      MODE · ' + wisMode + '      ◆      SURFACE MAP · NWS WEATHER PREDICTION CENTER' });
       } else {
         setNow({ k: 'NATIONAL RADAR', title: 'Radar and surface map', color: '#1a8cff', crawl: 'HIGHS, LOWS AND FRONTS · NWS WEATHER PREDICTION CENTER · MODE · ' + wisMode });
+      }
+      // Focused on one state: talk about that state only.
+      if (focusState()) {
+        const st = focusName();
+        const FRONT_WORDS = { COLD: 'A cold front', WARM: 'A warm front', STNRY: 'A stationary front', OCFNT: 'An occluded front', DRYLINE: 'The dryline' };
+        const crossing = sf.fronts.features.find((x) => FRONT_WORDS[x.properties.type] && x.geometry.coordinates.some(([lon, lat]) => inFocus(lon, lat)));
+        const b = focusBounds();
+        const nearby = (p) => b && p.lon > b[0][0] - 3 && p.lon < b[1][0] + 3 && p.lat > b[0][1] - 3 && p.lat < b[1][1] + 3;
+        const hiNear = sf.highs.filter(nearby).sort((x, y) => y.mb - x.mb)[0];
+        const loNear = sf.lows.filter(nearby).sort((x, y) => x.mb - y.mb)[0];
+        let t2 = pick(['Here’s the radar across ' + st + '.', 'Let’s check the radar over ' + st + '.', 'Here’s a look at ' + st + ' on radar.']);
+        if (crossing) t2 += ' ' + FRONT_WORDS[crossing.properties.type] + ' is moving through the state.';
+        if (loNear) t2 += ' There’s low pressure nearby, at ' + loNear.mb + ' millibars.';
+        else if (hiNear) t2 += ' High pressure nearby, at ' + hiNear.mb + ' millibars, is keeping things settled.';
+        chatter(t2);
+        return;
       }
       // WeBot's take, from the analysis itself.
       const high = sf.highs.filter(inConus).sort((a, b) => b.mb - a.mb)[0];
@@ -2484,6 +2559,7 @@
       }
       if (ttsCfg().engine === 'neural' && OPT.voice) startNeural();
       if (ttsCfg().engine === 'puter' && OPT.voice) startPuter();
+      if (focusState()) loadShapes();
       if (!talkAllowed() && speech.queue.some((item) => !item.force)) speech.queue = speech.queue.filter((item) => item.force);
       const linkedAt = S.control.puter?.linkedAt || null;
       if (linkedAt !== S.puterLinkedAt) { S.puterLinkedAt = linkedAt; if (['ready', 'signed-out'].includes(pt.state)) linkPuter(); }
@@ -2507,7 +2583,8 @@
 
     const roundup = () => {
       if (S.inBreaking || speech.busy) return;
-      const t = S.live?.tallies || {};
+      const st = focusState();
+      const t = st ? stateTallies(st) : S.live?.tallies || {};
       const wis = S.live?.wis;
       const parts = [];
       if (t.tor) parts.push(t.tor + ' tornado warning' + (t.tor === 1 ? '' : 's'));
@@ -2515,9 +2592,9 @@
       if (t.ffw) parts.push(t.ffw + ' flash flood warning' + (t.ffw === 1 ? '' : 's'));
       const watches = (t.torWatch || 0) + (t.svrWatch || 0);
       let text = 'WeatherPower update. ';
-      text += parts.length ? 'Right now there ' + (parts.length === 1 && /^1 /.test(parts[0]) ? 'is ' : 'are ') + parts.join(', ') + ' across the country.' : 'No tornado, severe thunderstorm or flash flood warnings are in effect right now.';
+      text += parts.length ? 'Right now there ' + (parts.length === 1 && /^1 /.test(parts[0]) ? 'is ' : 'are ') + parts.join(', ') + (st ? ' in ' + focusName() + '.' : ' across the country.') : 'No tornado, severe thunderstorm or flash flood warnings are in effect' + (st ? ' in ' + focusName() : '') + ' right now.';
       if (watches) text += ' ' + watches + ' severe weather watch' + (watches === 1 ? ' is' : 'es are') + ' active.';
-      if (wis?.loaded) text += ' The Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.';
+      if (wis?.loaded) text += (st ? ' Nationally, the' : ' The') + ' Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.';
       say(text, { label: 'UPDATE' });
     };
     setInterval(() => {

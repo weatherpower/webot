@@ -190,12 +190,12 @@ const pool = async (items, limit, fn) => {
 };
 
 // One number per city from the lead model: the window total for accumulated fields, the peak otherwise.
-const scanNation = async (field, model, run, horizonH) => {
+const scanNation = async (field, model, run, horizonH, spots = NATIONAL_SPOTS) => {
   const accumulated = ACCUMULATED.has(field.key);
   const hours = accumulated ? windowHours(run, horizonH, 400, 0) : windowHours(run, horizonH, 3, field.min_fhr);
   const startH = hours[0];
   const endH = hours[hours.length - 1];
-  return pool(NATIONAL_SPOTS, 6, async (spot) => {
+  return pool(spots, 6, async (spot) => {
     let value = null;
     if (accumulated) {
       const [start, end] = await Promise.all([
@@ -218,22 +218,28 @@ const LEAD_IN = {
   wind10: 'The strongest winds', pwat: 'The deepest moisture'
 };
 const NUMERIC_FIELDS = new Set(['cape', 'qpf', 'snow', 't2m', 'td2m', 'gust', 'wind10', 'pwat']);
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const listJoin = (items) => (items.length <= 1 ? items[0] || '' : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1]);
 const isQuiet = (fieldKey, v) => fieldKey in QUIET_BELOW && v < QUIET_BELOW[fieldKey];
 const cityOf = (place) => place.split(',')[0];
 
 // WeBot's national take, built only from the returned numbers.
-export const nationalTake = (fieldKey, fieldName, units, spots, compare, leadModel, leadName, horizonH) => {
+// region: a state name when the stream is focused on one state (its spots are "southeastern Oklahoma" etc.).
+export const nationalTake = (fieldKey, fieldName, units, spots, compare, leadModel, leadName, horizonH, region = '') => {
   const known = spots.filter((s) => s.value != null).sort((a, b) => b.value - a.value);
-  if (!known.length) return `I checked the ${leadName} across the country, but the model service doesn't have ${fieldName.toLowerCase()} right now.`;
+  const area = region || 'the whole country';
+  if (!known.length) return `I checked the ${leadName} across ${region || 'the country'}, but the model service doesn't have ${fieldName.toLowerCase()} right now.`;
   const top = known[0];
-  let text = `Let me check the models across the whole country over ${windowWords(horizonH)}.`;
-  if (isQuiet(fieldKey, top.value)) return `${text} The ${leadName} ${describe(fieldKey, top.value)} from coast to coast.`;
+  const at = (place) => (region ? 'in ' + place : 'near ' + place);
+  const short = (place) => (region ? place.replace(new RegExp('\\s*' + region + '$'), '') || place : cityOf(place));
+  let text = `Let me check the models across ${area} over ${windowWords(horizonH)}.`;
+  if (isQuiet(fieldKey, top.value)) return `${text} The ${leadName} ${describe(fieldKey, top.value)} ${region ? 'across ' + region : 'from coast to coast'}.`;
   // Fields people know by the number get the number; radar-style fields get described.
   text += NUMERIC_FIELDS.has(fieldKey)
-    ? ` ${LEAD_IN[fieldKey]} in the ${leadName} is near ${top.place}, around ${fmt(top.value, units)}.`
-    : ` The ${leadName} ${describe(fieldKey, top.value)} near ${top.place}.`;
+    ? ` ${LEAD_IN[fieldKey]} in the ${leadName} is ${at(top.place)}, around ${fmt(top.value, units)}.`
+    : ` The ${leadName} ${describe(fieldKey, top.value)} ${at(top.place)}.`;
   const next = known.slice(1, 3).filter((s) => !isQuiet(fieldKey, s.value));
-  if (next.length) text += ` ${next.map((s) => cityOf(s.place)).join(' and ')} ${next.length === 1 ? 'is' : 'are'} next.`;
+  if (next.length) text += ` ${cap(listJoin(next.map((s) => short(s.place))))} ${region ? 'parts of the state' : ''}${next.length === 1 ? (region ? ' are' : 'is') : ' are'} next.`.replace('  ', ' ');
   const others = compare.filter((c) => c.value != null && c.model !== leadModel);
   const lead = compare.find((c) => c.model === leadModel && c.value != null);
   if (lead && others.length) {
@@ -241,10 +247,10 @@ export const nationalTake = (fieldKey, fieldName, units, spots, compare, leadMod
     const lo = Math.min(...values);
     const hi = Math.max(...values);
     const tight = units === 'in' ? hi - lo <= Math.max(0.25, hi * 0.3) : units === '°F' ? hi - lo <= 4 : hi - lo <= Math.max(10, hi * 0.3);
-    if (tight) text += ` The ${others.map((c) => c.name).join(' and ')} agree${others.length === 1 ? 's' : ''} near ${cityOf(top.place)}.`;
+    if (tight) text += ` The ${others.map((c) => c.name).join(' and ')} agree${others.length === 1 ? 's' : ''} ${region ? 'in ' + top.place : 'near ' + cityOf(top.place)}.`;
     else {
       const all = [lead, ...others];
-      text += ` Near ${cityOf(top.place)} the models disagree, though: the ${all.find((c) => c.value === lo).name} shows ${fmt(lo, units)} while the ${all.find((c) => c.value === hi).name} shows ${fmt(hi, units)}.`;
+      text += ` ${region ? 'In ' + top.place : 'Near ' + cityOf(top.place)} the models disagree, though: the ${all.find((c) => c.value === lo).name} shows ${fmt(lo, units)} while the ${all.find((c) => c.value === hi).name} shows ${fmt(hi, units)}.`;
     }
   }
   return text;
@@ -253,12 +259,15 @@ export const nationalTake = (fieldKey, fieldName, units, spots, compare, leadMod
 // A complete segment: animation frames for one model/field plus the comparison and WeBot's take.
 // With no lat/lon it is a national check (the default for the live stream).
 const segmentCache = new Map();
-export const modelSegment = async ({ model = 'hrrr', field = 'refc', lat, lon, place = 'your area', horizon } = {}) => {
+export const modelSegment = async ({ model = 'hrrr', field = 'refc', lat, lon, place = 'your area', horizon, points, region } = {}) => {
   const catalog = await modelCatalog();
   const m = catalog.models.find((x) => x.key === model);
   const f = catalog.fields.find((x) => x.key === field);
   if (!m || !f || !f.models.includes(model) || f.kind === 'contour') throw Object.assign(new Error('Unknown model or field'), { status: 400 });
   const horizonH = Math.min(240, Math.max(6, Number(horizon) || (m.regional ? 18 : 120)));
+  // A focused state sends its own sample points ("lat,lon,label;…").
+  const spots = parsePoints(points);
+  if (spots.length) return nationalSegment(catalog, m, f, horizonH, { spots, region: String(region || '').slice(0, 40) });
   if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon)) || lat === '' || lon === '') return nationalSegment(catalog, m, f, horizonH);
   const pointLat = Number.isFinite(Number(lat)) ? Number(lat) : config.forecast.lat;
   const pointLon = Number.isFinite(Number(lon)) ? Number(lon) : config.forecast.lon;
@@ -295,16 +304,30 @@ export const modelSegment = async ({ model = 'hrrr', field = 'refc', lat, lon, p
   return { ...body, take: modelTake(field, f.name, f.units, compare, model, place, horizonH), place };
 };
 
-const nationalSegment = async (catalog, m, f, horizonH) => {
-  const id = ['national', m.key, f.key, horizonH].join('/');
+const parsePoints = (text) => String(text || '').split(';').slice(0, 40).map((part) => {
+  const [la, lo, ...label] = part.split(',');
+  const lat = Number(la);
+  const lon = Number(lo);
+  const placeName = label.join(',').replace(/[^\w .'-]/g, '').trim().slice(0, 60);
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && placeName ? { lat, lon, place: placeName } : null;
+}).filter(Boolean);
+
+const nationalSegment = async (catalog, m, f, horizonH, { spots = NATIONAL_SPOTS, region = '' } = {}) => {
+  const id = [region ? 'region:' + region + ':' + spots.length : 'national', m.key, f.key, horizonH].join('/');
   const cached = segmentCache.get(id);
   if (cached && Date.now() - cached.at < 15 * 60 * 1000) return cached.body;
   const run = await pickRun(m.key, Math.min(horizonH, m.regional ? 18 : horizonH));
   if (!run) throw Object.assign(new Error(`No ${m.name} runs are published right now`), { status: 503 });
   const hours = windowHours(run, horizonH, 20, f.min_fhr);
   prefetch(m.key, run.key, f.key, hours[0] ?? 0);
-  const scanned = (await scanNation(f, m.key, run, horizonH)).filter((s) => s.value != null).sort((a, b) => b.value - a.value);
-  const top = scanned[0] || NATIONAL_SPOTS.find((s) => s.place.startsWith('Kansas City'));
+  // Several sample points share an area label in a state: keep the strongest per area.
+  const best = new Map();
+  for (const s of await scanNation(f, m.key, run, horizonH, spots)) {
+    if (s.value == null) continue;
+    if (!best.has(s.place) || s.value > best.get(s.place).value) best.set(s.place, s);
+  }
+  const scanned = [...best.values()].sort((a, b) => b.value - a.value);
+  const top = scanned[0] || spots[Math.floor(spots.length / 2)] || NATIONAL_SPOTS.find((s) => s.place.startsWith('Kansas City'));
   const compare = await compareModels(catalog, f.key, horizonH, top.lat, top.lon);
   const [west, east, south, north] = m.extent;
   const body = {
@@ -319,11 +342,12 @@ const nationalSegment = async (catalog, m, f, horizonH) => {
     coordinates: [[west, north], [east, north], [east, south], [west, south]],
     frames: hours.map((h) => ({ fhr: h, valid: new Date(runTime(run.key) + h * HOUR).toISOString(), path: `/api/v3/models/frame/${m.key}/${run.key}/${f.key}/${h}.webp` })),
     point: { lat: top.lat, lon: top.lon },
-    place: 'the whole country',
+    place: region || 'the whole country',
+    region: region || null,
     topPlace: scanned[0]?.place || null,
     spots: scanned.slice(0, 5).map((s) => ({ place: s.place, lat: s.lat, lon: s.lon, value: s.value, display: fmt(s.value, f.units) })),
     compare: compare.map((c) => ({ ...c, display: fmt(c.value, f.units) })),
-    take: nationalTake(f.key, f.name, f.units, scanned, compare, m.key, m.name, horizonH),
+    take: nationalTake(f.key, f.name, f.units, scanned, compare, m.key, m.name, horizonH, region),
     credit: `Models: ${m.source || m.name} via WeatherPower Model Studio`
   };
   segmentCache.set(id, { at: Date.now(), body });

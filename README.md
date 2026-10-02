@@ -430,3 +430,8 @@ them. Live Control can still search and preview cameras privately and shows an O
   finish the thought just started; breaking alerts, new tornado-level warnings and typed lines skip the
   timer. Live Control shows the characters sent to the paid voice in the last hour (cache hits are free).
   Control action `talk` with `gap` (minutes).
+- **State focus** (Live Control → Show → Focus, or `?state=OK`): every shot zooms to the state's outline,
+  model checks sample points inside the state and talk about areas ("southeastern Oklahoma"), the radar map
+  mentions fronts crossing the state, the outlook gives the highest risk in the state, storm reports and the
+  report counter are the state's own, tropics only show with tropical alerts there, and WeBot's updates count
+  that state's warnings. `GET /api/v3/models/segment` accepts `points=lat,lon,label;…&region=Name`.

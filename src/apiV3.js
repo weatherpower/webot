@@ -440,7 +440,10 @@ export const apiV3Router = () => {
         lat: req.query.lat,
         lon: req.query.lon,
         place: String(req.query.place || '').slice(0, 80) || undefined,
-        horizon: req.query.horizon
+        horizon: req.query.horizon,
+        // State focus: sample points inside the state ("lat,lon,label;…") and the state's name.
+        points: String(req.query.points || '').slice(0, 4000),
+        region: String(req.query.region || '').slice(0, 40)
       }));
     } catch (error) {
       next(error);
