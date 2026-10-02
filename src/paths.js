@@ -7,7 +7,8 @@ const __dirname = path.dirname(__filename);
 
 export const projectRoot = path.resolve(__dirname, '..');
 export const publicDir = path.join(projectRoot, 'public');
-export const dataDir = path.join(projectRoot, 'data');
+// WARNING_DATA_DIR lets a second (test) server keep its own settings and state.
+export const dataDir = process.env.WARNING_DATA_DIR ? path.resolve(process.env.WARNING_DATA_DIR) : path.join(projectRoot, 'data');
 export const cardsDir = path.join(projectRoot, 'cards');
 export const chromiumTmpDir = path.join(dataDir, 'chromium-tmp');
 export const logPath = path.join(dataDir, 'post-log.jsonl');

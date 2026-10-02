@@ -394,3 +394,19 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
   `data/live-secrets.json` (never in the public `/api/v3/live`), and the stream fetches it from
   `GET /api/v3/live/puter?key=` using its private stream key. Use the OBS link shown in Live Control
   (it ends in `?key=…`); the key is derived from `CONTROLLER_TOKEN`.
+
+### Looks, state outlines, cameras on air
+
+- **Look (bar themes):** Live Control → Look picks the top/bottom bar colors: Auto (follows the weather:
+  tornado red, severe storm red, flood green, tropical teal, winter blue, heat orange, violet when quiet)
+  or a fixed look (Violet, Clear Skies, Severe Storms, Tornado, Flooding, Winter, Heat, Tropical, Night,
+  Halloween). Control action `theme`.
+- **State outlines** next to the state name in the radar box (US Census shapes from us-atlas via jsDelivr),
+  the lower-48 outline for the national view.
+- **WeBot talks about cameras:** every camera that comes up gets a line (queued after the alert line), with
+  the camera's place said naturally and whether it sits inside an active warning; pinned cameras get a
+  check-in every few segments. Sentences no longer split inside "U.S." or decimals.
+- **Sound starts by itself:** no "sound is on" announcement; a browser that blocks autoplay starts sound on
+  the first click or key press anywhere, and WeBot's opening line waits for it. Pinning an alert in Live
+  Control switches the stream right away.
+- `WARNING_DATA_DIR` runs a second (test) server with its own settings and state.

@@ -238,7 +238,9 @@ const DEFAULT_MUSIC = { on: true, volume: 35, source: 'auto', mood: 'auto', duck
 const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', speed: 1 };
 // Cameras on stream: auto = nearest camera to the alert on screen, pinned = one chosen camera all the time, off.
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, commands: [] };
+// Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
+export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'fall'];
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', commands: [] };
 let control = null;
 
 const loadControl = async () => {
@@ -262,7 +264,8 @@ export const noteStreamBeat = (query = {}) => {
     at: new Date().toISOString(),
     playing: clip(query.np, 90),
     mood: MUSIC_MOODS.includes(query.mood) ? query.mood : '',
-    tts: clip(query.tts, 40)
+    tts: clip(query.tts, 40),
+    theme: THEMES.includes(query.theme) ? query.theme : ''
   };
 };
 
@@ -417,6 +420,9 @@ export const applyLiveCommand = async (body = {}) => {
       current.tts = tts;
       break;
     }
+    case 'theme':
+      current.theme = THEMES.includes(body.theme) ? body.theme : 'auto';
+      break;
     case 'camera': {
       const camera = { ...current.camera };
       if (['auto', 'pinned', 'off'].includes(body.mode)) camera.mode = body.mode;

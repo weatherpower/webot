@@ -15,7 +15,7 @@
     /* Ryan Hall-style stream look: violet bars, dark navy panels with cyan corner accents, spaced mono labels. */
     :root {
       --ink: #f4f6fb; --muted: #8f9bb3; --line: rgba(255,255,255,.12); --edge: #33d4ff; --brand: #33d4ff;
-      --violet: linear-gradient(180deg, #7457ec 0%, #5b3fd3 100%); --violet-dark: #3e2a9c; --violet-deep: #2c1e74;
+      --violet: linear-gradient(180deg, #7457ec 0%, #5b3fd3 100%); --violet-dark: #3e2a9c; --violet-deep: #141d47;
       --panel: rgba(9,16,30,.93); --panel-solid: #0a1222;
     }
     * { box-sizing: border-box; }
@@ -40,7 +40,7 @@
     .hl .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); font-family: "WP Display"; font-weight: 700; font-size: 40px; letter-spacing: .01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; transition: transform .45s ease, opacity .3s; }
     .hl .txt.enter { transform: translateY(30%); opacity: 0; }
     .hl .txt.leave { transform: translateY(-130%); opacity: 0; }
-    .wpi { flex: none; width: 360px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: #141d47; border-left: 2px solid rgba(255,255,255,.12); }
+    .wpi { flex: none; width: 360px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--violet-deep); border-left: 2px solid rgba(255,255,255,.12); transition: background-color 1.2s; }
     .wpi .meta { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: #9fb3e6; display: flex; gap: 8px; }
     .wpi .v { font-family: "WP Display"; font-size: 38px; font-weight: 700; line-height: 1; color: var(--wc, #4fb4ff); }
     .wpi .lab { font-family: "WP Mono"; font-size: 11px; letter-spacing: .3em; color: var(--wc, #4fb4ff); }
@@ -114,7 +114,9 @@
     .rp .bar { height: 10px; margin: 0 22px; }
     .rp .lbl { display: flex; justify-content: space-between; padding: 8px 22px 12px; font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); }
     .rp .r3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px 16px; border-top: 1px solid var(--line); font-family: "WP Mono"; font-size: 16px; font-weight: 700; letter-spacing: .08em; }
-    .rp .r3 .st { color: var(--edge); font-family: "WP Display"; font-size: 24px; letter-spacing: .06em; }
+    .rp .r3 .st { display: flex; align-items: center; gap: 10px; color: var(--edge); font-family: "WP Display"; font-size: 24px; letter-spacing: .06em; }
+    .rp .r3 .st svg { flex: none; width: 34px; height: 34px; overflow: visible; }
+    .rp .r3 .st svg path { fill: rgba(51,212,255,.18); stroke: var(--edge); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .ticks { display: flex; gap: 3px; padding: 0 22px 12px; }
     .ticks i { flex: 1; height: 3px; background: rgba(255,255,255,.14); }
     .ticks i.on { background: rgba(255,255,255,.6); }
@@ -253,7 +255,7 @@
     <div class="brk" id="brk"></div>
     <div class="boot" id="boot">WEATHERPOWER LIVE</div>
   </div>
-  <button class="gate" id="gate" hidden>🔊 Click to turn on sound and the bot's voice</button>
+  <button class="gate" id="gate" hidden>🔊 Sound is blocked by this browser · click anywhere</button>
   <button class="gate" id="puter-gate" style="top:72px" hidden>🔑 Sign in to Puter for WeBot's Alloy voice (in OBS: use Live Control → Puter)</button>
 
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
@@ -723,7 +725,12 @@
         setTimeout(() => bot.classList.remove('talk'), Math.min(6000, 1200 + text.length * 30));
         return;
       }
-      const parts = speakable(text).match(/[^.!?]+[.!?]*/g) || [speakable(text)];
+      // Split on sentence ends only: not inside decimals (1.6 inches) or abbreviations (U.S., St., Mt.).
+      const SAFE = '․';
+      const guarded = speakable(text)
+        .replace(/(\d)\.(\d)/g, '$1' + SAFE + '$2')
+        .replace(/\b(U\.S|St|Mt|Dr|Ave|Rd|Hwy|Ft|Jr|Sr|vs)\./g, (m, w) => w.replace(/\./g, SAFE) + SAFE);
+      const parts = (guarded.match(/[^.!?]+[.!?]*/g) || [guarded]).map((p) => p.split(SAFE).join('.'));
       parts.map((p) => p.trim()).filter(Boolean).forEach((p) => {
         const audio = synth(p);
         audio?.catch(() => {});
@@ -737,14 +744,15 @@
       const blocked = actx && actx.state !== 'running';
       gate.hidden = !(blocked && (OPT.sound || OPT.voice));
     };
-    gate.addEventListener('click', async () => {
-      try { await actx?.resume(); } catch {}
-      gate.hidden = true;
-      chime('soft');
-      say('Sound is on. I will read out new warnings as they come in.');
-    });
-    actx?.resume?.().catch(() => {});
-    setTimeout(checkAudio, 1200);
+    // Sound starts on its own: OBS lets it play right away, and a browser starts it the moment anything
+    // is clicked or pressed (or straight away if the site is allowed to play sound). No announcement.
+    const startAudio = () => actx?.resume?.().then(checkAudio).catch(() => {});
+    ['pointerdown', 'keydown', 'touchstart'].forEach((type) => addEventListener(type, startAudio, { passive: true }));
+    gate.addEventListener('click', startAudio);
+    startAudio();
+    const audioRetry = setInterval(() => { if (!actx || actx.state === 'running') { clearInterval(audioRetry); checkAudio(); } else startAudio(); }, 2000);
+    // The reminder only shows if sound is still blocked after a while, never on a stream that already plays.
+    setTimeout(checkAudio, 6000);
 
     /* ---------------- background music ---------------- */
     // WeBot Radio is lo-fi music composed live in the page (electric piano, pads, bass, soft drums,
@@ -1268,16 +1276,72 @@
     };
     setInterval(animate, 420);
 
+    // State outline next to the state name in the radar box (US Census shapes via us-atlas).
+    const SHAPES = { ready: null, byName: new Map(), nation: null, cache: new Map() };
+    const loadShapes = () => SHAPES.ready || (SHAPES.ready = (async () => {
+      await new Promise((resolve, reject) => {
+        const tag = document.createElement('script');
+        tag.src = 'https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';
+        tag.onload = resolve;
+        tag.onerror = reject;
+        document.head.appendChild(tag);
+      });
+      const topo = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then((r) => r.json());
+      topojson.feature(topo, topo.objects.states).features.forEach((f) => SHAPES.byName.set(f.properties.name, f.geometry));
+      // The lower 48 for the national view (Alaska, Hawaii and territories would shrink it to a speck).
+      const lower48 = topo.objects.states.geometries.filter((g) => !['Alaska', 'Hawaii', 'Puerto Rico', 'Guam', 'American Samoa', 'Commonwealth of the Northern Mariana Islands', 'United States Virgin Islands'].includes(g.properties.name));
+      SHAPES.nation = topojson.merge(topo, lower48);
+    })().catch((error) => { console.warn('State shapes unavailable:', error.message); }));
+    const shapeSvg = (geometry) => {
+      if (!geometry) return '';
+      const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+      // Alaska's Aleutians cross the date line: keep everything on the west side.
+      const ring = (r) => r.map(([lon, lat]) => [lon > 0 ? lon - 360 : lon, lat]);
+      const rings = polys.map((p) => ring(p[0]));
+      const all = rings.flat();
+      if (!all.length) return '';
+      const lats = all.map((p) => p[1]);
+      const k = Math.cos((((Math.min(...lats) + Math.max(...lats)) / 2) * Math.PI) / 180);
+      const xs = all.map((p) => p[0] * k);
+      const ys = all.map((p) => -p[1]);
+      const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      const scale = 32 / Math.max(x1 - x0, y1 - y0);
+      const ox = (34 - (x1 - x0) * scale) / 2;
+      const oy = (34 - (y1 - y0) * scale) / 2;
+      // Tiny islands are dropped so the outline stays clean at icon size.
+      const d = rings.filter((r) => r.length > 8).map((r) => 'M' + r.map(([lon, lat]) => ((lon * k - x0) * scale + ox).toFixed(1) + ',' + ((-lat - y0) * scale + oy).toFixed(1)).join('L') + 'Z').join('');
+      return '<svg viewBox="0 0 34 34" aria-hidden="true"><path d="' + d + '"/></svg>';
+    };
+    // label: text to show; code: two-letter state, or 'US' for the lower 48.
+    const setRpState = (label, code) => {
+      const el = $('rp-state');
+      const key = code || '';
+      el.dataset.code = key;
+      const draw = () => {
+        if (el.dataset.code !== key) return;
+        let svg = SHAPES.cache.get(key);
+        if (svg == null) {
+          svg = key === 'US' ? shapeSvg(SHAPES.nation) : shapeSvg(SHAPES.byName.get(STATE_NAMES[key]));
+          SHAPES.cache.set(key, svg);
+        }
+        el.innerHTML = esc(label) + svg;
+      };
+      el.textContent = label;
+      if (!key) return;
+      if (SHAPES.nation) draw();
+      else loadShapes().then(draw);
+    };
+
     const renderRadarPanel = () => {
       const legend = S.velOn ? LEGENDS.vel : LEGENDS.refl;
       $('rp-bar').style.background = legend.bar;
       $('rp-lbl').innerHTML = legend.labels.map((l) => '<span>' + esc(l) + '</span>').join('');
       if (S.local) {
         $('rp-title').textContent = S.velOn ? 'STORM VELOCITY' : 'LOCAL RADAR';
-        $('rp-state').textContent = (STATE_NAMES[S.local.site.state] || S.local.site.state || '').toUpperCase();
+        setRpState((STATE_NAMES[S.local.site.state] || S.local.site.state || '').toUpperCase(), S.local.site.state);
       } else {
         $('rp-title').textContent = 'NATIONAL RADAR';
-        $('rp-state').textContent = focusState() ? (STATE_NAMES[focusState()] || focusState()).toUpperCase() : 'CONUS';
+        setRpState(focusState() ? (STATE_NAMES[focusState()] || focusState()).toUpperCase() : 'UNITED STATES', focusState() || 'US');
       }
       updateSiteLine();
     };
@@ -1325,7 +1389,47 @@
       ctx.fillStyle = '#fff';
       ctx.fill();
     };
+    /* ---------------- bar themes: match the vibe of the weather ---------------- */
+    const THEMES = {
+      violet: { a: '#7457ec', b: '#5b3fd3', dark: '#3e2a9c', deep: '#141d47' },
+      clear: { a: '#2f8cff', b: '#1f6fe0', dark: '#164a9e', deep: '#0f2a55' },
+      storm: { a: '#e0453a', b: '#b52a22', dark: '#7c1a16', deep: '#3a0f0d' },
+      tornado: { a: '#c8102e', b: '#8e0a1f', dark: '#4d0612', deep: '#24040a' },
+      flood: { a: '#1fa36b', b: '#14804f', dark: '#0c5534', deep: '#08301f' },
+      winter: { a: '#5aa7f0', b: '#3d8fe0', dark: '#255f9e', deep: '#14304f' },
+      heat: { a: '#ff8a2a', b: '#e0631a', dark: '#9e3f10', deep: '#4f2008' },
+      tropical: { a: '#14b8a6', b: '#0e8f82', dark: '#0a5f57', deep: '#06332f' },
+      night: { a: '#2a3550', b: '#1d2740', dark: '#121a2c', deep: '#0b1120' },
+      fall: { a: '#ff7a1a', b: '#d9520b', dark: '#4a2378', deep: '#261040' }
+    };
+    // Auto: the bars follow what's happening, most dangerous first. Quiet days keep the WeatherPower violet.
+    const weatherTheme = () => {
+      const t = S.live?.tallies || {};
+      const level = S.live?.wis?.level || '';
+      const usAlerts = S.alerts.filter((a) => ['warnings', 'watches'].includes(a.group) && (a.states || []).length && !offConus(a));
+      const count = (re) => usAlerts.filter((a) => re.test(a.event || '')).length;
+      if ((t.tor || 0) > 0 || ['intense', 'extreme'].includes(level)) return 'tornado';
+      if (count(/^(hurricane|tropical storm|storm surge) (warning|watch)$/i)) return 'tropical';
+      if ((t.svr || 0) >= 3 || level === 'active') return 'storm';
+      if ((t.ffw || 0) >= 3 || count(/flash flood emergency/i)) return 'flood';
+      if (count(/winter storm|blizzard|ice storm|winter weather|lake effect snow/i) >= 5) return 'winter';
+      if (count(/heat/i) >= 5) return 'heat';
+      return 'violet';
+    };
+    const applyTheme = () => {
+      const pick = S.control.theme && S.control.theme !== 'auto' ? S.control.theme : weatherTheme();
+      const key = THEMES[pick] ? pick : 'violet';
+      if (S.themeKey === key) return;
+      S.themeKey = key;
+      const th = THEMES[key];
+      const root = document.documentElement.style;
+      root.setProperty('--violet', 'linear-gradient(180deg, ' + th.a + ' 0%, ' + th.b + ' 100%)');
+      root.setProperty('--violet-dark', th.dark);
+      root.setProperty('--violet-deep', th.deep);
+    };
+
     const renderTop = () => {
+      applyTheme();
       const t = S.live?.tallies || {};
       setTally('t-tor', t.tor || 0);
       setTally('t-svr', t.svr || 0);
@@ -1562,7 +1666,7 @@
       $('rp-title').textContent = seg.modelName.replace(' 3km', '') + ' · ' + (SHORT_FIELD[f.key] || f.name.toUpperCase());
       $('rp-bar').style.background = legendCss(f.legend || []);
       $('rp-lbl').innerHTML = legendLabels(f.legend || [], f.units).map((l) => '<span>' + esc(String(l).toUpperCase()) + '</span>').join('');
-      $('rp-state').textContent = 'MODEL STUDIO';
+      setRpState('MODEL STUDIO', '');
       const shortPlace = (p) => String(p || '').replace(/, ([A-Za-z .]+)$/, (m, st) => ', ' + (Object.keys(STATE_NAMES).find((k) => STATE_NAMES[k] === st) || st));
       const spotRows = (seg.spots || []).slice(0, 4).map((sp, k) => '<div class="rowi" style="--rc:' + (k === 0 ? '#ffd34d' : '#c99a3c') + '"><span class="n">' + (k + 1) + '</span><b>' + esc(shortPlace(sp.place)) + '</b><em>' + esc(sp.display) + '</em></div>').join('');
       const rows = seg.compare.map((c) => '<div class="rowi" style="--rc:' + (c.model === seg.model ? '#1a8cff' : '#5d6f8d') + '"><i></i><b>' + esc(c.name) + '</b>' + (c.value == null ? '<span>' + esc(c.note || 'n/a') + '</span>' : '<em>' + esc(c.display) + '</em>') + '</div>').join('');
@@ -1612,6 +1716,8 @@
         const key = S.fresh.shift();
         if (byKey(key)) shot = { type: 'alert', alert: byKey(key), fresh: true };
       }
+      // Pinning from Live Control switches right away, even in the middle of a model check.
+      if (!shot && force && S.control.pin && byKey(S.control.pin)) shot = { type: 'alert', alert: byKey(S.control.pin), pinned: true };
       // A think shot always hands over to its model check (if the models came back in time).
       if (!shot && S.shot?.type === 'think' && !S.pendingModel && S.modelRequestPending && (S.thinkWait = (S.thinkWait || 0) + 1) <= 5) {
         S.shotTimer = setTimeout(nextShot, 2000);   // WeBot keeps thinking a little longer
@@ -1709,6 +1815,10 @@
       if (shot.type !== 'tropics') hideTropics();
       if (shot.type !== 'surface') hideSurface();
       hideCam();
+      // A pinned camera gets a mention every few segments, after WeBot's line for the segment.
+      if (S.camPinnedId && S.camPinned && shot.type !== 'think' && !shot.breaking && ++S.pinTalk % 4 === 0) {
+        setTimeout(() => { if (S.shot === shot && S.camPinned) sayNext(camTalk(S.camPinned, 'still')); }, 7000);
+      }
       if (shot.type === 'surface') {
         setSelected('');
         clearLocal();
@@ -1950,6 +2060,35 @@
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
     // Commentary never piles up: if WeBot is still talking, the new line is skipped.
     const chatter = (text) => { if (text && !speech.busy && !speech.queue.length) say(text); };
+    // Lines that must not be dropped (like the camera intro) wait their turn instead, unless a lot is queued.
+    // (The queue holds sentences, and one alert line is several sentences, so the cap is generous.)
+    const sayNext = (text) => { if (text && speech.queue.length < 14) say(text); };
+
+    // Camera names as they'd be said on air: "ARDOT US 71 @ Gilham RXR Overpass" -> "U.S. 71 at the Gilham railroad crossing overpass".
+    const camSpoken = (name) => String(name || '')
+      .replace(/^(ARDOT|Caltrans|WSDOT|MoDOT|ODOT|TxDOT|KDOT|NDOT|UDOT|CDOT|IDOT|INDOT|MnDOT|GDOT|FDOT|NCDOT|VDOT|PennDOT|NYSDOT|KanDrive|DriveTexas|iDrive\s?\w*)\b\s*/i, '')
+      .replace(/\s+-\s+/g, ', ')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s*:\s*/g, ', ')
+      .replace(/\s*@\s*/g, ' at ')
+      .replace(/\bRXR\b/gi, 'railroad crossing')
+      .replace(/\bI-?\s?(\d+)\b/g, 'Interstate $1')
+      .replace(/\bUS[- ]?(\d+)\b/g, 'U.S. $1')
+      .replace(/\bSR[- ]?(\d+)\b/g, 'State Route $1')
+      .replace(/\bMP\s?([\d.]+)/g, 'mile marker $1')
+      .replace(/\b(NB|SB|EB|WB)\b/g, (d) => ({ NB: 'northbound', SB: 'southbound', EB: 'eastbound', WB: 'westbound' })[d])
+      .replace(/\s+/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '').trim();
+    // What WeBot says about a camera, from what is actually going on there.
+    const camTalk = (cam, kind) => {
+      const where = camSpoken(cam.name) + (cam.state && STATE_NAMES[cam.state] ? ' in ' + STATE_NAMES[cam.state] : '');
+      const inside = S.alerts.filter((x) => ['warnings', 'watches'].includes(x.group) && inGeometry([cam.lon, cam.lat], x.geometry)).sort((x, y) => x.rank - y.rank)[0];
+      let t = kind === 'still' ? pick(['Still keeping an eye on our camera at ', 'Checking back on the camera at ', 'Here’s another look at ']) + where + '.'
+        : kind === 'pinned' ? pick(['We’re going to keep a camera up on ', 'Let’s keep watching the camera at ', 'Pulling up a live camera at ']) + where + '.'
+          : pick(['Here’s a live look from a camera at ', 'Let’s check a nearby camera at ', 'Live from a traffic camera at ']) + where + '.';
+      if (inside) t += ' That camera is right inside ' + article(inside.event) + ' ' + inside.event.toLowerCase() + '.';
+      else if (cam.miles != null && kind === 'auto') t += ' It’s about ' + Math.max(1, Math.round(cam.miles)) + ' miles from the center of this ' + (S.shot?.alert?.event || 'alert').toLowerCase() + '.';
+      return t;
+    };
     const listWords = (items) => (items.length <= 1 ? items[0] || '' : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1]);
     const plural = (w) => (/[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|ch|sh|x)$/.test(w) ? w + 'es' : w + 's');
     const COMPASS = { N: 'north', S: 'south', E: 'east', W: 'west' };
@@ -2130,7 +2269,8 @@
         if (!cam || S.shot !== shot || camCfg().mode !== 'auto') return;
         // If it dies, ask the server again next time (it skips camera sites that refused us).
         await playCam(cam, { onDead: () => camCache.delete(a.key) });
-        if (Math.random() < 0.5) setTimeout(() => S.shot === shot && chatter('Here’s a live look from the ' + titleCase(cam.name) + ' camera.'), 6000);
+        // Always introduce the camera (queued after whatever WeBot is saying about the alert).
+        if (S.shot === shot) sayNext(camTalk(cam, 'auto'));
       }, 2600);
     };
     // Pinned mode / Off, applied whenever Live Control changes the camera setting.
@@ -2140,13 +2280,16 @@
       if (cfg.mode === 'off' && !S.camPinnedId) hideCam(true);
       if (want === S.camPinnedId) return;
       S.camPinnedId = want;
+      S.camPinned = null;
       hideCam(true);
       if (!want) return;
       try {
         const cam = await getJson('/api/v3/cameras/item/' + encodeURIComponent(want));
         if (S.camPinnedId !== want) return;
         await playCam(cam);
-        chatter('Let’s keep an eye on the ' + titleCase(cam.name) + ' camera.');
+        S.camPinned = cam;
+        S.pinTalk = 0;
+        sayNext(camTalk(cam, 'pinned'));
       } catch (error) {
         console.warn('Pinned camera unavailable:', error.message);
       }
@@ -2278,7 +2421,7 @@
     };
     const loadLive = async () => {
       // The query is a heartbeat for the control panel: what is playing and which voice is on.
-      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: voiceOn() ? ttsLabel() : 'voice off' }));
+      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: voiceOn() ? ttsLabel() : 'voice off', theme: S.themeKey || '' }));
       const prevRev = S.control.rev;
       const prevCtl = S.control;
       S.live = body;
@@ -2382,6 +2525,8 @@
       const hello = Date.now();
       const intro = () => {
         if ((neural.state === 'loading' || pt.state === 'loading') && Date.now() - hello < 25000) { setTimeout(intro, 1000); return; }
+        // Hold the opening line until sound is actually playing (a browser may need a click first).
+        if (actx && actx.state !== 'running' && Date.now() - hello < 10 * 60 * 1000) { setTimeout(intro, 1000); return; }
         say('WeBot here, and WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.');
       };
       setTimeout(intro, 2500);
