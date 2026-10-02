@@ -498,10 +498,12 @@ export const nwsFeatureToWarning = (feature) => {
   const hazard = hazardForAlert(properties);
   const event = properties.event || 'Warning';
   const areaDesc = properties.areaDesc || 'your area';
-  const stateList = formatStateList([
-    ...statesFromAreaDesc(areaDesc),
-    ...statesFromGeocode(properties.geocode)
-  ]);
+  const stateCodes = Array.from(new Set([
+    ...statesFromGeocode(properties.geocode),
+    ...statesFromAreaDesc(areaDesc)
+  ]));
+  const stateList = formatStateList(stateCodes);
+  const vtecAction = String(firstParam(properties.parameters, 'VTEC') || '').split('.')[1] || '';
   const isBroadAreaProduct = /\b(watch|hurricane|tropical storm|storm surge|extreme wind|tropical cyclone|typhoon)\b/i.test(event);
   const state = isBroadAreaProduct && stateList ? stateList : titleCaseState(areaDesc);
   const office = properties.senderName?.replace(/^NWS\s+/i, '') || properties.sender || 'NWS';
@@ -538,6 +540,10 @@ export const nwsFeatureToWarning = (feature) => {
     title: `${event} in ${state}`,
     event,
     state,
+    stateCodes,
+    ugc: properties.geocode?.UGC || [],
+    vtecAction,
+    messageType: properties.messageType || '',
     areaDesc,
     office,
     expiresAt: properties.expires || properties.ends,

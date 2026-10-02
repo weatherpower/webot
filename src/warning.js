@@ -212,15 +212,35 @@ export const boundsForPolygon = (polygon) => {
   ];
 };
 
+// Intl falls back to "GMT+10"-style names for U.S. territories; NWS products use these.
+const TIMEZONE_ABBREVIATIONS = {
+  'Pacific/Guam': 'ChST',
+  'Pacific/Saipan': 'ChST',
+  'Pacific/Pago_Pago': 'SST',
+  'America/Puerto_Rico': 'AST',
+  'America/St_Thomas': 'AST'
+};
+
+export const timezoneAbbreviation = (timezone, date = new Date()) => {
+  if (TIMEZONE_ABBREVIATIONS[timezone]) return TIMEZONE_ABBREVIATIONS[timezone];
+  const part = getFormatter(timezone, { hour: 'numeric', timeZoneName: 'short' })
+    .formatToParts(date)
+    .find((item) => item.type === 'timeZoneName');
+  return part?.value || '';
+};
+
+export const formatAlertTime = (value, timezone) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const clock = getFormatter(timezone, { hour: 'numeric', minute: '2-digit' }).format(date).replace(/\s/g, ' ');
+  return `${clock} ${timezoneAbbreviation(timezone, date)}`.trim();
+};
+
 export const displayTimes = (warning) => {
   const timezone = resolveAlertTimezone(warning);
   const expires = new Date(warning.expiresAt || Date.now() + 60 * 60 * 1000);
   const issued = new Date(warning.issuedAt || Date.now());
-  const timeFormat = getFormatter(timezone, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short'
-  });
+  const timeFormat = { format: (date) => formatAlertTime(date, timezone) };
   const dateFormat = getFormatter(timezone, {
     weekday: 'short',
     month: 'short',
