@@ -11,6 +11,7 @@ import { fetchDailyForecastCards } from '../src/dailyForecasts.js';
 import { forecastSearchQuery } from '../src/forecastSearch.js';
 import { areaLineFor, headlineFor, statusTagFor, summaryFor } from '../src/broadcast.js';
 import { indexLabelFor, indexValueFor, spcDay1Risk, talliesFor } from '../src/live.js';
+import { modelTake } from '../src/models.js';
 import { warningShortHtml } from '../src/shortHtml.js';
 import { toV3Alert } from '../src/apiV3.js';
 import { formatAlertTime } from '../src/warning.js';
@@ -384,5 +385,15 @@ assert.equal(indexLabelFor(indexValueFor(outbreak)), 'SEVERE');
 assert.equal(spcDay1Risk([{ group: 'outlooks', eventLabel: 'SPC DAY 1 OUTLOOK', hazards: [{ label: 'RISK', value: 'TSTM' }] }, { group: 'outlooks', eventLabel: 'SPC DAY 1 OUTLOOK', hazards: [{ label: 'RISK', value: 'ENH' }] }]), 'ENH');
 const tallies = talliesFor([liveAlert('Tornado Warning'), liveAlert('Severe Thunderstorm Warning'), liveAlert('Flash Flood Warning'), liveAlert('Tornado Watch')]);
 assert.deepEqual([tallies.tor, tallies.svr, tallies.ffw, tallies.torWatch], [1, 1, 1, 1]);
+
+// WeBot's model take only uses returned numbers and calls out disagreement.
+const agree = modelTake('qpf', 'Total precipitation', 'in', [{ model: 'ecmwf', name: 'ECMWF', value: 1.2 }, { model: 'gfs', name: 'GFS', value: 1.3 }], 'ecmwf', 'Idabel, Oklahoma', 120);
+assert.match(agree, /next 5 days/);
+assert.match(agree, /ECMWF brings a soaking/);
+assert.match(agree, /GFS agrees/);
+const split = modelTake('cape', 'CAPE', 'J/kg', [{ model: 'hrrr', name: 'HRRR', value: 3000 }, { model: 'gfs', name: 'GFS', value: 400 }], 'hrrr', 'Dodge City, Kansas', 18);
+assert.match(split, /very unstable air/);
+assert.match(split, /models disagree/);
+assert.match(modelTake('refc', 'Simulated radar', 'dBZ', [{ model: 'hrrr', name: 'HRRR', value: null }], 'hrrr', 'Idabel', 18), /doesn't have/);
 
 console.log('Smoke checks passed.');

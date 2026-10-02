@@ -129,6 +129,13 @@ export const config = {
     retentionHours: Math.max(1, number(process.env.SHORTS_RETENTION_HOURS, 24)),
     timeoutMs: Math.round(clamp(number(process.env.SHORTS_TIMEOUT_MS, 15 * 60 * 1000), 60000, 60 * 60 * 1000))
   },
+  // WeatherPower Developers API (https://weatherpower.app/developers/): HRRR/GFS soundings and charts.
+  // The key stays server-side; the live stream only sees proxied results.
+  weatherPowerApi: {
+    key: process.env.WEATHERPOWER_API_KEY || '',
+    dataBase: process.env.WEATHERPOWER_API_BASE || 'https://weatherpower.app/wpcc-api',
+    renderBase: process.env.WEATHERPOWER_RENDER_BASE || 'https://weatherpower.app/wpcc-render'
+  },
   controllerToken: process.env.CONTROLLER_TOKEN || '',
   dryRunDefault: bool(process.env.DRY_RUN_DEFAULT, false)
 };

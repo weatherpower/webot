@@ -118,6 +118,19 @@
     @keyframes rim { 50% { opacity: .15; } }
     .bubble { position: absolute; right: 262px; bottom: 214px; z-index: 13; max-width: 600px; padding: 16px 20px; border-radius: 16px 16px 4px 16px; background: #f4f8ff; color: #0b1324; font-family: "WP Sans"; font-weight: 600; font-size: 21px; line-height: 1.38; box-shadow: 0 16px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(12px) scale(.96); transform-origin: 100% 100%; transition: opacity .3s, transform .35s; }
     .bubble.show { opacity: 1; transform: none; }
+    /* WeBot thinking: eyes glance around, thought dots float over its head. */
+    .bot.think .eye { animation: look 2.6s ease-in-out infinite; }
+    @keyframes look { 0%, 100% { transform: translate(0, 0); } 22% { transform: translate(-10px, -5px); } 30% { transform: translate(-10px, -5px) scaleY(.15); } 38% { transform: translate(-10px, -5px); } 65% { transform: translate(10px, -5px); } 82% { transform: translate(10px, -5px); } }
+    .thought { position: absolute; right: 196px; bottom: 352px; z-index: 13; display: flex; gap: 10px; padding: 16px 20px; border-radius: 999px; background: rgba(244,248,255,.96); box-shadow: 0 12px 30px rgba(0,0,0,.4); opacity: 0; transform: translateY(10px) scale(.85); transform-origin: 80% 100%; transition: opacity .35s, transform .35s; }
+    .thought.show { opacity: 1; transform: none; }
+    .thought i { width: 14px; height: 14px; border-radius: 50%; background: #2a6fd6; animation: dot 1.2s ease-in-out infinite; }
+    .thought i:nth-child(2) { animation-delay: .2s; }
+    .thought i:nth-child(3) { animation-delay: .4s; }
+    .thought b, .thought em { position: absolute; border-radius: 50%; background: rgba(244,248,255,.96); }
+    .thought b { width: 16px; height: 16px; right: 12px; bottom: -20px; }
+    .thought em { width: 9px; height: 9px; right: 2px; bottom: -34px; }
+    @keyframes dot { 0%, 80%, 100% { transform: translateY(0); opacity: .35; } 40% { transform: translateY(-7px); opacity: 1; } }
+    .card .skewt { display: block; width: calc(100% - 44px); margin: 0 22px 18px; border-radius: 10px; background: #fff; }
     .bubble b { display: block; font-family: "WP Mono"; font-size: 11px; letter-spacing: .2em; color: #2a6fd6; margin-bottom: 4px; }
 
     /* ---------- bottom bar ---------- */
@@ -205,6 +218,7 @@
     <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
 
     <div class="bubble" id="bubble"></div>
+    <div class="thought" id="thought" aria-hidden="true"><i></i><i></i><i></i><b></b><em></em></div>
     <div class="bot" id="bot" aria-hidden="true"></div>
 
     <footer class="bottom">
@@ -387,7 +401,13 @@
       const tz = shot?.alert?.timezone || OPT.tz;
       // The server's own abbreviation (ChST, SST, AST...) beats the browser's "GMT+10" fallback.
       const ownAbbr = String(shot?.alert?.times?.expires || '').split(' ').pop();
-      $('rp-clock').innerHTML = esc(tzClock(tz)) + ' <span>' + esc(/^[A-Za-z]{2,5}$/.test(ownAbbr) ? ownAbbr : tzAbbr(tz)) + '</span>';
+      if (S.modelOn && S.modelValid) {
+        // Model shots show the valid time of the frame on screen, not the wall clock.
+        const valid = new Date(S.modelValid);
+        $('rp-clock').innerHTML = esc(valid.toLocaleString('en-US', { timeZone: OPT.tz, weekday: 'short', hour: 'numeric' }).toUpperCase()) + ' <span>' + esc(tzAbbr(OPT.tz)) + '</span>';
+      } else {
+        $('rp-clock').innerHTML = esc(tzClock(tz)) + ' <span>' + esc(/^[A-Za-z]{2,5}$/.test(ownAbbr) ? ownAbbr : tzAbbr(tz)) + '</span>';
+      }
       if (shot?.alert) {
         const a = shot.alert;
         const exp = $('card-exp');
@@ -450,6 +470,11 @@
       .replace(/\b(AM|PM)\s+(CDT|CST|EDT|EST|MDT|MST|PDT|PST|AKDT|AKST|HST|AST|ChST|SST)\b/g, (m, ap, z) => ap + ' ' + ZONES[z] + ' time')
       .replace(/,\s*([A-Z]{2})\b/g, (m, s) => (STATE_NAMES[s] ? ', ' + STATE_NAMES[s] : m))
       .replace(/\bmph\b/gi, 'miles per hour')
+      .replace(/(\d)"/g, '$1 inches')
+      .replace(/\bJ\/kg\b/g, 'joules per kilogram')
+      .replace(/\bdBZ\b/g, 'D B Z')
+      .replace(/\b(\d+)°F?/g, '$1 degrees')
+      .replace(/\b(HRRR|NAM|GFS|ECMWF|ICON)\b/g, (m) => ({ HRRR: 'H triple R', NAM: 'NAM', GFS: 'G F S', ECMWF: 'European model', ICON: 'ICON' })[m])
       .replace(/\bWPI\b/g, 'W P I')
       .replace(/\bNWS\b/g, 'National Weather Service')
       .replace(/\bSPC\b/g, 'Storm Prediction Center')
@@ -475,10 +500,11 @@
         clearTimeout(speech.guard);
         if (!speech.busy) return;
         speech.busy = false;
-        if (!speech.queue.length) { bot.classList.remove('talk'); bubbleTimer = setTimeout(() => bubble.classList.remove('show'), 2200); }
+        if (!speech.queue.length) bot.classList.remove('talk');
         setTimeout(pumpSpeech, 180);
       };
-      if (item.first) showBubble(item.full, 0, item.label);
+      // Spoken lines get no caption bubble; the bubble is only the fallback when WeBot can't talk.
+      if (item.first) bubble.classList.remove('show');
       const utter = new SpeechSynthesisUtterance(item.text);
       utter.voice = pickVoice();
       utter.rate = 1.04;
@@ -651,6 +677,11 @@
       S.step += 1;
       if (!S.styleReady) return;
       const n = S.radar?.reflectivity.length || 0;
+      if (S.modelOn) {
+        // The model loop owns the map and the radar panel during model shots.
+        for (let k = 0; k < n; k += 1) S.map.setPaintProperty('rf' + k, 'raster-opacity', 0);
+        return;
+      }
       const localN = S.local?.reflectivity.length || 0;
       const fi = frameAt(n);
       const li = frameAt(localN);
@@ -844,8 +875,150 @@
         const a = shot.alert;
         s = a.rank <= 2 ? 30 : a.rank <= 3 ? 26 : a.group === 'warnings' && (a.states || []).length ? 20 : 15;
       } else if (shot.type === 'reports') s = 16;
+      else if (shot.type === 'think') s = 13;
+      else if (shot.type === 'models') s = 32;
       else s = 14;
       return s * OPT.speed * 1000;
+    };
+
+    /* ---------------- WeBot thinks, then checks the models (WeatherPower Model Studio) ---------------- */
+    const MODEL_ROTATION = {
+      warm: [['hrrr', 'refc'], ['hrrr', 'cape'], ['ecmwf', 'qpf'], ['hrrr', 't2m'], ['nam', 'uh'], ['gfs', 'qpf'], ['nam', 'gust'], ['hrrr', 'td2m']],
+      severe: [['hrrr', 'refc'], ['hrrr', 'cape'], ['hrrr', 'uh'], ['nam', 'refc'], ['ecmwf', 'qpf']],
+      cold: [['hrrr', 'ptype'], ['ecmwf', 'snow'], ['hrrr', 't2m'], ['gfs', 'qpf'], ['hrrr', 'refc'], ['nam', 'gust']]
+    };
+    const nextModelPick = () => {
+      const month = new Date().getMonth();
+      const t = S.live?.tallies || {};
+      const risk = S.live?.index?.spcDay1;
+      const severe = (t.tor || 0) + (t.svr || 0) > 0 || ['SLGT', 'ENH', 'MDT', 'HIGH'].includes(risk);
+      const list = severe ? MODEL_ROTATION.severe : (month >= 10 || month <= 2) ? MODEL_ROTATION.cold : MODEL_ROTATION.warm;
+      S.modelIdx = (S.modelIdx || 0) + 1;
+      return list[S.modelIdx % list.length];
+    };
+    const niceArea = (text) => String(text || '')
+      .replace(/,\s*([A-Z]{2})\b/g, (m, st) => ', ' + (STATE_NAMES[st] || st))
+      .replace(/\b[A-Z][A-Z']+\b/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+    // Where WeBot looks: the top CONUS warning, else the highest SPC risk, else home (Idabel).
+    const hotSpot = () => {
+      const top = candidates().find((a) => a.group !== 'statements' && !/marine/i.test(a.event) && !offConus(a) && (a.states || []).length);
+      if (top && top.rank <= 6) {
+        const c = centerOf(top);
+        if (c) return { lat: c[1], lon: c[0], place: (top.area || '').length <= 40 ? niceArea(top.area) : stateLine(top) };
+      }
+      const order = ['MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
+      const risky = outlooks().map((a) => ({ a, r: order.indexOf((a.hazards || []).find((h) => h.label === 'RISK')?.value) })).filter((x) => x.r >= 0).sort((x, y) => y.r - x.r)[0];
+      if (risky) {
+        const c = centerOf(risky.a);
+        if (c) return { lat: c[1], lon: c[0], place: 'the SPC ' + (RISK_NAMES[order[risky.r]] || 'risk').toLowerCase() + ' area' };
+      }
+      return S.home || { lat: 33.8957, lon: -94.8263, place: 'Idabel, Oklahoma' };
+    };
+    const frameUrl = (frame) => location.origin + BASE + frame.path;
+    // Frames load one at a time while WeBot thinks, so the render service is never flooded.
+    const loadModelSegment = async () => {
+      const [model, field] = nextModelPick();
+      const spot = hotSpot();
+      const q = '?model=' + model + '&field=' + field + '&lat=' + spot.lat.toFixed(3) + '&lon=' + spot.lon.toFixed(3) + '&place=' + encodeURIComponent(spot.place);
+      const seg = await getJson('/api/v3/models/segment' + q);
+      seg.ready = new Set();
+      seg.spot = spot;
+      S.loadingSeg = seg;
+      (async () => {
+        for (let i = 0; i < seg.frames.length; i += 1) {
+          if (S.loadingSeg !== seg && S.modelSeg !== seg) return;
+          try {
+            const response = await fetch(frameUrl(seg.frames[i]));
+            if (response.ok) { await response.blob(); seg.ready.add(i); }
+          } catch {}
+        }
+      })();
+      return seg;
+    };
+    const setThinking = (on) => {
+      bot.classList.toggle('think', on);
+      $('thought').classList.toggle('show', on);
+    };
+    const thinkShot = () => {
+      setThinking(true);
+      setMood('calm');
+      card.classList.remove('show');
+      fly(CONUS, { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: 5, duration: 5200 });
+      setNow({ k: 'WEBOT', title: 'WeBot is checking the models…', color: '#1a8cff', crawl: 'HRRR · NAM 3KM · GFS · ECMWF · WEATHERPOWER MODEL STUDIO · SIMULATED RADAR · CAPE · RAIN · TEMPERATURE · WIND' });
+      S.pendingModel = null;
+      S.modelRequestPending = true;
+      loadModelSegment()
+        .then((seg) => { S.pendingModel = seg; })
+        .catch((error) => console.warn('models', error.message))
+        .finally(() => { S.modelRequestPending = false; });
+    };
+    const legendCss = (legend) => (legend.length > 1 ? 'linear-gradient(90deg,' + legend.map((s, i) => s.c + ' ' + ((i / (legend.length - 1)) * 100).toFixed(1) + '%').join(',') + ')' : LEGENDS.refl.bar);
+    const legendLabels = (legend, units) => {
+      if (legend.length < 2) return LEGENDS.refl.labels;
+      const picks = [0, Math.round((legend.length - 1) / 3), Math.round(((legend.length - 1) * 2) / 3), legend.length - 1];
+      return picks.map((i, k) => legend[i].v + (k === 3 ? ' ' + units : ''));
+    };
+    const SHORT_FIELD = { refc: 'SIMULATED RADAR', ptype: 'PRECIP TYPE', cape: 'CAPE', uh: 'UPDRAFT HELICITY', t2m: 'TEMPERATURE', td2m: 'DEW POINT', gust: 'WIND GUSTS', wind10: 'WIND', qpf: 'TOTAL RAIN', pwat: 'PRECIP WATER', snow: 'TOTAL SNOW', snod: 'SNOW DEPTH' };
+    const hideModels = () => {
+      S.modelOn = false;
+      S.modelValid = null;
+      clearInterval(S.modelTimer);
+      if (S.styleReady && S.map.getLayer('model')) S.map.setLayoutProperty('model', 'visibility', 'none');
+      if (S.styleReady) S.map.setLayoutProperty('a-fill', 'visibility', 'visible');
+    };
+    const showModelFrame = (seg, i) => {
+      const frame = seg.frames[i];
+      if (!frame || !S.styleReady) return;
+      const source = S.map.getSource('model');
+      if (source) source.updateImage({ url: frameUrl(frame), coordinates: seg.coordinates });
+      else {
+        S.map.addSource('model', { type: 'image', url: frameUrl(frame), coordinates: seg.coordinates });
+        S.map.addLayer({ id: 'model', type: 'raster', source: 'model', paint: { 'raster-opacity': 0.82, 'raster-fade-duration': 0 } }, 'a-fill');
+      }
+      S.map.setLayoutProperty('model', 'visibility', 'visible');
+      S.modelValid = frame.valid;
+      $('rp-site').textContent = 'RUN ' + seg.runLabel.toUpperCase() + ' • F' + String(frame.fhr).padStart(3, '0');
+      $('rp-ticks').innerHTML = seg.frames.map((_, k) => '<i class="' + (k === i ? 'now' : seg.ready.has(k) ? 'on' : '') + '"></i>').join('');
+    };
+    const modelsShot = (seg) => {
+      setThinking(false);
+      setSelected('');
+      clearLocal();
+      setOutlookVisible(false);
+      setMood('calm');
+      S.modelSeg = seg;
+      S.modelOn = true;
+      if (S.styleReady) S.map.setLayoutProperty('a-fill', 'visibility', 'none');
+      const f = seg.field;
+      $('rp-title').textContent = seg.modelName.replace(' 3km', '') + ' · ' + (SHORT_FIELD[f.key] || f.name.toUpperCase());
+      $('rp-bar').style.background = legendCss(f.legend || []);
+      $('rp-lbl').innerHTML = legendLabels(f.legend || [], f.units).map((l) => '<span>' + esc(String(l).toUpperCase()) + '</span>').join('');
+      $('rp-state').textContent = 'MODEL STUDIO';
+      const rows = seg.compare.map((c) => '<div class="rowi" style="--rc:' + (c.model === seg.model ? '#1a8cff' : '#5d6f8d') + '"><i></i><b>' + esc(c.name) + '</b>' + (c.value == null ? '<span>' + esc(c.note || 'n/a') + '</span>' : '<em>' + esc(c.display) + '</em>') + '</div>').join('');
+      const horizon = seg.horizonH <= 24 ? 'NEXT ' + seg.horizonH + ' HRS' : 'NEXT ' + Math.round(seg.horizonH / 24) + ' DAYS';
+      const skewt = S.soundings && ['cape', 'refc', 'uh'].includes(f.key) && seg.spot
+        ? '<img class="skewt" alt="" src="' + BASE + '/api/v3/models/sounding.png?lat=' + seg.spot.lat.toFixed(2) + '&lon=' + seg.spot.lon.toFixed(2) + '&fhr=3" onerror="this.remove()">' : '';
+      setCard('<div class="head"><div class="ico">' + icon('outlook', 30) + '</div><div><h2>Model check</h2><div class="sub">' + esc(f.name.replace(/ \(.*\)$/, '').toUpperCase()) + ' · ' + horizon + '</div></div><span class="status">' + esc(seg.modelName.replace(' 3km', '')) + '</span></div>'
+        + '<dl><dt>WHERE</dt><dd>' + esc(seg.place) + '</dd></dl>'
+        + '<div class="rows">' + rows + '</div>' + skewt, '#1a8cff');
+      setNow({ k: 'MODELS', title: "WeBot's model check: " + seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name).toLowerCase(), color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
+      fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 5.2, duration: 2400 });
+      // Loop through the frames that have finished loading; hold on the last one.
+      let i = 0;
+      let hold = 0;
+      showModelFrame(seg, 0);
+      clearInterval(S.modelTimer);
+      S.modelTimer = setInterval(() => {
+        if (S.modelSeg !== seg || !S.modelOn) return;
+        if (i === seg.frames.length - 1 && hold < 4) { hold += 1; return; }
+        hold = 0;
+        let next = (i + 1) % seg.frames.length;
+        for (let guard = 0; guard < seg.frames.length && !seg.ready.has(next); guard += 1) next = (next + 1) % seg.frames.length;
+        if (!seg.ready.has(next)) return;
+        i = next;
+        showModelFrame(seg, i);
+      }, 650);
+      say(seg.take, { label: 'MODEL CHECK' });
     };
 
     const nextShot = () => {
@@ -859,25 +1032,36 @@
         const key = S.fresh.shift();
         if (byKey(key)) shot = { type: 'alert', alert: byKey(key), fresh: true };
       }
+      // A think shot always hands over to its model check (if the models came back in time).
+      if (!shot && S.shot?.type === 'think' && !S.pendingModel && S.modelRequestPending && (S.thinkWait = (S.thinkWait || 0) + 1) <= 5) {
+        S.shotTimer = setTimeout(nextShot, 2000);   // WeBot keeps thinking a little longer
+        return;
+      }
+      S.thinkWait = 0;
+      if (!shot && S.shot?.type === 'think' && S.pendingModel) {
+        shot = { type: 'models', seg: S.pendingModel };
+        S.modelSeg = S.pendingModel;
+        S.pendingModel = null;
+      }
       if (!shot && S.control.pin && byKey(S.control.pin)) shot = { type: 'alert', alert: byKey(S.control.pin), pinned: true };
-      if (!shot && S.control.mode && S.control.mode !== 'auto') shot = { type: S.control.mode };
+      if (!shot && S.control.mode === 'models') shot = { type: 'think' };
+      else if (!shot && S.control.mode && S.control.mode !== 'auto') shot = { type: S.control.mode };
       if (!shot) {
+        // Not only warnings: WeBot regularly zooms out to think and check the models.
+        const PATTERN = ['alert', 'alert', 'think', 'alert', 'national', 'alert', 'think', 'outlook', 'alert', 'reports'];
         S.cycle += 1;
         const list = candidates().slice(0, 10);
-        const reports = (S.live?.reports || []).length;
-        if (!list.length) shot = { type: ['national', 'outlook', 'reports'][S.cycle % 3] };
-        else if (S.cycle % 6 === 0) shot = { type: 'national' };
-        else if (S.cycle % 11 === 0 && outlooks().length) shot = { type: 'outlook' };
-        else if (S.cycle % 8 === 0 && reports >= 5) shot = { type: 'reports' };
-        else {
+        let kind = PATTERN[S.cycle % PATTERN.length];
+        if (kind === 'alert' && !list.length) kind = ['think', 'national', 'outlook', 'reports'][S.cycle % 4];
+        if (kind === 'alert') {
           const memory = Math.min(list.length - 1, 6);
           const pick = list.find((a) => !S.recent.slice(-memory).includes(a.key)) || list[0];
           S.recent = [...S.recent, pick.key].slice(-12);
           shot = { type: 'alert', alert: pick };
-        }
+        } else shot = { type: kind };
       }
       if (shot.type === 'outlook' && !outlooks().length) shot = { type: 'national' };
-      if (shot.type === 'reports' && !(S.live?.reports || []).length) shot = { type: 'national' };
+      if (shot.type === 'reports' && (S.live?.reports || []).length < 5) shot = { type: 'national' };
       runShot(shot);
     };
 
@@ -914,6 +1098,22 @@
     const stageShot = (shot) => {
       clearTimeout(S.velTimer);
       setVelocity(false);
+      if (shot.type !== 'think') setThinking(false);
+      if (shot.type !== 'models') hideModels();
+      if (shot.type === 'think') {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(false);
+        thinkShot();
+        renderRadarPanel();
+        $('rp').classList.add('show');
+        return;
+      }
+      if (shot.type === 'models') {
+        modelsShot(shot.seg);
+        $('rp').classList.add('show');
+        return;
+      }
       if (shot.type === 'alert') {
         const a = shot.alert;
         setOutlookVisible(false);
@@ -1120,6 +1320,8 @@
       ]);
       S.radar = radar;
       S.sites = sites.sites || [];
+      S.home = config.home || null;
+      S.soundings = Boolean(config.soundings);
       await Promise.all([loadAlerts(), loadLive()]).catch((e) => console.warn(e.message));
       S.map = new maplibregl.Map({
         container: 'map', style: config.darkStyleUrl, center: [-96, 38.6], zoom: 4.1,

@@ -7,11 +7,12 @@ import { compactPublicGeometry } from './publicFeed.js';
 import { compositeValidTime } from './shortVideo.js';
 import { getShort, listShorts, queueShort, requestShort, shortsByKey, shortsStatus } from './shorts.js';
 import {
-  SATELLITE_STYLE, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
+  SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 import {
   applyLiveCommand, indexSummary, liveControl, nexradSites, recentReports, requireLiveToken, siteRadar, talliesFor
 } from './live.js';
+import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
 const GROUP_ORDER = ['warnings', 'watches', 'statements', 'discussions', 'outlooks', 'forecasts'];
@@ -212,6 +213,12 @@ export const apiV3Router = () => {
     res.json({
       darkStyleUrl: config.maps.styleUrl,
       satelliteStyle: SATELLITE_STYLE,
+      home: {
+        lat: config.forecast.lat,
+        lon: config.forecast.lon,
+        place: `${config.forecast.city}, ${STATE_NAMES[config.forecast.state] || config.forecast.state}`
+      },
+      soundings: soundingAvailable(),
       shorts: { enabled: config.shorts.enabled, format: config.shorts.format, publicRequests: config.shorts.publicRequestsPerWindow > 0 }
     });
   });
@@ -302,6 +309,52 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=86400');
       res.json({ sites: await nexradSites() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/models/catalog', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=600');
+      res.json({ ...(await modelCatalog()), soundings: soundingAvailable() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/models/segment', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=120');
+      res.json(await modelSegment({
+        model: String(req.query.model || 'hrrr'),
+        field: String(req.query.field || 'refc'),
+        lat: req.query.lat,
+        lon: req.query.lon,
+        place: String(req.query.place || '').slice(0, 80) || undefined,
+        horizon: req.query.horizon
+      }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/models/frame/:model/:run/:field/:hour.webp', async (req, res, next) => {
+    try {
+      const frame = await modelFrame(req.params);
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.type('image/webp').send(frame);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/models/sounding.png', async (req, res, next) => {
+    try {
+      const sounding = await soundingPng({ lat: req.query.lat, lon: req.query.lon, fhr: req.query.fhr });
+      res.set('Cache-Control', 'public, max-age=900');
+      if (sounding.run) res.set('X-HRRR-Run', sounding.run);
+      res.type('image/png').send(sounding.png);
     } catch (error) {
       next(error);
     }

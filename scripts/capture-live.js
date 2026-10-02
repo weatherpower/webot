@@ -41,6 +41,10 @@ try {
   await shot('4-reports', 12000);
   await control({ action: 'mode', mode: 'outlook' });
   await shot('5-outlook', 12000);
+  await control({ action: 'mode', mode: 'models' });
+  await shot('5b-thinking', 12000);
+  await shot('5c-models', 20000);
+  await shot('5d-models-later', 6000);
   await control({ action: 'mode', mode: 'auto' });
   await control({ action: 'banner', text: 'Live coverage tonight at 7 PM', minutes: 15 });
   await control({ action: 'test-breaking' });

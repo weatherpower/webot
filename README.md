@@ -280,3 +280,28 @@ API: `GET /api/v3/live` (tallies, index + history, control state, storm reports)
 `POST /api/v3/live/control` with `X-Controller-Token` and `{ "action": "pin" | "unpin" | "state" |
 "mode" | "voice" | "sound" | "banner" | "say" | "next" | "test-breaking" | "reload" | "ping" }`.
 Stream state is stored in `data/live-control.json` and `data/live-index.json`.
+
+### WeBot thinks and checks the models
+
+The stream doesn't only track warnings. In its rotation WeBot zooms out, thinks (eyes glancing
+around, thought dots) while the next model check loads, then plays a **Model Studio** loop
+(WeatherPower Radar 3.1's model service, `https://weatherpower.app/wpcc-render/api/models`):
+
+- HRRR, NAM 3km, GFS and ECMWF fields: simulated radar, precip type, CAPE, updraft helicity,
+  temperature, dew point, gusts, total rain and snow. The rotation leans severe (radar, CAPE, UH)
+  when there are TOR/SVR warnings or an SPC slight risk or higher, and winter fields from November
+  to March.
+- A "model check" card compares every model at the hot spot (top CONUS warning, then the highest
+  SPC risk area, then home: `FORECAST_CARDS_CITY/STATE/LAT/LON`). WeBot reads a take built only from
+  those numbers and says when the models disagree. Hours a model doesn't have show as unavailable.
+- Frames go through `GET /api/v3/models/frame/:model/:run/:field/:hour.webp` (cached), because Model
+  Studio only renders new hours for weatherpower.app pages or keyed requests.
+- `WEATHERPOWER_API_KEY` (a `wp_` key from https://weatherpower.app/developers/) is sent with those
+  requests and also adds the HRRR Skew-T sounding chart to severe model checks
+  (`GET /api/v3/models/sounding.png`). Everything else works without it.
+
+API: `GET /api/v3/models/catalog`, `GET /api/v3/models/segment?model=hrrr&field=refc&lat=&lon=&place=`.
+Control panel: **Models** mode makes WeBot loop think → model check.
+
+While WeBot is speaking there is no caption bubble; the bubble only appears when voice is off or the
+browser has no speech voice.
