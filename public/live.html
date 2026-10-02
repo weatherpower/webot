@@ -1453,11 +1453,12 @@
 
     const renderTop = () => {
       applyTheme();
-      const t = S.live?.tallies || {};
+      const st = focusState();
+      const t = st && S.alerts.length ? stateTallies(st) : S.live?.tallies || {};
       setTally('t-tor', t.tor || 0);
       setTally('t-svr', t.svr || 0);
       setTally('t-ffw', t.ffw || 0);
-      setTally('t-wch', (t.torWatch || 0) + (t.svrWatch || 0));
+      setTally('t-wch', t.watches || 0);
       const wis = S.live?.wis;
       if (wis?.loaded) {
         const color = WIS_COLORS[wis.level] || '#6fd0ff';
@@ -1605,7 +1606,19 @@
     const stateTallies = (st) => {
       const here = S.alerts.filter((a) => (a.states || []).includes(st));
       const n = (re) => here.filter((a) => re.test(a.event || '')).length;
-      return { tor: n(/^tornado warning$/i), svr: n(/^severe thunderstorm warning$/i), ffw: n(/^flash flood warning$/i), torWatch: n(/^tornado watch$/i), svrWatch: n(/^severe thunderstorm watch$/i) };
+      return { tor: n(/^tornado warning$/i), svr: n(/^severe thunderstorm warning$/i), ffw: n(/^flash flood warning$/i), torWatch: n(/^tornado watch$/i), svrWatch: n(/^severe thunderstorm watch$/i), watches: here.filter((a) => a.group === 'watches').length };
+    };
+    // Every active watch (flood, winter storm, fire weather, tornado...), grouped by type: "4 flood watches and a coastal flood watch".
+    const watchSummary = (st) => {
+      const by = {};
+      S.alerts.filter((a) => a.group === 'watches' && (!st || (a.states || []).includes(st)))
+        .forEach((a) => { const ev = (a.event || 'Watch').replace(/^pds /i, ''); by[ev] = (by[ev] || 0) + 1; });
+      const parts = Object.entries(by).sort((x, y) => y[1] - x[1])
+        .map(([ev, n]) => n === 1 ? (/^[aeiou]/i.test(ev) ? 'an ' : 'a ') + ev.toLowerCase() : n + ' ' + ev.toLowerCase().replace(/watch$/, 'watches'));
+      const total = Object.values(by).reduce((s, n) => s + n, 0);
+      if (!total) return '';
+      const list = parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0];
+      return list.charAt(0).toUpperCase() + list.slice(1) + (total === 1 ? ' is' : ' are') + ' in effect' + (st ? ' in ' + focusName() : '') + '.';
     };
 
     const candidates = () => {
@@ -2590,10 +2603,10 @@
       if (t.tor) parts.push(t.tor + ' tornado warning' + (t.tor === 1 ? '' : 's'));
       if (t.svr) parts.push(t.svr + ' severe thunderstorm warning' + (t.svr === 1 ? '' : 's'));
       if (t.ffw) parts.push(t.ffw + ' flash flood warning' + (t.ffw === 1 ? '' : 's'));
-      const watches = (t.torWatch || 0) + (t.svrWatch || 0);
+      const watches = watchSummary(st);
       let text = 'WeatherPower update. ';
       text += parts.length ? 'Right now there ' + (parts.length === 1 && /^1 /.test(parts[0]) ? 'is ' : 'are ') + parts.join(', ') + (st ? ' in ' + focusName() + '.' : ' across the country.') : 'No tornado, severe thunderstorm or flash flood warnings are in effect' + (st ? ' in ' + focusName() : '') + ' right now.';
-      if (watches) text += ' ' + watches + ' severe weather watch' + (watches === 1 ? ' is' : 'es are') + ' active.';
+      if (watches) text += ' ' + watches;
       if (wis?.loaded) text += (st ? ' Nationally, the' : ' The') + ' Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.';
       say(text, { label: 'UPDATE' });
     };
