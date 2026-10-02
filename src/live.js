@@ -372,7 +372,7 @@ export const applyLiveCommand = async (body = {}) => {
       current.state = /^[A-Z]{2}$/.test(String(body.state || '').toUpperCase()) ? String(body.state).toUpperCase() : '';
       break;
     case 'mode':
-      current.mode = ['auto', 'national', 'outlook', 'reports', 'models', 'tropics', 'surface'].includes(body.mode) ? body.mode : 'auto';
+      current.mode = ['auto', 'national', 'outlook', 'reports', 'models', 'tropics', 'surface', 'forecast'].includes(body.mode) ? body.mode : 'auto';
       break;
     case 'voice':
       current.voice = Boolean(body.on);

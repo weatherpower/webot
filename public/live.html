@@ -98,6 +98,19 @@
     @keyframes tcspin { to { transform: rotate(360deg); } }
     .spotpin { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #c99a3c; color: #111; font: 700 17px "WP Display"; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(0,0,0,.5); pointer-events: none; }
     .spotpin.lead { background: #ffd34d; width: 36px; height: 36px; font-size: 20px; }
+    .citymk { display: grid; justify-items: center; gap: 8px; pointer-events: none; }
+    .citymk i { width: 20px; height: 20px; border-radius: 50%; background: #ffd34d; border: 3px solid #fff; box-shadow: 0 0 0 10px rgba(255,211,77,.25), 0 0 0 24px rgba(255,211,77,.1); }
+    .citymk span { font: 700 24px "WP Display"; color: #fff; background: rgba(9,16,30,.88); padding: 4px 12px; border-left: 4px solid #ffd34d; text-transform: uppercase; white-space: nowrap; }
+    .fc-now { display: flex; align-items: center; gap: 18px; padding: 4px 26px 10px; }
+    .fc-now b { font: 700 66px "WP Display"; line-height: 1; color: #fff; }
+    .fc-now div { display: grid; gap: 4px; min-width: 0; }
+    .fc-now span { font: 500 22px "WP Display"; text-transform: uppercase; color: #e3e8f1; line-height: 1.1; }
+    .fc-now small { font: 600 12px "WP Mono"; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+    .fcr { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .fcr small { font: 600 12px "WP Mono"; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+    .fcr b { grid-column: 1; font: 500 19px "WP Display"; text-transform: uppercase; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .fcr em { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-style: normal; font: 700 34px "WP Display"; line-height: 1; color: var(--tc, #fff); }
+    .fcr em small { display: block; margin-top: 4px; font-size: 12px; letter-spacing: .08em; color: #6fc8ff; }
     .rowi .n { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--rc); color: #111; font: 700 15px "WP Display"; }
     .rowi i { flex: none; width: 10px; height: 10px; background: var(--rc); }
     .rowi b { font-family: "WP Display"; font-size: 22px; font-weight: 500; text-transform: uppercase; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1634,7 +1647,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, think: 13 };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, think: 13 };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -1646,6 +1659,7 @@
       else if (shot.type === 'models') s = 32;
       else if (shot.type === 'tropics') s = 26;
       else if (shot.type === 'surface') s = 22;
+      else if (shot.type === 'forecast') s = 22;
       else s = 14;
       return s * OPT.speed * 1000;
     };
@@ -1858,10 +1872,12 @@
         // Focused on a state: the tropics only come up if that state has tropical alerts.
         tropics: tropicsActive() && tropicsHere() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
         // The national radar + surface map is the quiet-day staple (like Ryan's).
-        surface: S.surface ? (busy ? 0.8 : 2) : 0
+        surface: S.surface ? (busy ? 0.8 : 2) : 0,
+        // Daily forecast for a random city.
+        forecast: busy >= 10 ? 0.4 : 1.4
       };
       const calm = isCalm();
-      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5 });
+      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: 2.5 });
       const recent = S.kinds || [];
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
@@ -1913,6 +1929,7 @@
       if (shot.type !== 'models') hideModels();
       if (shot.type !== 'tropics') hideTropics();
       if (shot.type !== 'surface') hideSurface();
+      if (shot.type !== 'forecast') hideCity();
       hideCam();
       // A pinned camera gets a mention every few segments, after WeBot's line for the segment.
       if (S.camPinnedId && S.camPinned && shot.type !== 'think' && !shot.breaking && ++S.pinTalk % 4 === 0) {
@@ -1946,6 +1963,15 @@
       }
       if (shot.type === 'models') {
         modelsShot(shot.seg);
+        $('rp').classList.add('show');
+        return;
+      }
+      if (shot.type === 'forecast') {
+        setSelected('');
+        setOutlookVisible(false);
+        setMood('calm');
+        forecastShot(shot);
+        renderRadarPanel();
         $('rp').classList.add('show');
         return;
       }
@@ -2041,6 +2067,67 @@
       fly(focusState() ? viewBounds() : b, { padding: { top: 160, bottom: 150, left: 620, right: 640 }, maxZoom: 7 });
       if (reports[0]) chatter(pick(['Let’s look at storm reports.', 'Here are the latest storm reports.']) + ' There ' + (reports.length === 1 ? 'has been one' : 'have been ' + reports.length) + (focusState() ? ' in ' + focusName() : '') + ' in the last three hours. The most recent: ' + reportWords(reports[0]) + ' near ' + reportCity(reports[0]) + ', ' + (STATE_NAMES[reports[0].state] || reports[0].state) + ', ' + agoWords(reports[0].time) + '.');
       setNow({ k: 'REPORTS', title: reports.length + ' storm reports in the last 3 hours', color: '#ffd34d', crawl: latest.map((r) => r.type + ' · ' + r.city + ', ' + r.state + (r.remark ? ' — ' + r.remark : '')).join('   ◆   ') });
+    };
+
+    /* ---------------- daily forecast for a random city (NWS) ---------------- */
+    const tempColor = (t) => (t == null ? '#fff' : t <= 20 ? '#c9a4ff' : t <= 32 ? '#6fc8ff' : t <= 50 ? '#8fe3ff' : t <= 65 ? '#7dff9a' : t <= 80 ? '#ffd34d' : t <= 92 ? '#ff9f2a' : '#ff5a4a');
+    const isNight = (p) => /night|tonight|overnight/i.test(p.name || '');
+    // "Slight Chance Showers And Thunderstorms" -> "a slight chance of showers and thunderstorms"
+    const skyWords = (text) => {
+      let s = String(text || '').toLowerCase().replace(/\bt-?storms\b/g, 'thunderstorms').replace(/\bchance (?!of)/g, 'chance of ').replace(/\//g, ' and ');
+      if (/^(slight )?chance/.test(s)) s = 'a ' + s;
+      return s.replace(/ then /g, ', then ');
+    };
+    const periodWords = (p) => {
+      const temp = p.temperature != null ? (isNight(p) ? ', with a low around ' : ', with a high near ') + p.temperature : '';
+      const rain = p.probabilityOfPrecipitation >= 20 && !/chance|likely/i.test(p.shortForecast || '') ? ' and a ' + p.probabilityOfPrecipitation + ' percent chance of rain' : '';
+      return p.name + ', ' + skyWords(p.shortForecast) + temp + rain + '.';
+    };
+    const cityWords = (c) => c.name.replace(/^St\. /, 'Saint ') + ', ' + (STATE_NAMES[c.state] || c.state);
+    const hideCity = () => { S.cityMarker?.remove(); S.cityMarker = null; };
+    const forecastShot = async (shot) => {
+      let fc;
+      try { fc = await getJson('/api/v3/forecast/random' + (focusState() ? '?state=' + focusState() : '')); } catch { fc = null; }
+      if (S.shot !== shot) return;
+      if (!fc?.periods?.length) {
+        clearLocal();
+        nationalShot();
+        return;
+      }
+      shot.city = fc.city;
+      const { city, current, periods } = fc;
+      const label = city.name + ', ' + city.state;
+      hideCity();
+      const el = document.createElement('div');
+      el.className = 'citymk';
+      el.innerHTML = '<i></i><span>' + esc(city.name) + '</span>';
+      S.cityMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([city.lon, city.lat]).addTo(S.map);
+      fly([[city.lon - 1.3, city.lat - 0.85], [city.lon + 1.3, city.lat + 0.85]], { maxZoom: 8.2 });
+      loadLocal(nearestSite([city.lon, city.lat]));
+      const now = current && current.temperatureF != null
+        ? '<div class="fc-now"><b>' + Math.round(current.temperatureF) + '°</b><div><span>' + esc(current.textDescription || 'Now') + '</span><small>'
+          + esc(['NOW', current.windMph != null ? 'WIND ' + Math.round(current.windMph) + ' MPH' : '', current.humidityPct != null ? 'HUMIDITY ' + current.humidityPct + '%' : ''].filter(Boolean).join(' · ')) + '</small></div></div>'
+        : '';
+      const rows = periods.slice(0, 4).map((p) => '<div class="fcr" style="--tc:' + tempColor(p.temperature) + '"><small>' + esc(p.name) + '</small><em>' + (p.temperature != null ? p.temperature + '°' : '')
+        + (p.probabilityOfPrecipitation >= 20 ? '<small>' + p.probabilityOfPrecipitation + '% RAIN</small>' : '') + '</em><b>' + esc(p.shortForecast || '') + '</b></div>').join('');
+      const first = periods[0];
+      setCard('<div class="head"><div><h2>' + esc(label) + '</h2><div class="sub">DAILY FORECAST' + (fc.office ? ' · NWS ' + esc(fc.office) : '') + '</div></div></div>' + now + '<div class="rows">' + rows + '</div>', tempColor(first.temperature));
+      setNow({
+        k: 'FORECAST',
+        title: label + ' · ' + first.shortForecast + (first.temperature != null ? (isNight(first) ? ', low ' : ', high ') + first.temperature + '°' : ''),
+        color: '#ffb347',
+        hazards: fc.alerts.slice(0, 2),
+        crawl: periods.map((p) => p.name.toUpperCase() + ': ' + (p.shortForecast || '').toUpperCase() + (p.temperature != null ? ' ' + p.temperature + '°' : '')).join('   ◆   ')
+      });
+      const opener = pick([
+        'Let’s check the forecast for ' + cityWords(city) + '.',
+        'Time for a daily forecast. We’re heading to ' + cityWords(city) + '.',
+        'Let’s zoom into ' + cityWords(city) + ' and see what the forecast looks like.',
+        'Here’s your forecast for ' + cityWords(city) + '.'
+      ]);
+      const nowWords = current && current.temperatureF != null ? ' Right now it’s ' + Math.round(current.temperatureF) + ' degrees' + (current.textDescription ? ' and ' + skyWords(current.textDescription) : '') + '.' : '';
+      const alertWords = fc.alerts.length ? ' There’s also ' + article(fc.alerts[0]) + ' ' + fc.alerts[0].toLowerCase() + ' in effect there.' : '';
+      chatter(opener + nowWords + ' ' + periods.slice(0, 3).map(periodWords).join(' ') + alertWords);
     };
 
     /* ---------------- tropics (NOAA National Hurricane Center) ---------------- */

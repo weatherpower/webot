@@ -9,6 +9,8 @@ const IEM_HEADERS = {
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const numberOrNull = (value) => {
+  // A missing NWS reading (null) must stay missing, not become 0.
+  if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 };
@@ -25,9 +27,11 @@ const cToF = (value) => {
   return number === null ? null : round((number * 9 / 5) + 32);
 };
 
-const mpsToMph = (value) => {
-  const number = numberOrNull(value);
-  return number === null ? null : round(number * 2.236936);
+// NWS observations report wind in km/h (wmoUnit:km_h-1); some stations use m/s.
+const speedToMph = (property) => {
+  const number = numberOrNull(property?.value);
+  if (number === null) return null;
+  return round(number * (/m_s-1$/.test(property.unitCode || '') ? 2.236936 : 0.621371));
 };
 
 const paToInHg = (value) => {
@@ -156,8 +160,8 @@ export const fetchLocalWeather = async ({ lat = 33.8957, lon = -94.8263 } = {}) 
       windChillF: cToF(nwsValue(obsProps.windChill)),
       dewpointF: cToF(nwsValue(obsProps.dewpoint)),
       humidityPct: round(nwsValue(obsProps.relativeHumidity)),
-      windMph: mpsToMph(nwsValue(obsProps.windSpeed)),
-      windGustMph: mpsToMph(nwsValue(obsProps.windGust)),
+      windMph: speedToMph(obsProps.windSpeed),
+      windGustMph: speedToMph(obsProps.windGust),
       windDirection: nwsValue(obsProps.windDirection),
       pressureInHg: paToInHg(nwsValue(obsProps.barometricPressure)),
       visibilityMi: mToMi(nwsValue(obsProps.visibility))

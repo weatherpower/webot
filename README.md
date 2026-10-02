@@ -360,6 +360,11 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
 - **Tropics** (`GET /api/v3/tropics`, NOAA NHC): every active storm with its cone, forecast track and
   points, past track, model spaghetti tracks and coastal watches/warnings; WeBot reads each storm once
   per advisory. With no storms it shows the NHC 7-day outlook areas. Control panel: **Tropics** mode.
+- **Daily forecasts** (`GET /api/v3/forecast/random[?state=OK]`, NWS): WeBot zooms to a random city
+  (about 200 cities, every state; Alaska and Hawaii only when focused on them), shows current
+  conditions plus the next four forecast periods with the local radar, and reads the next three.
+  Cities don't repeat for a dozen visits, and a focused stream stays inside its state. They come up
+  more on calm days. Control panel: **Forecasts** mode stays on forecasts.
 
 ### WeBot talks on every shot, national radar map, live cameras
 
