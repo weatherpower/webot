@@ -1,0 +1,2115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeatherPower Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #02060d;
+      --panel: #06111d;
+      --panel-2: #0a1625;
+      --panel-3: #0f1e31;
+      --line: rgba(174, 199, 255, .14);
+      --line-strong: rgba(174, 199, 255, .26);
+      --text: #edf5ff;
+      --soft: #aebdd3;
+      --muted: #71829a;
+      --blue: #2488ff;
+      --cyan: #00d9ff;
+      --green: #42e06f;
+      --yellow: #ffd400;
+      --orange: #ff9800;
+      --red: #ff3131;
+      --pink: #ff57c7;
+      --purple: #b16dff;
+      --shadow: 0 20px 60px rgba(0, 0, 0, .36);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 16% 8%, rgba(0, 217, 255, .12), transparent 28%),
+        linear-gradient(180deg, #061522 0%, #02060d 60%);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app {
+      width: min(1560px, calc(100vw - 18px));
+      margin: 0 auto;
+      padding: 10px 0 24px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(250px, 1fr) auto minmax(320px, 1fr);
+      align-items: center;
+      gap: 16px;
+      min-height: 58px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand,
+    .status-row,
+    .health,
+    .quick-links,
+    .search-row,
+    .mode-row,
+    .map-tools,
+    .toolbar,
+    .metric-row,
+    .saved-row,
+    .layer-row,
+    .hour-card,
+    .report-row,
+    .alert-row {
+      display: flex;
+      align-items: center;
+    }
+
+    .brand { gap: 12px; min-width: 0; }
+
+    .brand img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px rgba(0, 217, 255, .42), 0 10px 25px rgba(0,0,0,.34);
+    }
+
+    .brand-title {
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -.01em;
+    }
+
+    .brand-subtitle {
+      margin-top: 3px;
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .status-row {
+      justify-content: center;
+      gap: 16px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(0, 217, 255, .42);
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: rgba(0, 217, 255, .08);
+      color: #c4f8ff;
+    }
+
+    .pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--cyan);
+      box-shadow: 0 0 0 6px rgba(0, 217, 255, .13);
+    }
+
+    .right-top {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .health {
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: rgba(10, 22, 37, .84);
+    }
+
+    .health-dot {
+      width: 23px;
+      height: 23px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #7cff9b, #159f4e);
+      box-shadow: 0 0 18px rgba(66, 224, 111, .38);
+    }
+
+    .health strong {
+      display: block;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .health span {
+      display: block;
+      margin-top: 3px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .quick-links { gap: 8px; }
+
+    .link-button,
+    .icon-button,
+    .tool-button,
+    .refresh-button,
+    .search-row button,
+    .mode-button {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #0a1727;
+      color: var(--text);
+      font-weight: 900;
+      transition: background .12s ease, border-color .12s ease, transform .12s ease;
+    }
+
+    .link-button {
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #dcecff;
+    }
+
+    .link-button.primary {
+      border-color: rgba(36, 136, 255, .65);
+      background: linear-gradient(180deg, #2188ff, #0d4da3);
+      color: #fff;
+    }
+
+    .icon-button {
+      width: 40px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+    }
+
+    .link-button:hover,
+    .icon-button:hover,
+    .tool-button:hover,
+    .refresh-button:hover,
+    .search-row button:hover,
+    .mode-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(0, 217, 255, .38);
+      background: #10223a;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 286px minmax(0, 1fr);
+      gap: 10px;
+      padding-top: 10px;
+    }
+
+    .rail,
+    .main {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      min-width: 0;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(6, 17, 29, .92);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-pad { padding: 12px; }
+
+    .search-row {
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .search-wrap input {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #050e18;
+      color: var(--text);
+      outline: none;
+      padding: 11px 34px 11px 36px;
+    }
+
+    .search-wrap input:focus {
+      border-color: rgba(0, 217, 255, .6);
+      box-shadow: 0 0 0 3px rgba(0, 217, 255, .1);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      width: 13px;
+      height: 13px;
+      border: 2px solid var(--soft);
+      border-radius: 50%;
+      transform: translateY(-50%);
+    }
+
+    .search-icon::after {
+      content: "";
+      position: absolute;
+      right: -6px;
+      bottom: -5px;
+      width: 7px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--soft);
+      transform: rotate(45deg);
+    }
+
+    .search-row button {
+      padding: 11px;
+      color: #bfeeff;
+    }
+
+    .location-card {
+      padding: 14px 14px 12px;
+    }
+
+    .location-name {
+      color: #cfeeff;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .current-main {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .temp {
+      font-family: Oswald, Inter, sans-serif;
+      font-size: 56px;
+      line-height: .92;
+      letter-spacing: .02em;
+      font-weight: 700;
+    }
+
+    .condition {
+      margin-top: 6px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .condition-icon {
+      width: 68px;
+      height: 68px;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+    }
+
+    .wx-icon {
+      --icon-a: #f7d65b;
+      --icon-b: #20d7ff;
+      position: relative;
+      display: inline-block;
+      flex: 0 0 auto;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(174, 199, 255, .2);
+      border-radius: 10px;
+      background:
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,.2), transparent 24%),
+        linear-gradient(145deg, rgba(18, 38, 62, .96), rgba(4, 11, 20, .96));
+      overflow: hidden;
+      box-shadow: inset 0 0 18px rgba(255,255,255,.05), 0 10px 22px rgba(0,0,0,.24);
+    }
+
+    .condition-icon.wx-icon {
+      display: block;
+      width: 68px;
+      height: 68px;
+      border-radius: 16px;
+    }
+
+    .wx-icon.wx-mini {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+    }
+
+    .wx-icon.wx-small {
+      width: 31px;
+      height: 31px;
+      border-radius: 9px;
+    }
+
+    .wx-icon::before,
+    .wx-icon::after {
+      content: "";
+      position: absolute;
+      display: block;
+    }
+
+    .wx-sun::before,
+    .wx-hot::before {
+      width: 42%;
+      height: 42%;
+      left: 29%;
+      top: 28%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff9b8, #ffd34d 62%, #ff9700);
+      box-shadow: 0 0 0 5px rgba(255, 212, 0, .14), 0 0 24px rgba(255, 191, 0, .45);
+    }
+
+    .wx-sun::after,
+    .wx-hot::after {
+      inset: 12%;
+      border-radius: 50%;
+      background: repeating-conic-gradient(from 0deg, rgba(255, 212, 0, .55) 0 9deg, transparent 9deg 25deg);
+      opacity: .62;
+    }
+
+    .wx-hot {
+      --icon-a: #ff8a00;
+    }
+
+    .wx-hot::before {
+      background: radial-gradient(circle at 35% 30%, #fff4ba, #ff9f1a 62%, #ff3b30);
+    }
+
+    .wx-moon::before {
+      width: 46%;
+      height: 46%;
+      left: 33%;
+      top: 21%;
+      border-radius: 50%;
+      background: #dceeff;
+      box-shadow: -8px 2px 0 0 #102039, 0 0 20px rgba(159, 210, 255, .42);
+    }
+
+    .wx-moon::after {
+      right: 16%;
+      bottom: 18%;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(220, 238, 255, .7);
+      box-shadow: -13px -4px 0 rgba(220,238,255,.45), -6px 9px 0 rgba(220,238,255,.35);
+    }
+
+    .wx-cloud::before,
+    .wx-rain::before,
+    .wx-storm::before,
+    .wx-snow::before,
+    .wx-fog::before {
+      width: 55%;
+      height: 30%;
+      left: 24%;
+      top: 41%;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #e8f5ff, #8fb1cf);
+      box-shadow: -10px -2px 0 -1px #cfe2f4, 9px -6px 0 1px #f5fbff;
+    }
+
+    .wx-rain::after {
+      left: 29%;
+      top: 68%;
+      width: 3px;
+      height: 8px;
+      border-radius: 999px;
+      background: #18d8ff;
+      box-shadow: 9px 3px 0 #18d8ff, 18px -1px 0 #18d8ff;
+      transform: rotate(16deg);
+    }
+
+    .wx-storm::after {
+      left: 42%;
+      top: 58%;
+      width: 22%;
+      height: 33%;
+      background: linear-gradient(180deg, #fff48d, #ffb300);
+      clip-path: polygon(45% 0, 92% 0, 58% 42%, 88% 42%, 26% 100%, 42% 54%, 12% 54%);
+      filter: drop-shadow(0 0 8px rgba(255, 212, 0, .6));
+    }
+
+    .wx-snow::after {
+      left: 31%;
+      top: 69%;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #e9f8ff;
+      box-shadow: 10px -2px 0 #e9f8ff, 20px 1px 0 #e9f8ff;
+    }
+
+    .wx-fog::after {
+      left: 19%;
+      right: 15%;
+      top: 68%;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(220, 238, 255, .82);
+      box-shadow: 0 8px 0 rgba(220,238,255,.54), 8px 16px 0 rgba(220,238,255,.34);
+    }
+
+    .wx-wind::before {
+      left: 17%;
+      top: 32%;
+      width: 64%;
+      height: 4px;
+      border-radius: 999px;
+      background: #bdeeff;
+      box-shadow: 12px 10px 0 rgba(189,238,255,.78), -4px 20px 0 rgba(189,238,255,.5);
+    }
+
+    .wx-wind::after {
+      right: 16%;
+      top: 23%;
+      width: 17%;
+      height: 17%;
+      border: 3px solid #bdeeff;
+      border-left: 0;
+      border-bottom: 0;
+      border-radius: 0 999px 0 0;
+    }
+
+    .metric-row {
+      justify-content: space-between;
+      gap: 9px;
+      border-top: 1px solid rgba(174,199,255,.1);
+      margin-top: 12px;
+      padding-top: 11px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .metric-row strong {
+      display: block;
+      margin-top: 4px;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .mini-days {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid rgba(174,199,255,.1);
+      margin-top: 12px;
+      padding-top: 10px;
+      gap: 6px;
+    }
+
+    .day-mini {
+      text-align: center;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .day-mini .wx-icon {
+      display: block;
+      margin: 4px auto;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 10px;
+      color: #f5f9ff;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .section-title span {
+      min-width: 28px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      padding: 3px 7px;
+      text-align: center;
+      font-size: 11px;
+    }
+
+    .summary-list {
+      display: grid;
+      gap: 2px;
+    }
+
+    .summary-item {
+      display: grid;
+      grid-template-columns: 5px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(174,199,255,.08);
+      padding: 7px 0;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .summary-item:last-child { border-bottom: 0; }
+
+    .summary-color {
+      width: 3px;
+      height: 21px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    .summary-count {
+      min-width: 28px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.08);
+      padding: 3px 7px;
+      color: #fff;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .quick-grid a,
+    .quick-grid button {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #071321;
+      color: #dbeaff;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .refresh-button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 11px;
+      color: #8fdcff;
+    }
+
+    .map-section {
+      position: relative;
+      min-height: 430px;
+      height: min(52vh, 560px);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #17202b;
+    }
+
+    .toolbar {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 10px;
+      z-index: 5;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .mode-row,
+    .map-tools {
+      gap: 6px;
+      pointer-events: auto;
+      border: 1px solid rgba(174,199,255,.14);
+      border-radius: 8px;
+      background: rgba(3, 8, 15, .78);
+      backdrop-filter: blur(10px);
+      padding: 5px;
+    }
+
+    .mode-label {
+      color: #dceaff;
+      padding: 0 8px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .mode-button {
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--soft);
+    }
+
+    .mode-button.active {
+      border-color: rgba(36, 136, 255, .72);
+      background: linear-gradient(180deg, #2488ff, #0f55a8);
+      color: #fff;
+    }
+
+    .map-tools label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 8px;
+      color: #dceaff;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .map-tools input {
+      accent-color: var(--blue);
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    .maplibregl-ctrl-bottom-left,
+    .maplibregl-ctrl-bottom-right {
+      display: none;
+    }
+
+    .legend {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      width: min(330px, calc(100% - 24px));
+      z-index: 4;
+      border-radius: 7px;
+      background: rgba(3, 8, 15, .9);
+      padding: 10px 12px;
+      box-shadow: 0 18px 45px rgba(0,0,0,.38);
+    }
+
+    .legend-bar {
+      height: 16px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #00b6ff, #00ffd5 18%, #13d948 35%, #fff000 53%, #ff8e00 69%, #f81d1d 83%, #c018ff);
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 7px;
+      color: #dce9ff;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .timebar {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-radius: 8px;
+      background: rgba(3,8,15,.9);
+      padding: 9px 12px;
+      color: #dcecff;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .play {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+    }
+
+    .timeline {
+      width: 200px;
+      height: 5px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(36,136,255,.9), rgba(255,255,255,.8));
+      position: relative;
+    }
+
+    .timeline::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      transform: translateY(-50%);
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr .85fr;
+      gap: 10px;
+    }
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1fr .86fr .9fr;
+      gap: 10px;
+    }
+
+    .alert-list {
+      display: grid;
+      gap: 7px;
+      max-height: 248px;
+      overflow: hidden;
+    }
+
+    .alert-row {
+      --accent: var(--blue);
+      gap: 10px;
+      border: 1px solid rgba(var(--rgb, 36,136,255), .42);
+      border-radius: 7px;
+      background: linear-gradient(90deg, rgba(var(--rgb, 36,136,255), .17), rgba(7,19,33,.86));
+      padding: 9px 10px;
+      min-width: 0;
+    }
+
+    .alert-icon {
+      width: 27px;
+      height: 27px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      background: rgba(var(--rgb,36,136,255),.22);
+      color: var(--accent);
+      font-weight: 900;
+    }
+
+    .alert-copy { min-width: 0; flex: 1; }
+
+    .alert-copy strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .alert-copy span {
+      display: block;
+      margin-top: 3px;
+      color: var(--soft);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .alert-age {
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .conditions-panel {
+      display: grid;
+      grid-template-columns: .85fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .conditions-temp {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .conditions-temp .temp {
+      font-size: 58px;
+    }
+
+    .detail-table {
+      display: grid;
+      gap: 7px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .detail-table div {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid rgba(174,199,255,.08);
+      padding-bottom: 6px;
+    }
+
+    .detail-table strong { color: #fff; }
+
+    .hour-strip {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(9, minmax(68px, 1fr));
+      gap: 7px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .hour-card {
+      flex-direction: column;
+      gap: 4px;
+      min-height: 94px;
+      border: 1px solid rgba(174,199,255,.1);
+      border-radius: 7px;
+      background: rgba(7,19,33,.82);
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+      text-align: center;
+      padding: 8px 6px;
+    }
+
+    .hour-card .wx-icon { margin: 0 auto; }
+
+    .hour-card strong {
+      color: #fff;
+      font-size: 18px;
+    }
+
+    .spc-layout {
+      display: grid;
+      grid-template-columns: 1fr 118px;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .outlook-map {
+      min-height: 130px;
+      border: 1px solid rgba(174,199,255,.1);
+      border-radius: 7px;
+      background:
+        linear-gradient(135deg, rgba(66,224,111,.24), transparent),
+        #0d1a28;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: #9ac7ff;
+      font-family: Oswald, sans-serif;
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .spc-text strong {
+      display: block;
+      color: var(--green);
+      font-size: 14px;
+      margin: 7px 0 5px;
+    }
+
+    .spc-text p,
+    .discussion-copy {
+      margin: 0;
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.55;
+      font-weight: 720;
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 7px;
+    }
+
+    .tool-button {
+      min-height: 58px;
+      display: grid;
+      place-items: center;
+      color: #dcecff;
+      font-size: 11px;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .layer-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .layer-row {
+      gap: 9px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .layer-row input[type="checkbox"] {
+      accent-color: var(--blue);
+    }
+
+    .range {
+      margin-left: auto;
+      width: 120px;
+      accent-color: var(--blue);
+    }
+
+    .report-list {
+      display: grid;
+      gap: 7px;
+      max-height: 172px;
+      overflow: hidden;
+    }
+
+    .report-row {
+      display: grid;
+      grid-template-columns: 72px 70px 1fr;
+      gap: 8px;
+      border-bottom: 1px solid rgba(174,199,255,.08);
+      padding-bottom: 6px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 760;
+    }
+
+    .report-row strong { color: #fff; }
+    .report-row .type { color: var(--cyan); font-weight: 900; }
+
+    .hazard-list,
+    .signal-grid,
+    .timeline-list,
+    .brief-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .local-alert {
+      border: 1px solid rgba(255, 212, 0, .2);
+      border-radius: 7px;
+      background: linear-gradient(90deg, rgba(255, 212, 0, .1), rgba(7, 19, 33, .82));
+      padding: 9px 10px;
+    }
+
+    .local-alert strong,
+    .brief-item strong {
+      display: block;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .local-alert span,
+    .brief-item span {
+      display: block;
+      margin-top: 3px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 760;
+      line-height: 1.4;
+    }
+
+    .signal-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .signal-card {
+      border: 1px solid rgba(174,199,255,.1);
+      border-radius: 7px;
+      background:
+        radial-gradient(circle at 100% 0, rgba(0,217,255,.12), transparent 42%),
+        rgba(7,19,33,.82);
+      padding: 10px;
+      min-height: 72px;
+    }
+
+    .signal-card span {
+      display: block;
+      color: var(--soft);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .signal-card strong {
+      display: block;
+      margin-top: 7px;
+      color: #fff;
+      font-family: Oswald, Inter, sans-serif;
+      font-size: 25px;
+      line-height: 1;
+      letter-spacing: .02em;
+    }
+
+    .signal-card small {
+      display: block;
+      margin-top: 5px;
+      color: #9edfff;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 58px 36px 1fr 64px;
+      align-items: center;
+      gap: 9px;
+      border-bottom: 1px solid rgba(174,199,255,.08);
+      padding-bottom: 7px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .timeline-row:last-child { border-bottom: 0; }
+
+    .timeline-row strong {
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .bar-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(174,199,255,.12);
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--blue), var(--yellow));
+    }
+
+    .brief-item {
+      border: 1px solid rgba(174,199,255,.1);
+      border-radius: 7px;
+      background: rgba(7,19,33,.82);
+      padding: 9px 10px;
+    }
+
+    .saved-row {
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid rgba(174,199,255,.08);
+      padding: 7px 0;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .saved-row button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-weight: 900;
+      padding: 0;
+      text-align: left;
+    }
+
+    .saved-row .star {
+      color: var(--yellow);
+    }
+
+    .empty,
+    .notice {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(7,19,33,.82);
+      color: var(--soft);
+      padding: 14px;
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .notice {
+      margin-top: 8px;
+      color: #9edfff;
+      text-align: left;
+    }
+
+    @media (max-width: 1200px) {
+      .topbar {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+      .status-row {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+      .right-top {
+        justify-self: stretch;
+        justify-content: space-between;
+      }
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .rail {
+        grid-template-columns: 1fr 1fr;
+      }
+      .data-grid,
+      .lower-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        width: min(100vw - 12px, 1560px);
+      }
+      .right-top,
+      .quick-links,
+      .toolbar,
+      .conditions-panel {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .rail {
+        grid-template-columns: 1fr;
+      }
+      .map-section {
+        height: 62vh;
+        min-height: 420px;
+      }
+      .toolbar {
+        display: grid;
+      }
+      .map-tools {
+        flex-wrap: wrap;
+      }
+      .timebar,
+      .legend {
+        display: none;
+      }
+      .hour-strip {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .tool-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .signal-grid {
+        grid-template-columns: 1fr;
+      }
+      .timeline-row {
+        grid-template-columns: 52px 34px 1fr;
+      }
+      .timeline-row > span:last-child {
+        grid-column: 3;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <a class="brand" href="/dashboard">
+        <img src="/public/assets/wp-logo.png" alt="WeatherPower" onerror="this.src='/dashboard/public/assets/wp-logo.png'">
+        <div>
+          <div class="brand-title">WeatherPower</div>
+          <div class="brand-subtitle">Operations Dashboard</div>
+        </div>
+      </a>
+      <div class="status-row">
+        <span class="live-pill"><span class="pulse"></span><span id="feedStatus">Loading live feed</span></span>
+        <span id="dataAge">Data: checking</span>
+        <span id="lastUpdated">Last updated: --</span>
+      </div>
+      <div class="right-top">
+        <div class="health">
+          <span class="health-dot"></span>
+          <div><strong>Health</strong><span id="healthText">Checking systems</span></div>
+        </div>
+        <nav class="quick-links" aria-label="WeatherPower links">
+          <a class="link-button primary" href="/dashboard/warningcenter">Warning Center</a>
+          <a class="link-button" href="/dashboard/controller">Controller</a>
+        </nav>
+      </div>
+    </header>
+
+    <section class="layout">
+      <aside class="rail">
+        <div class="panel panel-pad">
+          <div class="search-row">
+            <div class="search-wrap">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input id="locationSearch" type="search" placeholder="Search saved location or lat,lon">
+            </div>
+            <button id="searchButton" type="button">Go</button>
+          </div>
+          <button class="refresh-button" id="gpsButton" type="button">Use my location</button>
+          <div class="notice" id="searchNotice">Defaulting to Idabel, Oklahoma. Try saved cities like Dallas, Oklahoma City, Little Rock, Tulsa, or enter coordinates like 33.8957,-94.8263.</div>
+        </div>
+
+        <div class="panel location-card">
+          <div class="location-name" id="locationName">Idabel, OK</div>
+          <div class="current-main">
+            <div>
+              <div class="temp" id="railTemp">--°</div>
+              <div class="condition" id="railCondition">Loading current conditions</div>
+            </div>
+            <div class="condition-icon wx-icon wx-cloud" id="railIcon" role="img" aria-label="Generic weather icon"></div>
+          </div>
+          <div class="metric-row">
+            <div>Wind<strong id="railWind">--</strong></div>
+            <div>Humidity<strong id="railHumidity">--</strong></div>
+            <div>Pressure<strong id="railPressure">--</strong></div>
+          </div>
+          <div class="mini-days" id="miniDays"></div>
+        </div>
+
+        <div class="panel panel-pad">
+          <h2 class="section-title">Active Alert Summary <span id="summaryTotal">0</span></h2>
+          <div class="summary-list" id="summaryList"></div>
+          <button class="refresh-button" id="refreshButton" type="button">Refresh dashboard</button>
+        </div>
+
+        <div class="panel panel-pad">
+          <h2 class="section-title">Quick Actions</h2>
+          <div class="quick-grid">
+            <a href="/dashboard/warningcenter">Warning Center</a>
+            <a href="/dashboard/controller">Controller</a>
+            <button type="button" data-focus-group="outlooks">SPC Outlooks</button>
+            <button type="button" data-focus-group="discussions">Mesoscale</button>
+            <button type="button" data-focus-hazards="true">Local Hazards</button>
+            <button type="button" data-focus-timeline="true">Timeline</button>
+            <button type="button" data-focus-reports="true">Storm Reports</button>
+            <button type="button" data-focus-map="true">Radar Map</button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="main">
+        <section class="panel map-section" id="mapPanel">
+          <div id="map"></div>
+          <div class="toolbar">
+            <div class="mode-row" aria-label="Radar mode">
+              <span class="mode-label">Radar Mode</span>
+              <button class="mode-button active" data-radar-mode="reflectivity" type="button">Reflectivity</button>
+              <button class="mode-button" data-radar-mode="velocityCards" type="button">Velocity Cards</button>
+              <button class="mode-button" data-radar-mode="dual" type="button">Dual-pol</button>
+            </div>
+            <div class="map-tools">
+              <label><input type="checkbox" id="toggleAlerts" checked> Alerts</label>
+              <label><input type="checkbox" id="toggleOutlooks" checked> Outlooks</label>
+              <label><input type="checkbox" id="toggleReports" checked> Reports</label>
+              <label><input type="checkbox" id="toggleWatches" checked> Watches</label>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="legend-bar"></div>
+            <div class="legend-labels"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Extreme</span></div>
+          </div>
+          <div class="timebar">
+            <span class="play">▶</span>
+            <span id="radarTime">Radar now</span>
+            <span class="timeline"></span>
+            <span class="live-pill" style="padding:5px 8px;font-size:10px;">Live</span>
+          </div>
+        </section>
+
+        <section class="data-grid">
+          <div class="panel panel-pad">
+            <h2 class="section-title">Active Alerts <span id="alertCount">0</span></h2>
+            <div class="alert-list" id="activeAlerts"></div>
+          </div>
+
+          <div class="panel panel-pad">
+            <h2 class="section-title">Local Conditions</h2>
+            <div class="conditions-panel">
+              <div>
+                <div class="conditions-temp">
+                  <div class="temp" id="mainTemp">--°</div>
+                  <div class="condition-icon wx-icon wx-cloud" id="mainIcon" role="img" aria-label="Generic weather icon"></div>
+                </div>
+                <div class="condition" id="mainCondition">Loading conditions</div>
+              </div>
+              <div class="detail-table">
+                <div><span>Wind</span><strong id="detailWind">--</strong></div>
+                <div><span>Humidity</span><strong id="detailHumidity">--</strong></div>
+                <div><span>Dew Point</span><strong id="detailDewpoint">--</strong></div>
+                <div><span>Pressure</span><strong id="detailPressure">--</strong></div>
+                <div><span>Visibility</span><strong id="detailVisibility">--</strong></div>
+              </div>
+            </div>
+            <div class="hour-strip" id="hourStrip"></div>
+          </div>
+
+          <div class="panel panel-pad" id="spcPanel">
+            <h2 class="section-title">SPC Outlooks <span id="outlookCount">0</span></h2>
+            <div class="spc-layout">
+              <div class="spc-text" id="spcText"></div>
+              <div class="outlook-map" id="spcBadge">SPC</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lower-grid">
+          <div class="panel panel-pad" id="reportsPanel">
+            <h2 class="section-title">Storm Reports <span id="reportCount">0</span></h2>
+            <div class="report-list" id="reportList"></div>
+          </div>
+
+          <div class="panel panel-pad" id="hazardsPanel">
+            <h2 class="section-title">Local Hazards <span id="localAlertCount">0</span></h2>
+            <div class="hazard-list" id="localHazards"></div>
+          </div>
+
+          <div class="panel panel-pad" id="planningPanel">
+            <h2 class="section-title">Planning Signals</h2>
+            <div class="signal-grid" id="planningSignals"></div>
+          </div>
+
+          <div class="panel panel-pad" id="timelinePanel">
+            <h2 class="section-title">Forecast Timeline</h2>
+            <div class="timeline-list" id="forecastTimeline"></div>
+          </div>
+
+          <div class="panel panel-pad">
+            <h2 class="section-title">Radar Tools</h2>
+            <div class="tool-grid">
+              <button class="tool-button" type="button">Measure</button>
+              <button class="tool-button" type="button">Distance</button>
+              <button class="tool-button" type="button">Area</button>
+              <button class="tool-button" type="button">Tracks</button>
+              <button class="tool-button" type="button">Shear</button>
+            </div>
+            <div class="notice">Radar tools are UI-ready. Measurement drawing can be added next if you want click-to-measure on the map.</div>
+          </div>
+
+          <div class="panel panel-pad">
+            <h2 class="section-title">Layers</h2>
+            <div class="layer-list">
+              <label class="layer-row"><input type="checkbox" id="layerRadar" checked> NEXRAD Reflectivity <input class="range" id="radarOpacity" type="range" min="0" max="100" value="62"></label>
+              <label class="layer-row"><input type="checkbox" id="layerAlerts" checked> Warnings <input class="range" id="alertOpacity" type="range" min="0" max="100" value="26"></label>
+              <label class="layer-row"><input type="checkbox" id="layerWatches" checked> Watches <input class="range" id="watchOpacity" type="range" min="0" max="100" value="21"></label>
+              <label class="layer-row"><input type="checkbox" id="layerOutlooks" checked> SPC Outlooks <input class="range" id="outlookOpacity" type="range" min="0" max="100" value="16"></label>
+              <label class="layer-row"><input type="checkbox" id="layerReports" checked> Storm Reports <input class="range" id="reportOpacity" type="range" min="0" max="100" value="90"></label>
+            </div>
+          </div>
+
+          <div class="panel panel-pad">
+            <h2 class="section-title">Saved Locations</h2>
+            <div id="savedLocations"></div>
+          </div>
+
+          <div class="panel panel-pad" id="discussionPanel">
+            <h2 class="section-title">Mesoscale Discussion <span id="discussionCount">0</span></h2>
+            <div class="discussion-copy" id="discussionText"></div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script>
+    const NEXRAD_TILE = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
+    const SAVED_LOCATIONS = [
+      { name: 'Idabel, OK', lat: 33.8957, lon: -94.8263 },
+      { name: 'Dallas, TX', lat: 32.7767, lon: -96.797 },
+      { name: 'Oklahoma City, OK', lat: 35.4676, lon: -97.5164 },
+      { name: 'Little Rock, AR', lat: 34.7465, lon: -92.2896 },
+      { name: 'Tulsa, OK', lat: 36.154, lon: -95.993 },
+      { name: 'Springfield, MO', lat: 37.209, lon: -93.2923 },
+      { name: 'Madison, WI', lat: 43.0731, lon: -89.4012 }
+    ];
+
+    const state = {
+      apiBase: '',
+      local: null,
+      rendered: [],
+      reports: [],
+      map: null,
+      mapReady: false,
+      mapPromise: null,
+      selectedLocation: SAVED_LOCATIONS[0],
+      radarMode: 'reflectivity'
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const lower = (value) => clean(value).toLowerCase();
+    const fallbackBases = ['', '/dashboard', '/warningcenter'];
+
+    function apiUrl(path) {
+      return `${state.apiBase}${path}`;
+    }
+
+    function appHref(path) {
+      if (!path) return `${state.apiBase || ''}/dashboard/warningcenter`;
+      if (/^https?:/i.test(path)) return path;
+      return `${state.apiBase || ''}${path}`;
+    }
+
+    async function fetchApi(path, options) {
+      const bases = state.apiBase ? [state.apiBase, ...fallbackBases.filter((base) => base !== state.apiBase)] : fallbackBases;
+      let lastError;
+      for (const base of bases) {
+        try {
+          const response = await fetch(`${base}${path}`, options);
+          if (response.ok) {
+            state.apiBase = base;
+            return response;
+          }
+          lastError = new Error(`${path} returned ${response.status}`);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error(`${path} failed`);
+    }
+
+    function timeAgo(value) {
+      const timestamp = Date.parse(value || '');
+      if (!Number.isFinite(timestamp)) return '--';
+      const diff = Math.max(0, Date.now() - timestamp);
+      const minutes = Math.floor(diff / 60000);
+      if (minutes < 1) return 'now';
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 48) return `${hours}h ago`;
+      return `${Math.floor(hours / 24)}d ago`;
+    }
+
+    function fmtTime(value) {
+      const timestamp = Date.parse(value || '');
+      if (!Number.isFinite(timestamp)) return '--';
+      return new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function fmtDateTime(value) {
+      const timestamp = Date.parse(value || '');
+      if (!Number.isFinite(timestamp)) return '--';
+      return new Date(timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function isNightTime(value) {
+      const timestamp = Date.parse(value || '');
+      if (!Number.isFinite(timestamp)) return false;
+      const hour = new Date(timestamp).getHours();
+      return hour < 7 || hour >= 19;
+    }
+
+    function weatherKind(text = '', timeValue = '') {
+      const phrase = lower(text);
+      if (/\b(thunder|tstorm|storm)\b/.test(phrase)) return 'storm';
+      if (/\b(snow|sleet|ice|freezing|flurr)\b/.test(phrase)) return 'snow';
+      if (/\b(rain|shower|drizzle)\b/.test(phrase)) return 'rain';
+      if (/\b(fog|mist|haze|smoke)\b/.test(phrase)) return 'fog';
+      if (/\b(wind|breezy|gust)\b/.test(phrase)) return 'wind';
+      if (/\b(hot|heat)\b/.test(phrase)) return 'hot';
+      if (/\b(cloud|overcast)\b/.test(phrase)) return 'cloud';
+      if (/\b(clear|sun|fair)\b/.test(phrase)) return isNightTime(timeValue) ? 'moon' : 'sun';
+      return isNightTime(timeValue) ? 'moon' : 'cloud';
+    }
+
+    function iconLabel(text = '', kind = 'cloud') {
+      const label = clean(text) || `${kind} conditions`;
+      return `${label} generic icon`;
+    }
+
+    function setWeatherIcon(id, text = '', timeValue = '') {
+      const element = $(id);
+      if (!element) return;
+      const kind = weatherKind(text, timeValue);
+      element.className = `condition-icon wx-icon wx-${kind}`;
+      element.setAttribute('aria-label', iconLabel(text, kind));
+      element.hidden = false;
+    }
+
+    function weatherIconHtml(text = '', timeValue = '', size = 'small') {
+      const kind = weatherKind(text, timeValue);
+      const sizeClass = size === 'mini' ? 'wx-mini' : 'wx-small';
+      return `<span class="wx-icon wx-${kind} ${sizeClass}" role="img" aria-label="${esc(iconLabel(text, kind))}"></span>`;
+    }
+
+    function maxNumberFromText(value = '') {
+      const numbers = String(value || '').match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
+      return numbers.length ? Math.max(...numbers) : null;
+    }
+
+    function clampPct(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return 0;
+      return Math.max(0, Math.min(100, number));
+    }
+
+    function trendLabel(hours = []) {
+      const valid = hours.filter((hour) => Number.isFinite(Number(hour.temperature)));
+      if (valid.length < 2) return '--';
+      const first = Number(valid[0].temperature);
+      const last = Number(valid[Math.min(valid.length - 1, 8)].temperature);
+      const delta = Math.round(last - first);
+      if (delta > 0) return `+${delta}°`;
+      return `${delta}°`;
+    }
+
+    function eventGroup(item) {
+      const text = lower(`${item.event} ${item.title} ${item.classification?.family}`);
+      if (item.classification?.isOutlook || text.includes('outlook')) return 'outlooks';
+      if (item.classification?.isDiscussion || text.includes('mesoscale discussion')) return 'discussions';
+      if (item.classification?.isWatch || text.includes('watch')) return 'watches';
+      return 'warnings';
+    }
+
+    function accent(item) {
+      return item.theme?.accent || item.theme?.primary || '#2488ff';
+    }
+
+    function rgb(item) {
+      return item.theme?.rgb || '36,136,255';
+    }
+
+    function eventCounts(items) {
+      const rows = new Map();
+      items.forEach((item) => {
+        const key = item.event || 'Weather Alert';
+        if (!rows.has(key)) rows.set(key, { label: key, count: 0, accent: accent(item) });
+        rows.get(key).count += 1;
+      });
+      return Array.from(rows.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    }
+
+    function geometryFor(item) {
+      if (item.geometry) return item.geometry;
+      if (Array.isArray(item.polygon) && item.polygon.length >= 4) return { type: 'Polygon', coordinates: [item.polygon] };
+      return null;
+    }
+
+    function collectCoords(coords) {
+      const out = [];
+      const stack = [coords];
+      while (stack.length) {
+        const current = stack.pop();
+        if (!Array.isArray(current)) continue;
+        if (current.length >= 2 && Number.isFinite(Number(current[0])) && Number.isFinite(Number(current[1]))) {
+          out.push([Number(current[0]), Number(current[1])]);
+        } else {
+          for (let i = current.length - 1; i >= 0; i -= 1) stack.push(current[i]);
+        }
+      }
+      return out;
+    }
+
+    function alertFeatureCollection(items) {
+      return {
+        type: 'FeatureCollection',
+        features: items.map((item) => {
+          const geometry = geometryFor(item);
+          if (!geometry) return null;
+          return {
+            type: 'Feature',
+            properties: {
+              key: item.key,
+              event: item.event,
+              title: item.title,
+              group: eventGroup(item),
+              accent: accent(item),
+              rgb: rgb(item),
+              url: item.detailUrl || `/warningdetail?key=${encodeURIComponent(item.key || item.nwsId || '')}`
+            },
+            geometry
+          };
+        }).filter(Boolean)
+      };
+    }
+
+    function reportFeatureCollection(reports) {
+      return {
+        type: 'FeatureCollection',
+        features: reports.map((report) => report.geometry ? {
+          type: 'Feature',
+          properties: {
+            type: report.type,
+            magnitude: report.magnitude,
+            label: `${report.type} ${report.magnitude || ''}`.trim()
+          },
+          geometry: report.geometry
+        } : null).filter(Boolean)
+      };
+    }
+
+    async function loadMapConfig() {
+      const response = await fetchApi('/api/maps/config');
+      const config = await response.json();
+      if (!config.styleUrl) throw new Error('WeatherPower map style is missing');
+      return config;
+    }
+
+    function firstSymbolLayerId(map) {
+      return map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id;
+    }
+
+    function addMapLayers(map) {
+      if (!map.getSource('nexrad-reflectivity')) {
+        map.addSource('nexrad-reflectivity', { type: 'raster', tiles: [NEXRAD_TILE], tileSize: 256, scheme: 'xyz' });
+        map.addLayer({
+          id: 'nexrad-reflectivity',
+          type: 'raster',
+          source: 'nexrad-reflectivity',
+          paint: { 'raster-opacity': Number($('radarOpacity').value) / 100, 'raster-resampling': 'nearest' }
+        }, firstSymbolLayerId(map));
+      }
+      if (!map.getSource('dashboard-alerts')) {
+        map.addSource('dashboard-alerts', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        const before = firstSymbolLayerId(map);
+        map.addLayer({
+          id: 'dashboard-alert-fill',
+          type: 'fill',
+          source: 'dashboard-alerts',
+          paint: {
+            'fill-color': ['coalesce', ['get', 'accent'], '#2488ff'],
+            'fill-opacity': ['case',
+              ['==', ['get', 'group'], 'outlooks'], Number($('outlookOpacity').value) / 100,
+              ['==', ['get', 'group'], 'watches'], Number($('watchOpacity').value) / 100,
+              Number($('alertOpacity').value) / 100
+            ]
+          }
+        }, before);
+        map.addLayer({
+          id: 'dashboard-alert-line-shadow',
+          type: 'line',
+          source: 'dashboard-alerts',
+          paint: { 'line-color': '#02060d', 'line-width': 5, 'line-opacity': .8 }
+        }, before);
+        map.addLayer({
+          id: 'dashboard-alert-line',
+          type: 'line',
+          source: 'dashboard-alerts',
+          paint: { 'line-color': ['coalesce', ['get', 'accent'], '#2488ff'], 'line-width': ['case', ['==', ['get', 'group'], 'watches'], 3, 2.4], 'line-opacity': 1 }
+        }, before);
+      }
+      if (!map.getSource('storm-reports')) {
+        map.addSource('storm-reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({
+          id: 'storm-report-points',
+          type: 'circle',
+          source: 'storm-reports',
+          paint: {
+            'circle-color': ['match', ['get', 'type'], 'Tornado', '#ff3131', 'Hail', '#42e06f', 'Wind', '#00d9ff', 'Rain', '#2488ff', '#ffd400'],
+            'circle-radius': 5,
+            'circle-stroke-color': '#07111d',
+            'circle-stroke-width': 2,
+            'circle-opacity': Number($('reportOpacity').value) / 100
+          }
+        });
+      }
+    }
+
+    async function ensureMap() {
+      if (state.mapReady) return state.map;
+      if (state.mapPromise) return state.mapPromise;
+      state.mapPromise = (async () => {
+        const config = await loadMapConfig();
+        const map = new maplibregl.Map({
+          container: 'map',
+          style: config.styleUrl,
+          center: [state.selectedLocation.lon, state.selectedLocation.lat],
+          zoom: 5.9,
+          attributionControl: false
+        });
+        map.on('styleimagemissing', (event) => {
+          if (map.hasImage(event.id)) return;
+          map.addImage(event.id, {
+            width: 1,
+            height: 1,
+            data: new Uint8Array([0, 0, 0, 0])
+          });
+        });
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+        await new Promise((resolve, reject) => {
+          map.once('load', resolve);
+          map.once('error', (event) => reject(event?.error || new Error('Map failed to load')));
+        });
+        addMapLayers(map);
+        state.map = map;
+        state.mapReady = true;
+        return map;
+      })();
+      return state.mapPromise;
+    }
+
+    function visibleAlertItems() {
+      const alerts = $('toggleAlerts').checked && $('layerAlerts').checked;
+      const watches = $('toggleWatches').checked && $('layerWatches').checked;
+      const outlooks = $('toggleOutlooks').checked && $('layerOutlooks').checked;
+      return state.rendered.filter((item) => {
+        const group = eventGroup(item);
+        if (group === 'outlooks') return outlooks;
+        if (group === 'watches') return watches;
+        if (group === 'discussions') return false;
+        return alerts;
+      });
+    }
+
+    async function drawMap({ fit = false } = {}) {
+      const map = await ensureMap();
+      map.getSource('dashboard-alerts')?.setData(alertFeatureCollection(visibleAlertItems()));
+      map.getSource('storm-reports')?.setData(reportFeatureCollection($('toggleReports').checked && $('layerReports').checked ? state.reports : []));
+      if (map.getLayer('nexrad-reflectivity')) {
+        map.setLayoutProperty('nexrad-reflectivity', 'visibility', $('layerRadar').checked ? 'visible' : 'none');
+        map.setPaintProperty('nexrad-reflectivity', 'raster-opacity', Number($('radarOpacity').value) / 100);
+      }
+      if (map.getLayer('dashboard-alert-fill')) {
+        map.setPaintProperty('dashboard-alert-fill', 'fill-opacity', ['case',
+          ['==', ['get', 'group'], 'outlooks'], Number($('outlookOpacity').value) / 100,
+          ['==', ['get', 'group'], 'watches'], Number($('watchOpacity').value) / 100,
+          Number($('alertOpacity').value) / 100
+        ]);
+      }
+      if (map.getLayer('storm-report-points')) {
+        map.setPaintProperty('storm-report-points', 'circle-opacity', Number($('reportOpacity').value) / 100);
+      }
+      if (fit) {
+        map.flyTo({ center: [state.selectedLocation.lon, state.selectedLocation.lat], zoom: 6.4, speed: 1.4 });
+      }
+    }
+
+    function renderSummary() {
+      const rows = eventCounts(state.rendered).slice(0, 9);
+      $('summaryTotal').textContent = state.rendered.length.toLocaleString();
+      $('summaryList').innerHTML = rows.length ? rows.map((row) => `
+        <div class="summary-item" style="--accent:${esc(row.accent)}">
+          <span class="summary-color"></span>
+          <span>${esc(row.label)}</span>
+          <span class="summary-count">${row.count}</span>
+        </div>
+      `).join('') : '<div class="empty">No active products.</div>';
+    }
+
+    function renderAlerts() {
+      const topAlerts = state.rendered
+        .filter((item) => ['warnings', 'watches'].includes(eventGroup(item)))
+        .sort((a, b) => (Date.parse(b.issuedAt || '') || 0) - (Date.parse(a.issuedAt || '') || 0))
+        .slice(0, 7);
+      $('alertCount').textContent = topAlerts.length.toLocaleString();
+      $('activeAlerts').innerHTML = topAlerts.length ? topAlerts.map((item) => `
+        <a class="alert-row" href="${esc(appHref(item.detailUrl || '/warningcenter'))}" style="--accent:${esc(accent(item))};--rgb:${esc(rgb(item))}">
+          <span class="alert-icon">!</span>
+          <span class="alert-copy"><strong>${esc(item.event || item.title)}</strong><span>${esc(item.areaDesc || item.state || '')}</span></span>
+          <span class="alert-age">${esc(timeAgo(item.issuedAt))}</span>
+        </a>
+      `).join('') : '<div class="empty">No active warnings or watches.</div>';
+    }
+
+    function renderLocal() {
+      const local = state.local;
+      if (!local) return;
+      const current = local.current || {};
+      const point = local.point || {};
+      const city = [point.city, point.state].filter(Boolean).join(', ') || state.selectedLocation.name;
+      const temp = current.temperatureF ?? local.hourly?.[0]?.temperature ?? '--';
+      const condition = current.textDescription || local.hourly?.[0]?.shortForecast || 'No current observation';
+      const wind = current.windMph !== null && current.windMph !== undefined ? `${current.windMph} mph` : local.hourly?.[0]?.windSpeed || '--';
+      $('locationName').textContent = city;
+      $('railTemp').textContent = `${temp}°`;
+      $('mainTemp').textContent = `${temp}°`;
+      $('railCondition').textContent = condition;
+      $('mainCondition').textContent = condition;
+      setWeatherIcon('railIcon', condition, current.timestamp || local.hourly?.[0]?.startTime);
+      setWeatherIcon('mainIcon', condition, current.timestamp || local.hourly?.[0]?.startTime);
+      $('railWind').textContent = wind;
+      $('detailWind').textContent = wind;
+      $('railHumidity').textContent = current.humidityPct !== null && current.humidityPct !== undefined ? `${current.humidityPct}%` : '--';
+      $('detailHumidity').textContent = $('railHumidity').textContent;
+      $('railPressure').textContent = current.pressureInHg ? `${current.pressureInHg} in` : '--';
+      $('detailPressure').textContent = $('railPressure').textContent;
+      $('detailDewpoint').textContent = current.dewpointF !== null && current.dewpointF !== undefined ? `${current.dewpointF}°` : '--';
+      $('detailVisibility').textContent = current.visibilityMi !== null && current.visibilityMi !== undefined ? `${current.visibilityMi} mi` : '--';
+      $('miniDays').innerHTML = (local.daily || []).slice(0, 4).map((day) => `
+        <div class="day-mini">
+          <span>${esc(day.name?.split(' ')[0] || '')}</span>
+          ${weatherIconHtml(day.shortForecast, day.startTime, 'mini')}
+          <strong>${esc(day.temperature)}°</strong>
+        </div>
+      `).join('');
+      $('hourStrip').innerHTML = (local.hourly || []).slice(0, 9).map((hour) => `
+        <div class="hour-card">
+          <span>${esc(fmtTime(hour.startTime))}</span>
+          ${weatherIconHtml(hour.shortForecast, hour.startTime, 'small')}
+          <strong>${esc(hour.temperature)}°</strong>
+          <span>${hour.probabilityOfPrecipitation ?? 0}%</span>
+        </div>
+      `).join('');
+    }
+
+    function renderSpc() {
+      const outlooks = state.rendered.filter((item) => eventGroup(item) === 'outlooks');
+      const discussions = state.rendered.filter((item) => eventGroup(item) === 'discussions');
+      const primary = outlooks.find((item) => /day 1/i.test(item.areaDesc || item.title || '')) || outlooks[0];
+      $('outlookCount').textContent = outlooks.length.toLocaleString();
+      $('spcText').innerHTML = primary ? `
+        <span>Day ${esc(primary.outlookDetails?.day || '')}</span>
+        <strong>${esc(primary.outlookDetails?.labelText || primary.title || 'SPC Outlook')}</strong>
+        <p>${esc(primary.sourceText || primary.areaDesc || 'SPC severe weather outlook is active.')}</p>
+        <p style="margin-top:10px;"><a href="${esc(appHref(primary.detailUrl || '/warningcenter'))}">View full outlook</a></p>
+      ` : '<p>No SPC outlook cards are active.</p>';
+      $('spcBadge').textContent = primary?.outlookDetails?.label || 'SPC';
+      $('discussionCount').textContent = discussions.length.toLocaleString();
+      const discussion = discussions[0];
+      $('discussionText').innerHTML = discussion ? `
+        <strong>${esc(discussion.title || 'Mesoscale Discussion')}</strong>
+        <p>${esc(discussion.whatToDo || discussion.sourceText || discussion.areaDesc || '')}</p>
+        <p style="margin-top:10px;"><a href="${esc(appHref(discussion.detailUrl || '/warningcenter'))}">Read discussion</a></p>
+      ` : 'No active mesoscale discussions right now.';
+    }
+
+    function renderReports() {
+      $('reportCount').textContent = state.reports.length.toLocaleString();
+      $('reportList').innerHTML = state.reports.length ? state.reports.slice(0, 9).map((report) => `
+        <div class="report-row">
+          <span class="type">${esc(report.type)}</span>
+          <strong>${esc(report.magnitude || '--')}</strong>
+          <span>${esc([report.city, report.county, report.state].filter(Boolean).join(', ') || report.remark || '--')}</span>
+        </div>
+      `).join('') : '<div class="empty">No recent reports found.</div>';
+    }
+
+    function renderLocalHazards() {
+      const alerts = state.local?.alerts || [];
+      $('localAlertCount').textContent = alerts.length.toLocaleString();
+      $('localHazards').innerHTML = alerts.length ? alerts.slice(0, 5).map((alert) => `
+        <div class="local-alert">
+          <strong>${esc(alert.event || 'Local Weather Alert')}</strong>
+          <span>${esc([alert.severity, alert.urgency, alert.certainty].filter(Boolean).join(' · '))}</span>
+          <span>${esc(alert.headline || alert.areaDesc || 'Monitor local conditions.')}</span>
+          <span>Expires ${esc(fmtDateTime(alert.expires))}</span>
+        </div>
+      `).join('') : '<div class="empty">No point-based hazards for this location right now.</div>';
+    }
+
+    function renderPlanningSignals() {
+      const local = state.local || {};
+      const current = local.current || {};
+      const hours = local.hourly || [];
+      const next6 = hours.slice(0, 6);
+      const next12 = hours.slice(0, 12);
+      const maxPop = Math.max(0, ...next6.map((hour) => Number(hour.probabilityOfPrecipitation) || 0));
+      const maxWind = Math.max(0, ...next12.map((hour) => maxNumberFromText(hour.windSpeed) || 0));
+      const thunderHours = next12.filter((hour) => /\b(thunder|tstorm|storm)\b/i.test(hour.shortForecast || '')).length;
+      const feelsLike = current.heatIndexF ?? current.windChillF ?? current.temperatureF ?? hours[0]?.temperature ?? null;
+      const visibility = current.visibilityMi !== null && current.visibilityMi !== undefined ? `${current.visibilityMi} mi` : '--';
+      const alerts = local.alerts?.length || 0;
+      const cards = [
+        ['Rain Next 6h', `${maxPop}%`, maxPop >= 50 ? 'Wet window likely' : 'Low to moderate signal'],
+        ['Max Wind 12h', maxWind ? `${maxWind} mph` : '--', maxWind >= 40 ? 'Watch gusts closely' : 'General winds'],
+        ['Feels Like', feelsLike !== null ? `${feelsLike}°` : '--', current.heatIndexF ? 'Heat index' : current.windChillF ? 'Wind chill' : 'Air temperature'],
+        ['Storm Hours', `${thunderHours}`, thunderHours ? 'Thunder in hourly forecast' : 'No storm wording nearby'],
+        ['Visibility', visibility, visibility === '--' ? 'No obs value' : 'Current observation'],
+        ['Local Alerts', `${alerts}`, alerts ? 'Point alert active' : 'No point alerts']
+      ];
+      $('planningSignals').innerHTML = cards.map(([label, value, note]) => `
+        <div class="signal-card">
+          <span>${esc(label)}</span>
+          <strong>${esc(value)}</strong>
+          <small>${esc(note)}</small>
+        </div>
+      `).join('');
+    }
+
+    function renderForecastTimeline() {
+      const hours = state.local?.hourly || [];
+      $('forecastTimeline').innerHTML = hours.length ? hours.slice(0, 8).map((hour) => {
+        const temp = Number(hour.temperature);
+        const pop = clampPct(hour.probabilityOfPrecipitation);
+        const tempWidth = Number.isFinite(temp) ? Math.max(5, Math.min(100, Math.round(((temp + 10) / 120) * 100))) : 5;
+        const width = Math.max(tempWidth, pop);
+        return `
+          <div class="timeline-row">
+            <span>${esc(fmtTime(hour.startTime))}</span>
+            ${weatherIconHtml(hour.shortForecast, hour.startTime, 'small')}
+            <div>
+              <strong>${esc(hour.shortForecast || 'Forecast')}</strong>
+              <div class="bar-track"><span class="bar-fill" style="width:${width}%"></span></div>
+            </div>
+            <span>${esc(hour.temperature)}° · ${pop}%</span>
+          </div>
+        `;
+      }).join('') : '<div class="empty">Hourly timeline is loading.</div>';
+    }
+
+    function renderFeatures() {
+      renderLocalHazards();
+      renderPlanningSignals();
+      renderForecastTimeline();
+    }
+
+    function renderSaved() {
+      $('savedLocations').innerHTML = SAVED_LOCATIONS.map((location) => `
+        <div class="saved-row">
+          <button type="button" data-location="${esc(location.name)}">${esc(location.name)}</button>
+          <span class="star">${location.name === state.selectedLocation.name ? '★' : '☆'}</span>
+        </div>
+      `).join('');
+      document.querySelectorAll('[data-location]').forEach((button) => {
+        button.addEventListener('click', () => selectLocation(SAVED_LOCATIONS.find((item) => item.name === button.dataset.location)));
+      });
+    }
+
+    function renderAll() {
+      renderSummary();
+      renderAlerts();
+      renderLocal();
+      renderSpc();
+      renderReports();
+      renderFeatures();
+      renderSaved();
+      drawMap({ fit: false }).catch((error) => { $('healthText').textContent = error.message; });
+    }
+
+    async function loadHealth() {
+      const response = await fetchApi('/api/health');
+      const health = await response.json();
+      $('healthText').textContent = health.ok ? 'All systems operational' : 'Needs attention';
+    }
+
+    async function loadRendered() {
+      const response = await fetchApi('/api/warnings/rendered');
+      const payload = await response.json();
+      state.rendered = (payload.items || []).filter((item) => item.status === 'rendered' || item.status === 'pending');
+      $('feedStatus').textContent = payload.status === 'rendering'
+        ? `Rendering ${payload.renderedCount || 0}/${payload.count || state.rendered.length}`
+        : `${(payload.renderedCount || state.rendered.length).toLocaleString()} products ready`;
+      $('dataAge').textContent = `Data: ${timeAgo(payload.lastFinishedAt || payload.lastStartedAt)}`;
+      $('lastUpdated').textContent = `Last updated: ${fmtDateTime(payload.lastFinishedAt || payload.lastStartedAt)}`;
+    }
+
+    async function loadLocal() {
+      const params = new URLSearchParams({
+        lat: String(state.selectedLocation.lat),
+        lon: String(state.selectedLocation.lon)
+      });
+      const response = await fetchApi(`/api/dashboard/local?${params}`);
+      state.local = await response.json();
+    }
+
+    async function loadReports() {
+      const response = await fetchApi('/api/dashboard/reports?hours=12&limit=90');
+      const payload = await response.json();
+      state.reports = payload.reports || [];
+    }
+
+    async function refreshDashboard({ fit = false } = {}) {
+      try {
+        $('healthText').textContent = 'Updating';
+        await Promise.all([loadHealth(), loadRendered(), loadLocal(), loadReports()]);
+        $('radarTime').textContent = `Radar ${fmtTime(new Date().toISOString())}`;
+        renderAll();
+        await drawMap({ fit });
+      } catch (error) {
+        $('healthText').textContent = error.message;
+        $('searchNotice').textContent = error.message;
+      }
+    }
+
+    function selectLocation(location) {
+      if (!location) return;
+      state.selectedLocation = location;
+      $('locationSearch').value = location.name;
+      $('searchNotice').textContent = `Loaded ${location.name}.`;
+      refreshDashboard({ fit: true });
+    }
+
+    function handleSearch() {
+      const query = clean($('locationSearch').value);
+      const coord = query.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+      if (coord) {
+        state.selectedLocation = { name: `${coord[1]}, ${coord[2]}`, lat: Number(coord[1]), lon: Number(coord[2]) };
+        $('searchNotice').textContent = `Loaded coordinates ${state.selectedLocation.name}.`;
+        refreshDashboard({ fit: true });
+        return;
+      }
+      const saved = SAVED_LOCATIONS.find((item) => lower(item.name).includes(lower(query)));
+      if (saved) {
+        selectLocation(saved);
+        return;
+      }
+      $('searchNotice').textContent = 'I can load saved cities or direct coordinates right now. Geocoding city names can be added next.';
+    }
+
+    function bindEvents() {
+      $('searchButton').addEventListener('click', handleSearch);
+      $('locationSearch').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') handleSearch();
+      });
+      $('gpsButton').addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          $('searchNotice').textContent = 'Geolocation is not available in this browser.';
+          return;
+        }
+        navigator.geolocation.getCurrentPosition((position) => {
+          state.selectedLocation = {
+            name: 'Current Location',
+            lat: position.coords.latitude,
+            lon: position.coords.longitude
+          };
+          $('searchNotice').textContent = 'Loaded your current location.';
+          refreshDashboard({ fit: true });
+        }, () => {
+          $('searchNotice').textContent = 'Location permission was not granted.';
+        });
+      });
+      $('refreshButton').addEventListener('click', () => refreshDashboard({ fit: false }));
+      [...document.querySelectorAll('[data-radar-mode]')].forEach((button) => {
+        button.addEventListener('click', () => {
+          state.radarMode = button.dataset.radarMode;
+          document.querySelectorAll('[data-radar-mode]').forEach((item) => item.classList.toggle('active', item === button));
+          $('searchNotice').textContent = state.radarMode === 'velocityCards'
+            ? 'Velocity is shown on tornado and severe thunderstorm cards using nearest-site N0U radar.'
+            : state.radarMode === 'dual'
+              ? 'Dual-pol controls are staged; reflectivity remains the live map layer.'
+              : 'Live NEXRAD reflectivity layer active.';
+        });
+      });
+      ['toggleAlerts', 'toggleOutlooks', 'toggleReports', 'toggleWatches', 'layerRadar', 'layerAlerts', 'layerWatches', 'layerOutlooks', 'layerReports', 'radarOpacity', 'alertOpacity', 'watchOpacity', 'outlookOpacity', 'reportOpacity'].forEach((id) => {
+        $(id).addEventListener('input', () => drawMap());
+        $(id).addEventListener('change', () => drawMap());
+      });
+      document.querySelector('[data-focus-reports]')?.addEventListener('click', () => $('reportsPanel').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      document.querySelector('[data-focus-map]')?.addEventListener('click', () => $('mapPanel').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      document.querySelector('[data-focus-group="outlooks"]')?.addEventListener('click', () => $('spcPanel').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      document.querySelector('[data-focus-group="discussions"]')?.addEventListener('click', () => $('discussionPanel').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      document.querySelector('[data-focus-hazards]')?.addEventListener('click', () => $('hazardsPanel').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      document.querySelector('[data-focus-timeline]')?.addEventListener('click', () => $('timelinePanel').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    }
+
+    bindEvents();
+    $('locationSearch').value = state.selectedLocation.name;
+    refreshDashboard({ fit: true });
+    setInterval(() => refreshDashboard({ fit: false }), 5000);
+  </script>
+</body>
+</html>

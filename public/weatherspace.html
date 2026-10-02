@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>WeatherSpace Command Center</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305070d'/%3E%3Ccircle cx='32' cy='30' r='18' fill='%23a873ff'/%3E%3Cellipse cx='32' cy='34' rx='27' ry='7' fill='none' stroke='%2320d7ff' stroke-width='4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --void: #05070d;
+    --surface: rgba(8, 13, 26, .78);
+    --line: rgba(139, 113, 255, .24);
+    --line-strong: rgba(128, 225, 255, .34);
+    --text: #f4f7ff;
+    --muted: #99a6c9;
+    --faint: #626d90;
+    --violet: #a873ff;
+    --cyan: #20d7ff;
+    --green: #38e59e;
+    --yellow: #ffd84d;
+    --panel-shadow: 0 24px 80px rgba(0, 0, 0, .38);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; margin: 0; background: var(--void); color: var(--text); font-family: "Barlow Condensed", system-ui, sans-serif; overflow-x: hidden; }
+  body::before { content: ""; position: fixed; inset: 0; z-index: -3; background: radial-gradient(circle at 18% 14%, rgba(168,115,255,.17), transparent 28%), radial-gradient(circle at 76% 6%, rgba(32,215,255,.12), transparent 26%), linear-gradient(135deg, #03040a 0%, #07101a 48%, #10091c 100%); }
+  body::after { content: ""; position: fixed; inset: 0; z-index: -2; opacity: .42; background-image: radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.5px), radial-gradient(circle, rgba(139,113,255,.85) 0 1px, transparent 1.5px); background-size: 90px 90px, 140px 140px; background-position: 12px 18px, 34px 76px; pointer-events: none; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; }
+
+  .app { min-height: 100vh; display: grid; grid-template-columns: 226px minmax(0, 1fr) 360px; grid-template-rows: 70px minmax(0, 1fr); gap: 12px; padding: 12px; }
+  .topbar, .rail, .map-shell, .side, .bottom-deck, .panel { background: linear-gradient(180deg, rgba(11,17,32,.9), rgba(8,13,26,.75)); border: 1px solid var(--line); box-shadow: var(--panel-shadow); backdrop-filter: blur(18px); }
+  .topbar { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 18px; padding: 10px 14px; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+  .planet { width: 42px; height: 42px; flex: 0 0 auto; filter: drop-shadow(0 0 16px rgba(168,115,255,.42)); }
+  .brand h1, .panel-title, .nav a, .action, .status-card strong, .metric strong, .alert-title { font-family: "Oswald", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .brand h1 { margin: 0; line-height: .95; font-size: 28px; }
+  .brand h1 span { color: var(--violet); }
+  .brand small { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .live-strip { display: flex; align-items: center; gap: 16px; min-width: 0; color: var(--muted); font-size: 15px; }
+  .live-dot { display: inline-flex; width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 18px rgba(56,229,158,.75); margin-right: 7px; }
+  .top-actions { display: flex; align-items: center; gap: 10px; }
+  .status-card, .action { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: rgba(3,7,16,.62); display: flex; align-items: center; gap: 10px; padding: 8px 12px; color: var(--muted); }
+  .status-card strong { color: var(--text); font-size: 13px; }
+  .status-card span { display: block; color: var(--green); font-size: 12px; }
+  .action { color: var(--text); cursor: pointer; }
+  .action:hover { border-color: var(--line-strong); color: var(--cyan); }
+
+  .rail { grid-column: 1; grid-row: 2; border-radius: 18px; padding: 12px; display: flex; flex-direction: column; min-height: 0; }
+  .nav { display: grid; gap: 8px; }
+  .nav a { display: flex; align-items: center; gap: 11px; min-height: 46px; padding: 0 12px; color: #dbe5ff; border: 1px solid transparent; border-radius: 12px; font-size: 15px; }
+  .nav a.active, .nav a:hover { color: var(--text); border-color: rgba(168,115,255,.55); background: rgba(168,115,255,.14); }
+  .nav svg, .quick svg, .action svg { width: 18px; height: 18px; stroke-width: 2; }
+  .rail-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .rail-label { color: var(--faint); font-size: 12px; letter-spacing: .13em; text-transform: uppercase; margin: 0 0 10px; }
+  .quick { display: grid; gap: 8px; }
+  .quick a { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); background: rgba(5,9,19,.52); }
+  .quick a:hover { color: var(--text); border-color: var(--cyan); }
+  .rail-footer { margin-top: auto; color: var(--faint); font-size: 13px; line-height: 1.35; }
+
+  .main { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(420px, 1fr) 276px; gap: 12px; }
+  .map-shell { position: relative; border-radius: 18px; overflow: hidden; min-height: 420px; }
+  #map { position: absolute; inset: 0; background: #151a24; }
+  .radar-energy { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .48; mix-blend-mode: screen; background:
+    radial-gradient(circle at 23% 34%, rgba(56,229,158,.42), rgba(56,229,158,.08) 16%, transparent 32%),
+    radial-gradient(circle at 68% 42%, rgba(255,216,77,.32), rgba(255,85,50,.18) 11%, transparent 28%),
+    radial-gradient(circle at 46% 72%, rgba(32,215,255,.2), transparent 26%),
+    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size: auto, auto, auto, 96px 96px, 96px 96px;
+    animation: radarDrift 18s ease-in-out infinite alternate;
+  }
+  .radar-energy::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 0 18%, rgba(5,7,13,.12) 62%, rgba(5,7,13,.64) 100%); }
+  @keyframes radarDrift { from { transform: translate3d(-1.5%, -.8%, 0) scale(1.02); } to { transform: translate3d(1.2%, 1%, 0) scale(1.05); } }
+  .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { opacity: .74; }
+  .maplibregl-ctrl-logo { filter: invert(1) hue-rotate(150deg); }
+  .maplibregl-ctrl-attrib { background: rgba(5,7,13,.64) !important; color: var(--muted) !important; }
+  .maplibregl-ctrl-attrib a { color: var(--cyan) !important; }
+  .map-toolbar { position: absolute; z-index: 4; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
+  .map-tools, .map-time { display: inline-flex; align-items: center; gap: 8px; pointer-events: auto; background: rgba(4,8,16,.78); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+  .mode-btn { border: 0; background: transparent; color: var(--muted); padding: 7px 11px; border-radius: 8px; cursor: pointer; }
+  .mode-btn.active { background: linear-gradient(135deg, rgba(32,215,255,.24), rgba(168,115,255,.2)); color: var(--text); }
+  .map-time { color: var(--text); font-family: "Oswald", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .legend { position: absolute; z-index: 4; left: 12px; bottom: 12px; padding: 9px 11px; background: rgba(4,8,16,.82); border: 1px solid var(--line); border-radius: 12px; color: var(--text); display: flex; align-items: center; gap: 10px; font-size: 12px; text-transform: uppercase; }
+  .legend-bar { width: 160px; height: 10px; border-radius: 999px; background: linear-gradient(90deg, #00dbc8, #16d442, #ffe900, #ff5600, #f600ff); }
+
+  .bottom-deck { border-radius: 18px; padding: 12px; min-height: 0; overflow: hidden; }
+  .deck-head, .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .panel-title { margin: 0; font-size: 16px; color: var(--text); }
+  .deck-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .chip { border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--muted); border-radius: 999px; padding: 7px 11px; white-space: nowrap; cursor: pointer; }
+  .chip.active { color: var(--text); border-color: var(--cyan); background: rgba(32,215,255,.12); }
+  .card-row { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 10px; overflow: auto; padding-bottom: 4px; }
+  .warning-card { min-width: 220px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: rgba(5,10,20,.7); position: relative; }
+  .warning-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(135deg, rgba(var(--rgb, 168,115,255), .18), transparent 60%); }
+  .card-thumb { height: 92px; background: #111827; border-bottom: 1px solid var(--line); overflow: hidden; }
+  .card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-body { position: relative; z-index: 1; padding: 10px 11px 12px; }
+  .alert-title { display: block; font-size: 14px; line-height: 1.1; margin-bottom: 7px; }
+  .meta { display: block; color: var(--muted); font-size: 13px; line-height: 1.25; }
+  .tag { display: inline-flex; margin-top: 9px; border-radius: 999px; padding: 3px 8px; color: var(--text); background: rgba(var(--rgb, 168,115,255), .18); border: 1px solid rgba(var(--rgb, 168,115,255), .42); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+
+  .side { grid-column: 3; grid-row: 2; border-radius: 18px; padding: 12px; min-height: 0; overflow-y: auto; display: grid; gap: 12px; align-content: start; }
+  .panel { border-radius: 15px; padding: 12px; box-shadow: none; }
+  .alert-list, .mini-list { display: grid; gap: 8px; }
+  .alert-row { display: grid; grid-template-columns: 42px 1fr auto; gap: 10px; align-items: center; min-height: 62px; padding: 9px; border-radius: 12px; border: 1px solid var(--line); background: rgba(3,7,16,.54); }
+  .alert-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--text); background: rgba(var(--rgb, 168,115,255), .2); border: 1px solid rgba(var(--rgb, 168,115,255), .38); }
+  .alert-row time { color: var(--muted); font-size: 12px; }
+  .forecast { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+  .temp { font-family: "Oswald", sans-serif; font-size: 56px; line-height: .92; }
+  .forecast-desc { color: var(--muted); font-size: 16px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .metric { border: 1px solid var(--line); border-radius: 12px; padding: 9px; background: rgba(255,255,255,.035); }
+  .metric span { display: block; color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
+  .metric strong { display: block; margin-top: 3px; font-size: 18px; }
+  .mini-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(139,113,255,.13); padding-bottom: 8px; color: var(--muted); }
+  .mini-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .mini-row b { color: var(--text); font-weight: 600; }
+  .empty { min-height: 76px; display: grid; place-items: center; border: 1px dashed var(--line); border-radius: 12px; color: var(--faint); text-align: center; padding: 16px; }
+  .pulse { animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+
+  @media (max-width: 1180px) {
+    .app { grid-template-columns: 86px minmax(0, 1fr); grid-template-rows: 70px minmax(0, auto) auto; }
+    .rail { grid-column: 1; grid-row: 2 / 4; }
+    .brand small, .nav span, .quick span, .rail-footer, .rail-label { display: none; }
+    .nav a { justify-content: center; padding: 0; }
+    .main { grid-column: 2; grid-row: 2; }
+    .side { grid-column: 2; grid-row: 3; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .top-actions .status-card { display: none; }
+  }
+
+  @media (max-width: 760px) {
+    .app { display: block; padding: 8px; }
+    .topbar { position: sticky; top: 8px; z-index: 20; margin-bottom: 8px; }
+    .brand h1 { font-size: 22px; }
+    .live-strip { display: none; }
+    .rail { position: sticky; top: 86px; z-index: 19; margin-bottom: 8px; padding: 8px; }
+    .nav { grid-auto-flow: column; grid-auto-columns: 52px; overflow-x: auto; }
+    .rail-section, .rail-footer { display: none; }
+    .main { display: block; }
+    .map-shell { height: 58vh; min-height: 410px; margin-bottom: 8px; }
+    .bottom-deck, .side { margin-top: 8px; }
+    .side { display: grid; grid-template-columns: 1fr; }
+    .card-row { grid-auto-flow: column; grid-auto-columns: minmax(230px, 78vw); grid-template-columns: none; }
+    .map-toolbar { flex-direction: column; align-items: flex-start; right: auto; }
+    .top-actions .action:not(:last-child) { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <a class="brand" href="/weatherspace" aria-label="WeatherSpace home">
+      <svg class="planet" viewBox="0 0 100 100" aria-hidden="true">
+        <defs><radialGradient id="planetGradient" cx="36%" cy="30%" r="70%"><stop offset="0%" stop-color="#c8f4ff"/><stop offset="42%" stop-color="#a873ff"/><stop offset="100%" stop-color="#351364"/></radialGradient></defs>
+        <ellipse cx="50" cy="55" rx="42" ry="12" transform="rotate(-18 50 55)" fill="none" stroke="#20d7ff" stroke-width="5" opacity=".64"/>
+        <circle cx="50" cy="50" r="27" fill="url(#planetGradient)"/>
+        <path d="M21 62c22 7 50 4 69-12" fill="none" stroke="#f4f7ff" stroke-width="3" opacity=".38"/>
+      </svg>
+      <span><h1>Weather<span>Space</span></h1><small>WeatherPower command center</small></span>
+    </a>
+    <div class="live-strip"><span><i class="live-dot"></i>Live data</span><span id="updatedAt">Updated: checking</span><span id="productCount">Products: --</span></div>
+    <div class="top-actions">
+      <div class="status-card"><span aria-hidden="true">●</span><div><strong>Discord Auto Post</strong><span id="discordStatus">Checking</span></div></div>
+      <div class="status-card"><span aria-hidden="true">●</span><div><strong>X Posting</strong><span id="xStatus">Checking</span></div></div>
+      <a class="action" href="/controller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="3"/></svg>Open Controller</a>
+    </div>
+  </header>
+
+  <aside class="rail">
+    <nav class="nav">
+      <a class="active" href="#command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/></svg><span>Command Center</span></a>
+      <a href="#radar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 4"/></svg><span>Live Radar</span></a>
+      <a href="#warnings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3 10 18H2Z"/><path d="M12 9v5M12 17h.01"/></svg><span>Warnings</span></a>
+      <a href="#spc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19c4-7 8-12 16-14"/><path d="M4 19c7 0 12-4 16-14"/></svg><span>SPC Outlook</span></a>
+      <a href="#mesoscale"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 17a5 5 0 1 1 1-9 7 7 0 0 1 13 4 4 4 0 0 1-2 7H7Z"/><path d="m10 13-2 4h4l-2 4"/></svg><span>Mesoscale</span></a>
+      <a href="#reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 4v16"/><path d="M5 5h12l-2 4 2 4H5"/></svg><span>Reports</span></a>
+    </nav>
+    <section class="rail-section">
+      <p class="rail-label">Quick launch</p>
+      <div class="quick">
+        <a href="/warningcenter"><span>Live Warning Center</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+        <a href="/dashboard"><span>WeatherPower Dashboard</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-3H4v3Z"/></svg></a>
+        <a href="/warningcenter#radar"><span>Radar Viewer</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8"/><path d="M12 12 17 7"/></svg></a>
+        <a href="/controller"><span>WeWatch Builder</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m4 20 4-1 10-10-3-3L5 16l-1 4Z"/><path d="m14 6 3 3"/></svg></a>
+      </div>
+    </section>
+    <p class="rail-footer">WeatherSpace wraps WeatherPower cards, alerts, radar, forecast, and posting status into one flight deck.</p>
+  </aside>
+
+  <section class="main" id="command">
+    <section class="map-shell" id="radar" aria-label="Live radar map">
+      <div id="map"></div>
+      <div class="radar-energy" aria-hidden="true"></div>
+      <div class="map-toolbar">
+        <div class="map-tools">
+          <button class="mode-btn active" type="button" data-mode="all">All Products</button>
+          <button class="mode-btn" type="button" data-mode="warnings">Warnings</button>
+          <button class="mode-btn" type="button" data-mode="spc">SPC</button>
+          <button class="mode-btn" type="button" data-mode="reports">Reports</button>
+        </div>
+        <div class="map-time" id="radarTime">Radar now</div>
+      </div>
+      <div class="legend"><span>Light</span><div class="legend-bar"></div><span>Heavy</span></div>
+    </section>
+
+    <section class="bottom-deck" id="warnings">
+      <div class="deck-head">
+        <h2 class="panel-title">Live Warning Cards</h2>
+        <div class="deck-tabs">
+          <button class="chip active" type="button" data-card-filter="all">All</button>
+          <button class="chip" type="button" data-card-filter="warnings">Warnings</button>
+          <button class="chip" type="button" data-card-filter="watches">Watches</button>
+          <button class="chip" type="button" data-card-filter="outlooks">SPC</button>
+          <button class="chip" type="button" data-card-filter="discussions">Mesoscale</button>
+        </div>
+      </div>
+      <div class="card-row" id="cardRow"><div class="empty pulse">Loading rendered cards...</div></div>
+    </section>
+  </section>
+
+  <aside class="side">
+    <section class="panel">
+      <div class="panel-head"><h2 class="panel-title">Active Warnings</h2><a class="chip" href="/warningcenter">View All</a></div>
+      <div class="alert-list" id="alertList"><div class="empty pulse">Loading alerts...</div></div>
+    </section>
+    <section class="panel" id="spc">
+      <div class="panel-head"><h2 class="panel-title">SPC Outlook</h2><span class="chip" id="outlookCount">--</span></div>
+      <div class="mini-list" id="outlookList"><div class="empty pulse">Loading SPC outlooks...</div></div>
+    </section>
+    <section class="panel" id="mesoscale">
+      <div class="panel-head"><h2 class="panel-title">Mesoscale</h2><span class="chip" id="discussionCount">--</span></div>
+      <div class="mini-list" id="discussionList"><div class="empty pulse">Loading discussions...</div></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2 class="panel-title">Idabel, OK</h2><span class="chip">Default</span></div>
+      <div class="forecast">
+        <div><div class="temp" id="temp">--°</div><div class="forecast-desc" id="forecastText">Loading local forecast...</div></div>
+        <svg width="90" height="90" viewBox="0 0 90 90" aria-hidden="true"><defs><linearGradient id="cloudGrad" x1="0" x2="1"><stop stop-color="#20d7ff"/><stop offset="1" stop-color="#a873ff"/></linearGradient></defs><path d="M25 59h39a15 15 0 0 0 1-30 23 23 0 0 0-43 8 11 11 0 0 0 3 22Z" fill="url(#cloudGrad)" opacity=".84"/><path d="m38 63-6 13h10l-4 11 15-18H43l5-6Z" fill="#ffd84d"/></svg>
+      </div>
+      <div class="metric-grid">
+        <div class="metric"><span>Humidity</span><strong id="humidity">--</strong></div>
+        <div class="metric"><span>Dewpoint</span><strong id="dewpoint">--</strong></div>
+        <div class="metric"><span>Wind</span><strong id="wind">--</strong></div>
+        <div class="metric"><span>Pressure</span><strong id="pressure">--</strong></div>
+      </div>
+    </section>
+    <section class="panel" id="reports">
+      <div class="panel-head"><h2 class="panel-title">Storm Reports</h2><span class="chip" id="reportCount">--</span></div>
+      <div class="mini-list" id="reportList"><div class="empty pulse">Loading storm reports...</div></div>
+    </section>
+  </aside>
+</main>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script>
+  const NEXRAD_TILE = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
+  const state = { apiBase: '', health: null, items: [], reports: [], local: null, map: null, mapReady: false, mapPromise: null, mapMode: 'all', cardFilter: 'all' };
+  const $ = (id) => document.getElementById(id);
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+  const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+  const lower = (value) => clean(value).toLowerCase();
+  const routeBase = (() => {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/warningcenter' || path.startsWith('/warningcenter/')) return '/warningcenter';
+    if (path === '/dashboard' || path.startsWith('/dashboard/')) return '/dashboard';
+    return '';
+  })();
+  const appPath = (path) => {
+    if (!routeBase) return path;
+    if (path === '/') return routeBase;
+    if (path.startsWith(`${routeBase}/`)) return path;
+    return `${routeBase}${path}`;
+  };
+  const bases = [...new Set([routeBase, '', '/weatherspace', '/dashboard', '/warningcenter'])];
+
+  function rewriteInternalLinks() {
+    document.querySelectorAll('a[href^="/"]').forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      if (/^\/(weatherspace|warningcenter|dashboard|controller|warningdetail)\b/.test(href)) link.setAttribute('href', appPath(href));
+    });
+  }
+
+  async function fetchApi(path, options) {
+    const preferred = state.apiBase ? [state.apiBase, ...bases.filter((base) => base !== state.apiBase)] : bases;
+    let lastError;
+    for (const base of preferred) {
+      try {
+        const response = await fetch(`${base}${path}`, { ...options, headers: { Accept: 'application/json', ...(options?.headers || {}) } });
+        if (response.ok && (response.headers.get('content-type') || '').includes('json')) { state.apiBase = base; return response; }
+        lastError = new Error(`${path} returned ${response.status}`);
+      } catch (error) { lastError = error; }
+    }
+    throw lastError || new Error(`${path} failed`);
+  }
+
+  const timeAgo = (value) => {
+    const timestamp = Date.parse(value || '');
+    if (!Number.isFinite(timestamp)) return '--';
+    const minutes = Math.floor(Math.max(0, Date.now() - timestamp) / 60000);
+    if (minutes < 1) return 'now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return hours < 48 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
+  };
+  const fmtTime = (value) => { const timestamp = Date.parse(value || ''); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '--'; };
+  const fmtTemp = (value) => Number.isFinite(Number(value)) ? `${Math.round(Number(value))}°F` : '--';
+
+  function groupFor(item) {
+    const text = lower(`${item.event} ${item.title} ${item.theme?.type} ${item.classification?.family}`);
+    if (item.classification?.isOutlook || text.includes('outlook')) return 'outlooks';
+    if (item.classification?.isDiscussion || text.includes('mesoscale discussion')) return 'discussions';
+    if (item.classification?.isWatch || text.includes('watch')) return 'watches';
+    return 'warnings';
+  }
+  function severityRank(item) {
+    const text = lower(`${item.event} ${item.title} ${item.classification?.alertTag}`);
+    if (text.includes('emergency')) return 100;
+    if (text.includes('pds')) return 90;
+    if (text.includes('tornado')) return 82;
+    if (text.includes('destructive')) return 72;
+    if (text.includes('severe thunderstorm')) return 62;
+    if (text.includes('flash flood')) return 58;
+    if (text.includes('flood')) return 45;
+    if (text.includes('watch')) return 36;
+    if (text.includes('outlook')) return 28;
+    return 10;
+  }
+  const accent = (item) => item.theme?.accent || item.theme?.primary || '#a873ff';
+  const accentRgb = (item) => item.theme?.rgb || '168, 115, 255';
+  const isCurrent = (item) => { const expires = Date.parse(item.expiresAt || ''); return !Number.isFinite(expires) || expires > Date.now(); };
+  const cardImage = (item) => { const url = item.card?.url || item.card?.path || ''; return !url ? '' : /^https?:/i.test(url) ? url : `${state.apiBase}${url}`; };
+  const detailUrl = (item) => `${state.apiBase}/warningdetail?key=${encodeURIComponent(item.key || item.nwsId || '')}`;
+
+  function geometryFor(item) {
+    if (item.geometry) return item.geometry;
+    if (Array.isArray(item.polygon) && item.polygon.length >= 4) return { type: 'Polygon', coordinates: [item.polygon] };
+    return null;
+  }
+  function featureCollection(items) {
+    return { type: 'FeatureCollection', features: items.map((item) => {
+      const geometry = geometryFor(item);
+      if (!geometry) return null;
+      return { type: 'Feature', properties: { key: item.key, title: item.title, event: item.event, color: accent(item), rgb: accentRgb(item), group: groupFor(item), rank: severityRank(item) }, geometry };
+    }).filter(Boolean) };
+  }
+  function reportCollection(reports) {
+    return { type: 'FeatureCollection', features: reports.map((report) => report.geometry ? { type: 'Feature', properties: { type: report.type, title: `${report.type} · ${report.city || ''}`, remark: report.remark || '', color: report.type === 'Hail' ? '#a873ff' : report.type === 'Flood' ? '#38e59e' : '#ff9b26' }, geometry: report.geometry } : null).filter(Boolean) };
+  }
+  function filteredForMap() {
+    if (state.mapMode === 'reports') return [];
+    if (state.mapMode === 'warnings') return state.items.filter((item) => groupFor(item) === 'warnings' || groupFor(item) === 'watches');
+    if (state.mapMode === 'spc') return state.items.filter((item) => groupFor(item) === 'outlooks' || groupFor(item) === 'discussions');
+    return state.items;
+  }
+
+  async function initMap() {
+    if (state.mapPromise) return state.mapPromise;
+    state.mapPromise = (async () => {
+      const config = await fetchApi('/api/maps/config').then((r) => r.json());
+      if (!config.styleUrl) throw new Error('WeatherPower map style is missing.');
+      const map = new maplibregl.Map({ container: 'map', style: config.styleUrl, center: [-96.2, 37.4], zoom: 4, attributionControl: true });
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+      map.on('load', () => {
+        map.addSource('nexrad', { type: 'raster', tiles: [NEXRAD_TILE], tileSize: 256, scheme: 'xyz' });
+        map.addLayer({ id: 'nexrad', type: 'raster', source: 'nexrad', paint: { 'raster-opacity': .64, 'raster-resampling': 'nearest' } });
+        map.addSource('alerts', { type: 'geojson', data: featureCollection([]) });
+        map.addLayer({ id: 'alerts-fill', type: 'fill', source: 'alerts', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['interpolate', ['linear'], ['get', 'rank'], 10, .13, 100, .36] } });
+        map.addLayer({ id: 'alerts-line', type: 'line', source: 'alerts', paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['get', 'rank'], 10, 1.4, 100, 4], 'line-opacity': .94 } });
+        map.addSource('reports', { type: 'geojson', data: reportCollection([]) });
+        map.addLayer({ id: 'reports', type: 'circle', source: 'reports', paint: { 'circle-radius': 5, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#f4f7ff', 'circle-stroke-width': 1.2, 'circle-opacity': .88 } });
+        map.on('click', 'alerts-fill', (event) => { const feature = event.features?.[0]; if (feature) window.location.href = `${state.apiBase}/warningdetail?key=${encodeURIComponent(feature.properties.key)}`; });
+        state.mapReady = true;
+        updateMap();
+      });
+      state.map = map;
+      return map;
+    })();
+    return state.mapPromise;
+  }
+  function updateMap() {
+    if (!state.mapReady || !state.map) return;
+    state.map.getSource('alerts')?.setData(featureCollection(filteredForMap()));
+    state.map.getSource('reports')?.setData(state.mapMode === 'all' || state.mapMode === 'reports' ? reportCollection(state.reports) : reportCollection([]));
+    $('radarTime').textContent = `Radar ${fmtTime(new Date().toISOString())}`;
+  }
+
+  function renderHealth() {
+    const health = state.health;
+    if (!health) return;
+    $('discordStatus').textContent = health.discord?.autoPostEnabled ? `Enabled · ${Math.round((health.discord.autoPostMinSeconds || 0) / 60)}m cooldown` : health.discord?.readyToPost ? 'Manual only' : 'Missing webhook';
+    $('xStatus').textContent = health.x?.readyToPost ? `Enabled · ${health.x.authMethod || 'ready'}` : 'Needs auth';
+  }
+  function renderCards() {
+    const cards = state.items.filter((item) => state.cardFilter === 'all' || groupFor(item) === state.cardFilter).sort((a, b) => severityRank(b) - severityRank(a)).slice(0, 12);
+    $('cardRow').innerHTML = cards.length ? cards.map((item) => `<a class="warning-card" style="--rgb:${esc(accentRgb(item))};border-color:rgba(${esc(accentRgb(item))},.62)" href="${esc(detailUrl(item))}"><div class="card-thumb">${cardImage(item) ? `<img src="${esc(cardImage(item))}" alt="${esc(item.title)}">` : ''}</div><div class="card-body"><div class="alert-title">${esc(item.title || item.event)}</div><div class="meta">${esc(item.areaDesc || item.state || '')}</div><div class="meta">Expires ${esc(fmtTime(item.expiresAt))}</div><span class="tag">${esc(groupFor(item))}</span></div></a>`).join('') : '<div class="empty">No rendered products match this filter.</div>';
+  }
+  function iconFor(item) {
+    const text = lower(`${item.event} ${item.title}`);
+    if (text.includes('tornado')) return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><path d="M4 5h16M6 9h12M8 13h8M10 17h4M11 21h2"/></svg>';
+    if (text.includes('flood')) return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><path d="M3 16c3-2 6 2 9 0s6 2 9 0M3 20c3-2 6 2 9 0s6 2 9 0"/></svg>';
+    if (text.includes('outlook')) return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><path d="M4 19c4-7 8-12 16-14"/><path d="M4 19c7 0 12-4 16-14"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><path d="M13 2 4 14h7l-1 8 10-14h-7l0-6Z"/></svg>';
+  }
+  function renderAlerts() {
+    const warnings = state.items.filter((item) => groupFor(item) === 'warnings' || groupFor(item) === 'watches').sort((a, b) => severityRank(b) - severityRank(a)).slice(0, 6);
+    $('alertList').innerHTML = warnings.length ? warnings.map((item) => `<a class="alert-row" href="${esc(detailUrl(item))}" style="--rgb:${esc(accentRgb(item))};border-color:rgba(${esc(accentRgb(item))},.46)"><span class="alert-icon">${iconFor(item)}</span><span><span class="alert-title">${esc(item.event || item.title)}</span><span class="meta">${esc(item.areaDesc || item.state || '')}</span></span><time>${esc(fmtTime(item.expiresAt))}</time></a>`).join('') : '<div class="empty">No active warnings or watches.</div>';
+  }
+  function miniProduct(item) { return `<a class="mini-row" href="${esc(detailUrl(item))}"><span><b>${esc(item.event || item.title)}</b><br>${esc(item.areaDesc || item.state || '')}</span><span>${esc(fmtTime(item.expiresAt))}</span></a>`; }
+  function renderSpc() {
+    const outlooks = state.items.filter((item) => groupFor(item) === 'outlooks').slice(0, 4);
+    const discussions = state.items.filter((item) => groupFor(item) === 'discussions').slice(0, 5);
+    $('outlookCount').textContent = String(outlooks.length);
+    $('discussionCount').textContent = String(discussions.length);
+    $('outlookList').innerHTML = outlooks.length ? outlooks.map((item) => miniProduct(item)).join('') : '<div class="empty">No active SPC outlook cards.</div>';
+    $('discussionList').innerHTML = discussions.length ? discussions.map((item) => miniProduct(item)).join('') : '<div class="empty">No active mesoscale discussions.</div>';
+  }
+  function renderLocal() {
+    const current = state.local?.current || {};
+    $('temp').textContent = Number.isFinite(Number(current.temperatureF)) ? `${Math.round(Number(current.temperatureF))}°` : '--°';
+    $('forecastText').textContent = current.textDescription || state.local?.daily?.[0]?.shortForecast || 'No local weather available.';
+    $('humidity').textContent = Number.isFinite(Number(current.humidityPct)) ? `${Math.round(Number(current.humidityPct))}%` : '--';
+    $('dewpoint').textContent = fmtTemp(current.dewpointF);
+    $('wind').textContent = Number.isFinite(Number(current.windMph)) ? `${Math.round(Number(current.windMph))} mph` : '--';
+    $('pressure').textContent = Number.isFinite(Number(current.pressureInHg)) ? `${Number(current.pressureInHg).toFixed(2)}"` : '--';
+  }
+  function renderReports() {
+    $('reportCount').textContent = String(state.reports.length);
+    $('reportList').innerHTML = state.reports.length ? state.reports.slice(0, 6).map((report) => `<div class="mini-row"><span><b>${esc(report.type)} · ${esc(report.city || report.county || '')}</b><br>${esc(report.remark || '')}</span><span>${esc(fmtTime(report.time))}</span></div>`).join('') : '<div class="empty">No recent reports.</div>';
+  }
+  function renderAll(payload = {}) {
+    $('updatedAt').textContent = `Updated: ${timeAgo(payload.lastFinishedAt || payload.updated || new Date().toISOString())}`;
+    $('productCount').textContent = `Products: ${state.items.length}`;
+    renderHealth(); renderCards(); renderAlerts(); renderSpc(); renderLocal(); renderReports(); updateMap();
+  }
+  async function loadAll() {
+    try {
+      const [health, rendered, local, reports] = await Promise.all([
+        fetchApi('/api/health').then((r) => r.json()),
+        fetchApi('/api/warnings/rendered').then((r) => r.json()),
+        fetchApi('/api/dashboard/local?lat=33.8957&lon=-94.8263').then((r) => r.json()),
+        fetchApi('/api/dashboard/reports?hours=12&limit=90').then((r) => r.json())
+      ]);
+      state.health = health;
+      state.items = (rendered.items || []).filter((item) => item.status === 'rendered' && isCurrent(item));
+      state.local = local;
+      state.reports = reports.reports || [];
+      renderAll(rendered);
+    } catch (error) {
+      $('updatedAt').textContent = `Update failed: ${error.message}`;
+      console.error(error);
+    }
+  }
+  document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => { state.mapMode = button.dataset.mode; document.querySelectorAll('[data-mode]').forEach((item) => item.classList.toggle('active', item === button)); updateMap(); }));
+  document.querySelectorAll('[data-card-filter]').forEach((button) => button.addEventListener('click', () => { state.cardFilter = button.dataset.cardFilter; document.querySelectorAll('[data-card-filter]').forEach((item) => item.classList.toggle('active', item === button)); renderCards(); }));
+  rewriteInternalLinks();
+  initMap().catch((error) => { $('radarTime').textContent = error.message; });
+  loadAll();
+  setInterval(loadAll, 5000);
+</script>
+</body>
+</html>

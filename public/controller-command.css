@@ -1,0 +1,521 @@
+@font-face {
+  font-family: "WP Sans";
+  src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "WP Condensed";
+  src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+}
+
+:root {
+  --bg: #030405;
+  --panel: #080a0b;
+  --panel-2: #0d1012;
+  --text: #f3f6f7;
+  --muted: #95a1a7;
+  --border: #2a3033;
+  --red: #f13f46;
+  --green: #35d477;
+  --yellow: #f2c84b;
+  --cyan: #16c8e8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: #030405;
+  color: var(--text);
+  font-family: "WP Sans", Inter, system-ui, sans-serif;
+}
+
+.controller-app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+}
+
+.control-rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: #050607;
+  z-index: 20;
+}
+
+.rail-brand {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 12px;
+  color: #fff;
+}
+.rail-brand:hover { background: #0a0d0f; }
+.rail-brand img {
+  width: 36px;
+  height: 36px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #46535a;
+}
+.rail-brand span {
+  font-family: "WP Condensed", Oswald, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.control-nav {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  padding: 12px 0;
+}
+
+.control-nav-item {
+  position: relative;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-bottom: 1px solid #171b1d;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 12px;
+  color: #8e999f;
+  text-align: left;
+}
+.control-nav-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: transparent;
+}
+.control-nav-item:hover { background: #0b0e10; color: #fff; }
+.control-nav-item.active {
+  background: #0b1114;
+  color: #eafcff;
+}
+.control-nav-item.active::before { background: var(--cyan); }
+.control-nav-item svg { width: 22px; height: 22px; color: currentColor; }
+.control-nav-item span {
+  font-family: "WP Condensed", Oswald, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .035em;
+}
+
+.rail-footer {
+  display: grid;
+  gap: 7px;
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding: 12px;
+}
+.rail-footer a {
+  border-radius: 1px;
+  background: #0a0d0f;
+  padding: 8px 9px;
+  color: #c3cbd0;
+  font-size: 10px;
+  text-align: center;
+}
+.rail-footer span {
+  color: #525c61;
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.controller-shell {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 34px;
+}
+
+.header {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  background: #070809;
+  padding: 9px 16px;
+}
+.controller-heading { min-width: 0; }
+.eyebrow {
+  margin: 0;
+  color: #6e7a80;
+  font-size: 8px;
+  letter-spacing: .16em;
+}
+h1 {
+  margin-top: 2px;
+  font-family: "WP Condensed", Oswald, sans-serif;
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.controller-view-description {
+  margin: 4px 0 0;
+  color: #8b979d;
+  font-size: 9px;
+}
+.status-pill {
+  border-radius: 1px;
+  background: #0a0d0f;
+  padding: 8px 11px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+button,
+a {
+  border-color: var(--border);
+  border-radius: 1px;
+  background: #111518;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 750;
+}
+button:hover,
+a:hover { background: #191f22; }
+button.danger { background: #8f2026; }
+
+.only-ops,
+.only-wewatch,
+.only-studio,
+.only-connections { display: none !important; }
+body[data-controller-view="ops"] .only-ops,
+body[data-controller-view="wewatch"] .only-wewatch,
+body[data-controller-view="studio"] .only-studio,
+body[data-controller-view="connections"] .only-connections { display: block !important; }
+
+.system-grid,
+.live-feed-panel,
+#wewatch-builder-panel,
+.card-studio-panel,
+.payload-panel,
+.workspace-preview-grid {
+  margin: 14px 14px 0;
+}
+
+.system-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 0;
+}
+body[data-controller-view="ops"] .system-grid { grid-template-columns: 1fr; }
+body[data-controller-view="connections"] .system-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body[data-controller-view="wewatch"] .system-grid,
+body[data-controller-view="studio"] .system-grid { display: none; }
+
+.panel {
+  border-color: var(--border);
+  border-radius: 1px;
+  background: #080a0b;
+}
+.panel-head {
+  min-height: 45px;
+  border-color: var(--border);
+  background: #0b0e10;
+  padding: 8px 11px;
+}
+.panel-head h2 {
+  font-family: "WP Condensed", Oswald, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.actions { gap: 5px; }
+
+.health-list,
+.log-list { padding: 10px; }
+.health-list {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.status-line {
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  border-color: #252a2d;
+  border-radius: 1px;
+  background: #0c0f11;
+  padding: 8px 9px;
+}
+.status-line span:first-child {
+  color: #657177;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.status-line strong {
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+.live-feed-panel .panel-head { border-left: 3px solid var(--cyan); }
+.warning-list {
+  max-height: 420px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 8px;
+}
+.warning-item {
+  min-width: 0;
+  border-color: #272d30;
+  border-left-width: 3px;
+  border-radius: 1px;
+  background: #0c0f11;
+  padding: 8px 9px;
+}
+.warning-item-title {
+  overflow: hidden;
+  font-family: "WP Condensed", Oswald, sans-serif;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.warning-item-meta { font-size: 9px; }
+
+.workspace-preview-grid {
+  display: grid;
+  gap: 10px;
+}
+body[data-controller-view="ops"] .workspace-preview-grid,
+body[data-controller-view="studio"] .workspace-preview-grid { grid-template-columns: 1fr; }
+body[data-controller-view="wewatch"] .workspace-preview-grid,
+body[data-controller-view="connections"] .workspace-preview-grid { display: none; }
+.log-list {
+  max-height: 520px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.log-item {
+  border-color: #272d30;
+  border-left-width: 3px;
+  border-radius: 1px;
+  background: #0c0f11;
+  padding: 8px 9px;
+}
+.log-item-title { font-size: 9px; }
+.log-item pre { max-height: 116px; overflow: auto; font-size: 9px; }
+
+.field { padding: 12px; }
+.field span,
+.hint {
+  color: #89959b;
+  font-size: 10px;
+}
+input,
+textarea,
+select {
+  border-color: #2b3134;
+  border-radius: 1px;
+  background: #050607;
+  padding: 9px 10px;
+  font-size: 10px;
+}
+.mini-input { height: 34px; }
+
+#wewatch-builder-panel .panel-head { border-left: 3px solid #f0c94d; }
+.wewatch-builder {
+  grid-template-columns: minmax(390px, .78fr) minmax(520px, 1.22fr);
+  gap: 10px;
+  padding: 10px;
+}
+.wewatch-fields { gap: 7px; }
+.wewatch-map-wrap {
+  min-height: calc(100vh - 172px);
+  border-color: #343b3f;
+  border-radius: 1px;
+}
+#wewatch-map { min-height: calc(100vh - 172px); }
+.wewatch-map-status {
+  border-radius: 1px;
+  background: rgba(4, 6, 7, .92);
+  font-size: 10px;
+  backdrop-filter: none;
+}
+
+.card-studio-panel .panel-head { border-left: 3px solid var(--cyan); }
+.visual-editor { padding: 10px 10px 0; }
+.visual-card {
+  border-color: #343b3f;
+  border-radius: 1px;
+  background: #050607;
+  box-shadow: none;
+}
+.visual-topbar {
+  min-height: 64px;
+  background: var(--vc-primary);
+}
+.visual-topbar img { border-radius: 2px; }
+.visual-title-copy {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+.visual-title {
+  font-family: "WP Condensed", Oswald, sans-serif;
+  font-size: clamp(25px, 4vw, 41px);
+  letter-spacing: .02em;
+  overflow: visible;
+  white-space: normal;
+}
+.visual-area {
+  max-height: 27px;
+  overflow: hidden;
+  color: rgba(255,255,255,.9);
+  font-family: "WP Sans", Inter, system-ui, sans-serif;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+.visual-body { min-height: 410px; }
+.visual-side { background: #07090a; }
+.visual-hazard,
+.visual-source,
+.visual-action,
+.visual-stat-row div { border-radius: 1px; }
+.visual-map-label { border-radius: 1px; }
+.editor-grid { gap: 7px; padding: 10px; }
+.editor-grid textarea { border-radius: 1px; }
+
+.payload-panel textarea {
+  min-height: 310px;
+  background: #040506;
+  font-size: 10px;
+}
+.latest-card-panel .preview {
+  min-height: 360px;
+  background: #050607;
+}
+.latest-card-panel .preview img {
+  width: min(100%, 960px);
+  margin: 0 auto;
+}
+
+body[data-controller-view="connections"] .system-grid {
+  max-width: 1080px;
+}
+body[data-controller-view="connections"] .system-grid .panel {
+  min-height: 190px;
+}
+
+@media (max-width: 1100px) {
+  .controller-app { grid-template-columns: 142px minmax(0, 1fr); }
+  .rail-brand span { font-size: 12px; }
+  .control-nav-item { grid-template-columns: 27px minmax(0, 1fr); padding: 8px 9px; }
+  .health-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wewatch-builder { grid-template-columns: 1fr; }
+  .wewatch-map-wrap,
+  #wewatch-map { min-height: 520px; }
+}
+
+@media (max-width: 760px) {
+  .controller-app { display: block; }
+  .control-rail {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    height: auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .rail-brand {
+    min-height: 54px;
+    border-bottom: 0;
+    border-right: 1px solid var(--border);
+    padding: 8px;
+  }
+  .rail-brand img { width: 34px; height: 34px; }
+  .rail-brand span { display: none; }
+  .control-nav {
+    display: flex;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 0;
+  }
+  .control-nav-item {
+    min-width: 78px;
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 2px;
+    border-right: 1px solid #171b1d;
+    border-bottom: 0;
+    padding: 5px 7px;
+    text-align: center;
+  }
+  .control-nav-item svg { width: 18px; height: 18px; }
+  .control-nav-item span { font-size: 9px; white-space: nowrap; }
+  .rail-footer { display: none; }
+  .header { min-height: 62px; padding: 8px 10px; }
+  h1 { font-size: 19px; }
+  .controller-view-description { display: none; }
+  .status-pill { max-width: 130px; white-space: normal; text-align: center; }
+  .system-grid,
+  .live-feed-panel,
+  #wewatch-builder-panel,
+  .card-studio-panel,
+  .payload-panel,
+  .workspace-preview-grid { margin: 8px 8px 0; }
+  body[data-controller-view="connections"] .system-grid { grid-template-columns: 1fr; }
+  .health-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .warning-list,
+  .log-list { grid-template-columns: 1fr; }
+  .panel-head { align-items: flex-start; flex-wrap: wrap; }
+  .actions { width: 100%; justify-content: flex-start; }
+  .actions .mini-input { min-width: 0; flex: 1 1 120px; }
+  .wewatch-builder { display: block; }
+  .wewatch-map-wrap { margin-top: 10px; }
+  .wewatch-map-wrap,
+  #wewatch-map { min-height: 430px; }
+  .visual-body { grid-template-columns: 1fr; }
+  .visual-map { min-height: 300px; }
+  .visual-topbar { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .visual-topbar img:last-child { display: none; }
+  .editor-grid,
+  .wewatch-fields { grid-template-columns: 1fr; }
+  .field.wide { grid-column: auto; }
+}

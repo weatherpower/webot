@@ -1,0 +1,25 @@
+{
+  "name": "warning-card-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:local": "bash scripts/start-local-server.sh",
+    "stop:local": "bash scripts/stop-local-server.sh",
+    "render:sample": "node scripts/render-sample.js",
+    "render:pds-watch": "node scripts/render-pds-watch-sample.js",
+    "render:tropical": "node scripts/render-live-tropical.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "149.0.0",
+    "compression": "^1.8.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "gif-encoder-2": "^1.0.5",
+    "playwright": "^1.57.0",
+    "pngjs": "^7.0.0",
+    "tz-lookup": "^6.1.25"
+  }
+}

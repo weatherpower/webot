@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Warning Card Controller</title>
+  <link rel="icon" type="image/png" href="/warningcenter/favicon.ico">
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="/public/styles.css?v=20260624-visual-editor">
+  <link rel="stylesheet" href="/warningcenter/public/controller-command.css?v=20260822-2">
+</head>
+<body data-controller-view="ops">
+  <div class="controller-app">
+    <aside class="control-rail" aria-label="Controller workspaces">
+      <a class="rail-brand" href="/controller" aria-label="WeatherPower Controller">
+        <img src="/public/assets/wp-logo.png" alt="WeatherPower" onerror="this.src='/warningcenter/public/assets/wp-logo.png'">
+        <span>WP Control</span>
+      </a>
+      <nav class="control-nav">
+        <button class="control-nav-item active" data-controller-view="ops" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg>
+          <span>Live Ops</span>
+        </button>
+        <button class="control-nav-item" data-controller-view="wewatch" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 17 5-5 4 3 5-7 4 3"/><path d="M4 21h16M4 3v18"/></svg>
+          <span>WeWatch Studio</span>
+        </button>
+        <button class="control-nav-item" data-controller-view="studio" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg>
+          <span>Card Studio</span>
+        </button>
+        <button class="control-nav-item" data-controller-view="connections" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m9 11 6-4M9 13l6 4"/></svg>
+          <span>Connections</span>
+        </button>
+      </nav>
+      <div class="rail-footer">
+        <a href="/warningcenter">Public Center</a>
+        <span>WeatherPower</span>
+      </div>
+    </aside>
+
+  <main class="shell controller-shell">
+    <header class="header">
+      <div class="controller-heading">
+        <p class="eyebrow">WeatherPower Controller</p>
+        <h1 id="controller-view-name">Live Operations</h1>
+        <p class="controller-view-description" id="controller-view-description">Renderer health, real alerts, and posting activity.</p>
+      </div>
+      <div class="status-pill" id="overall-status">Checking health</div>
+    </header>
+
+    <section class="grid system-grid">
+      <div class="panel only-ops health-panel">
+        <div class="panel-head">
+          <h2>Health</h2>
+          <button id="refresh-health">Refresh</button>
+        </div>
+        <div class="health-list" id="health-list"></div>
+      </div>
+
+      <div class="panel only-connections">
+        <div class="panel-head">
+          <h2>Controller Token</h2>
+          <button id="save-token">Save</button>
+        </div>
+        <label class="field">
+          <span>Token</span>
+          <input id="controller-token" type="password" autocomplete="off" placeholder="Only needed if CONTROLLER_TOKEN is set">
+        </label>
+      </div>
+
+      <div class="panel only-connections">
+        <div class="panel-head">
+          <h2>X Authorization</h2>
+          <button id="connect-x">Connect X</button>
+        </div>
+        <p class="hint" id="x-auth-note">Use this after setting the callback URL in your X app settings.</p>
+      </div>
+    </section>
+
+    <section class="panel only-ops live-feed-panel">
+      <div class="panel-head">
+        <h2>Live NWS Warnings + Watches</h2>
+        <div class="actions">
+          <input id="nws-area" class="mini-input" value="" maxlength="2" aria-label="State" placeholder="US">
+          <select id="nws-event" class="mini-input" aria-label="Warning type">
+            <option value="">All warnings + watches + discussions</option>
+            <option value="Mesoscale Discussion">Mesoscale Discussion</option>
+            <option value="Tornado Warning">Tornado Warning</option>
+            <option value="Severe Thunderstorm Warning">Severe Thunderstorm Warning</option>
+            <option value="Severe Thunderstorm Watch">Severe Thunderstorm Watch</option>
+            <option value="Flash Flood Warning">Flash Flood Warning</option>
+            <option value="Flood Warning">Flood Warning</option>
+            <option value="Flood Watch">Flood Watch</option>
+            <option value="Tornado Watch">Tornado Watch</option>
+            <option value="Winter Storm Warning">Winter Storm Warning</option>
+            <option value="Special Marine Warning">Special Marine Warning</option>
+            <option value="Red Flag Warning">Red Flag Warning</option>
+          </select>
+          <button id="fetch-warnings">Fetch Real Warnings</button>
+        </div>
+      </div>
+      <div class="warning-list" id="warning-list">
+        <p class="hint">Fetch active NWS warnings, watches, and SPC mesoscale discussions, then choose one to load into the card payload.</p>
+      </div>
+    </section>
+
+    <section class="panel only-wewatch" id="wewatch-builder-panel">
+      <div class="panel-head">
+        <h2>WeWatch Builder</h2>
+        <div class="actions">
+          <button id="wewatch-idabel" type="button">Use Idabel Box</button>
+          <button id="wewatch-undo" type="button">Undo Point</button>
+          <button id="wewatch-clear" type="button">Clear Map</button>
+          <button id="wewatch-save" type="button">Save WeWatch</button>
+          <button id="wewatch-save-render" type="button">Save + Render</button>
+          <button id="wewatch-delete" class="danger" type="button">Delete</button>
+        </div>
+      </div>
+      <div class="wewatch-builder">
+        <div class="wewatch-form">
+          <label class="field compact">
+            <span>Saved WeWatches</span>
+            <select id="wewatch-list">
+              <option value="">New WeWatch</option>
+            </select>
+          </label>
+          <div class="editor-grid wewatch-fields">
+            <label class="field compact">
+              <span>Title</span>
+              <input id="wewatch-title" autocomplete="off" placeholder="SEVERE THUNDERSTORM WEWATCH IN OK">
+            </label>
+            <label class="field compact">
+              <span>Watch Type</span>
+              <select id="wewatch-event">
+                <option value="Severe Thunderstorm Watch">Severe Thunderstorm Watch</option>
+                <option value="Tornado Watch">Tornado Watch</option>
+                <option value="Flood Watch">Flood Watch</option>
+                <option value="Winter Storm Watch">Winter Storm Watch</option>
+                <option value="WeatherPower Watch">WeatherPower Watch</option>
+              </select>
+            </label>
+            <label class="field compact">
+              <span>Watch Level</span>
+              <select id="wewatch-level">
+                <option value="Standard">Standard</option>
+                <option value="Elevated">Elevated</option>
+                <option value="Significant">Significant</option>
+                <option value="PDS">PDS</option>
+              </select>
+            </label>
+            <label class="field compact">
+              <span>State / Region</span>
+              <input id="wewatch-state" maxlength="40" autocomplete="off" value="OK">
+            </label>
+            <label class="field compact">
+              <span>Area Name</span>
+              <input id="wewatch-area" autocomplete="off" placeholder="Idabel, Oklahoma">
+            </label>
+            <label class="field compact">
+              <span>Expires</span>
+              <input id="wewatch-expires" type="datetime-local">
+            </label>
+            <label class="field compact">
+              <span>Max Wind</span>
+              <input id="wewatch-wind" autocomplete="off" value="70 MPH">
+            </label>
+            <label class="field compact">
+              <span>Max Hail</span>
+              <input id="wewatch-hail" autocomplete="off" value="1.50 IN">
+            </label>
+            <label class="field compact">
+              <span>Tornado Chance</span>
+              <input id="wewatch-tornado" autocomplete="off" value="10%">
+            </label>
+            <label class="field compact">
+              <span>Color</span>
+              <input id="wewatch-color" type="color" value="#ffd400">
+            </label>
+            <label class="field compact wide">
+              <span>Summary / Source</span>
+              <textarea id="wewatch-source" spellcheck="true">WeatherPower WeWatch issued for storms capable of damaging wind and hail.</textarea>
+            </label>
+            <label class="field compact wide">
+              <span>What To Do</span>
+              <textarea id="wewatch-action" spellcheck="true">Stay weather aware and be ready to move to shelter if warnings are issued.</textarea>
+            </label>
+          </div>
+        </div>
+        <div class="wewatch-map-wrap">
+          <div id="wewatch-map"></div>
+          <div class="wewatch-map-status" id="wewatch-map-status">Click the map to draw a WeWatch area. Use at least 3 points.</div>
+        </div>
+      </div>
+      <p class="hint">This creates your own WeatherPower WeWatch. Click the map to outline the highlighted area, set wind/hail/watch level, then save. It will auto-render into the Warning Center feed.</p>
+    </section>
+
+    <section class="panel only-studio card-studio-panel">
+      <div class="panel-head">
+        <h2>Card Editor</h2>
+        <div class="actions">
+          <select id="editor-preset" class="mini-input" aria-label="Card preset">
+            <option value="severe">Severe T-Storm</option>
+            <option value="destructive">Destructive T-Storm</option>
+            <option value="tornado">Tornado Warning</option>
+            <option value="pds-tornado">PDS Tornado</option>
+            <option value="tornado-emergency">Tornado Emergency GIF</option>
+            <option value="flood">Flood Warning</option>
+            <option value="flood-emergency">Flood Emergency</option>
+            <option value="tornado-watch">Tornado Watch</option>
+            <option value="severe-watch">Severe T-Storm Watch</option>
+          </select>
+          <button id="apply-preset">Apply Preset</button>
+          <button id="sync-editor">Sync From JSON</button>
+          <button id="apply-editor">Update JSON</button>
+          <button id="render-edited">Render Edited</button>
+        </div>
+      </div>
+      <div class="visual-editor">
+        <div class="visual-card" id="visual-card">
+          <div class="visual-topbar">
+            <img src="/public/assets/wp-logo.png" alt="WeatherPower">
+            <div class="visual-title-copy">
+              <div id="visual-title" class="visual-title" contenteditable="true" spellcheck="false">WARNING CARD</div>
+              <div id="visual-area" class="visual-area" contenteditable="true" spellcheck="false">Affected area</div>
+            </div>
+            <div id="visual-tag" class="visual-tag" contenteditable="true" spellcheck="false"></div>
+            <img src="/public/assets/wp-logo.png" alt="WeatherPower">
+          </div>
+          <div class="visual-body">
+            <aside class="visual-side">
+              <div class="visual-label">Expires</div>
+              <div id="visual-expires" class="visual-time">--:--</div>
+              <div class="visual-hazard">
+                <div id="visual-hazard-label" class="visual-label" contenteditable="true" spellcheck="false">Hazard</div>
+                <div id="visual-hazard-value" class="visual-big" contenteditable="true" spellcheck="false">Warning</div>
+              </div>
+              <div class="visual-stat-row">
+                <div><span>Wind</span><strong id="visual-wind" contenteditable="true" spellcheck="false">--</strong></div>
+                <div><span>Hail</span><strong id="visual-hail" contenteditable="true" spellcheck="false">--</strong></div>
+                <div><span>Motion</span><strong id="visual-motion" contenteditable="true" spellcheck="false">--</strong></div>
+              </div>
+              <div id="visual-source" class="visual-source" contenteditable="true" spellcheck="false">Live Alert</div>
+              <div class="visual-action">
+                <div class="visual-action-head">What To Do</div>
+                <div id="visual-action-copy" contenteditable="true" spellcheck="true">Stay weather aware.</div>
+              </div>
+            </aside>
+            <div class="visual-map">
+              <div class="visual-radar"></div>
+              <div class="visual-polygon"></div>
+              <div class="visual-map-label">MapLibre + NEXRAD preview</div>
+            </div>
+          </div>
+        </div>
+        <p class="hint">Click text inside this mini card to edit it. The full render uses the WeatherPower MapLibre basemap with NEXRAD and creates the real PNG or GIF.</p>
+      </div>
+      <div class="editor-grid">
+        <label class="field compact">
+          <span>Title</span>
+          <input id="edit-title" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Event</span>
+          <input id="edit-event" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>State</span>
+          <input id="edit-state" maxlength="40" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Office</span>
+          <input id="edit-office" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Expires</span>
+          <input id="edit-expires" type="datetime-local">
+        </label>
+        <label class="field compact">
+          <span>Issued</span>
+          <input id="edit-issued" type="datetime-local">
+        </label>
+        <label class="field compact">
+          <span>Banner Tag</span>
+          <select id="edit-tag">
+            <option value="auto">Auto</option>
+            <option value="">None</option>
+            <option value="WATCH">WATCH</option>
+            <option value="DESTRUCTIVE">DESTRUCTIVE</option>
+            <option value="PDS EMERGENCY">PDS EMERGENCY</option>
+            <option value="PDS WATCH">PDS WATCH</option>
+            <option value="EMERGENCY">EMERGENCY</option>
+          </select>
+        </label>
+        <label class="field compact">
+          <span>Radar</span>
+          <select id="edit-radar-mode">
+            <option value="both">Reflectivity + Velocity</option>
+            <option value="reflectivity">Reflectivity</option>
+            <option value="velocity">Velocity</option>
+          </select>
+        </label>
+        <label class="field compact">
+          <span>Primary Color</span>
+          <input id="edit-primary" type="color">
+        </label>
+        <label class="field compact">
+          <span>Accent Color</span>
+          <input id="edit-accent" type="color">
+        </label>
+        <label class="field compact">
+          <span>Hazard Label</span>
+          <input id="edit-hazard-label" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Hazard Value</span>
+          <input id="edit-hazard-value" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Wind</span>
+          <input id="edit-wind" placeholder="60 MPH" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Hail</span>
+          <input id="edit-hail" placeholder="1.00 IN" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Motion</span>
+          <input id="edit-motion" placeholder="35 kt" autocomplete="off">
+        </label>
+        <label class="field compact">
+          <span>Source</span>
+          <input id="edit-source" autocomplete="off">
+        </label>
+        <label class="field compact wide">
+          <span>Safety Text</span>
+          <textarea id="edit-what-to-do" spellcheck="true"></textarea>
+        </label>
+      </div>
+      <p class="hint">Use presets for the official color/banner rules, then tweak fields and click Update JSON or Render Edited.</p>
+    </section>
+
+    <section class="panel only-studio payload-panel">
+      <div class="panel-head">
+        <h2>Warning Payload</h2>
+        <div class="actions">
+          <button id="load-sample">Load Sample</button>
+          <button id="render-card">Render Card</button>
+          <button id="dry-post">Dry Post</button>
+          <button id="live-post" class="danger">Live Post</button>
+        </div>
+      </div>
+      <textarea id="payload" spellcheck="false"></textarea>
+      <p class="hint">Live Post renders the card, uploads to X when credentials are complete, and forwards the card to the WeatherPower endpoint.</p>
+    </section>
+
+    <section class="preview-grid workspace-preview-grid">
+      <div class="panel only-studio latest-card-panel">
+        <div class="panel-head">
+          <h2>Latest Card</h2>
+          <a id="open-card" href="#" target="_blank" rel="noreferrer">Open Card</a>
+        </div>
+        <div class="preview">
+          <img id="preview-image" alt="Latest warning card preview">
+        </div>
+      </div>
+
+      <div class="panel only-ops post-log-panel">
+        <div class="panel-head">
+          <h2>Post Log</h2>
+          <button id="refresh-logs">Refresh</button>
+        </div>
+        <div class="log-list" id="log-list"></div>
+      </div>
+    </section>
+  </main>
+  </div>
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="/public/controller.js?v=20260822-command-workspaces" type="module"></script>
+</body>
+</html>

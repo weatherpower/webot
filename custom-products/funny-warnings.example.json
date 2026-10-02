@@ -1,0 +1,18 @@
+[
+  {
+    "id": "dollar-store-temu-idabel",
+    "event": "Funny Weather Statement",
+    "title": "Dollar Store Half Off Temu Warning in OK",
+    "state": "OK",
+    "areaDesc": "Idabel, Oklahoma",
+    "lat": 33.8957,
+    "lon": -94.8263,
+    "radiusMiles": 18,
+    "hazardLabel": "Funny",
+    "hazardValue": "Temu",
+    "hazardSubtext": "Still take it seriously",
+    "alertTag": "TEMU WARNING",
+    "description": "Dollar Store Half Off Temu warning. This is a WeatherPower joke product, not an official NWS alert.",
+    "whatToDo": "Laugh, stay weather aware, and still take real watches and warnings seriously."
+  }
+]

@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#05080d">
+  <title>WeatherPower Warning Detail</title>
+  <link rel="icon" type="image/png" href="/warningcenter/public/assets/wp-logo.png">
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    @font-face { font-family: Inter; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-style: normal; font-weight: 400 900; font-display: swap; }
+    @font-face { font-family: Oswald; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-style: normal; font-weight: 500 700; font-display: swap; }
+    @font-face { font-family: "Barlow Condensed"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-style: normal; font-weight: 400 700; font-display: swap; }
+    :root {
+      color-scheme: dark;
+      --void: #05080d;
+      --surface: #081019;
+      --surface-2: #0b1520;
+      --line: #243542;
+      --line-soft: rgba(148, 184, 204, .18);
+      --text: #f4f8fa;
+      --muted: #a3b3bd;
+      --faint: #6d7d87;
+      --accent: #f7bf2b;
+      --accent-rgb: 247, 191, 43;
+      --shadow: 0 20px 52px rgba(0, 0, 0, .3);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      min-height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 75% -28%, rgba(var(--accent-rgb), .12), transparent 29%),
+        linear-gradient(180deg, #060a0f 0%, var(--void) 100%);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body { overflow-x: hidden; }
+    button, a { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+
+    .page {
+      width: min(1510px, calc(100vw - 28px));
+      margin: 0 auto;
+      padding: 12px 0 32px;
+    }
+
+    .topbar {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px 8px 0 0;
+      background: rgba(6, 12, 18, .95);
+      box-shadow: var(--shadow);
+      padding: 9px 14px;
+    }
+
+    .brand-wrap,
+    .brand,
+    .crumbs,
+    .top-actions,
+    .live-state,
+    .title-row,
+    .tag-row,
+    .time-grid,
+    .hazard-list,
+    .source-line,
+    .location-list {
+      display: flex;
+      align-items: center;
+    }
+
+    .brand-wrap { gap: 18px; min-width: 0; }
+    .brand { gap: 10px; }
+    .brand img {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      box-shadow: 0 0 0 1px rgba(90, 189, 255, .35), 0 8px 20px rgba(0, 0, 0, .38);
+    }
+    .brand-name {
+      font-family: Oswald, sans-serif;
+      font-size: 23px;
+      font-weight: 700;
+      letter-spacing: .035em;
+      line-height: 1;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .crumbs {
+      gap: 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .crumbs::before { content: ""; width: 1px; height: 27px; margin-right: 8px; background: var(--line); }
+    .crumbs a { color: var(--accent); }
+    .crumb-arrow { color: var(--faint); }
+
+    .top-actions { gap: 9px; }
+    .live-state { gap: 7px; margin-right: 8px; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2ed17b;
+      box-shadow: 0 0 0 4px rgba(46, 209, 123, .12), 0 0 11px rgba(46, 209, 123, .8);
+    }
+
+    .top-button,
+    .back-link {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #0c1722;
+      color: var(--text);
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+
+    .top-button {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    .back-link { display: inline-flex; align-items: center; gap: 7px; padding: 9px 11px; font-size: 12px; font-weight: 800; }
+    .top-button:hover, .back-link:hover { border-color: var(--accent); background: #102334; transform: translateY(-1px); }
+    .top-button svg, .back-link svg { width: 17px; height: 17px; }
+
+    .detail-shell {
+      border: 1px solid var(--line);
+      border-top: 0;
+      background: rgba(5, 10, 15, .9);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .alert-hero { padding: 0 0 18px; }
+    .title-row { gap: 12px; align-items: flex-start; }
+    .event-symbol {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      margin-top: 6px;
+      color: var(--accent);
+    }
+    .event-symbol svg { width: 35px; height: 35px; }
+    .alert-title {
+      margin: 0;
+      color: var(--accent);
+      font-family: Oswald, sans-serif;
+      font-size: clamp(36px, 4.4vw, 66px);
+      font-weight: 700;
+      letter-spacing: .028em;
+      line-height: .97;
+      text-transform: uppercase;
+    }
+    .alert-area {
+      margin: 7px 0 0 50px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .expiry-line { color: var(--text); }
+    .expiry-line b { color: var(--accent); }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(315px, .98fr);
+      gap: 12px;
+    }
+
+    .card-frame,
+    .action-panel,
+    .time-panel,
+    .hazard-panel,
+    .source-panel,
+    .detail-panel {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(11, 21, 32, .94), rgba(6, 13, 20, .94));
+    }
+
+    .card-frame { padding: 10px; }
+    .frame-label {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-family: Oswald, sans-serif;
+      font-size: 13px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .card-media {
+      position: relative;
+      overflow: hidden;
+      background: #0a1520;
+      border: 1px solid rgba(var(--accent-rgb), .52);
+      aspect-ratio: 16 / 9;
+    }
+    .card-media img { display: block; width: 100%; height: 100%; object-fit: contain; background: #05080d; }
+
+    .rendering-card {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 12px;
+      padding: 24px;
+      color: #e8f6ff;
+      text-align: center;
+      background:
+        radial-gradient(circle at 50% 44%, rgba(var(--accent-rgb), .25), transparent 34%),
+        repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 1px, transparent 1px 8px),
+        #07111a;
+    }
+    .detail-spinner {
+      width: 52px;
+      height: 52px;
+      border: 4px solid rgba(255,255,255,.14);
+      border-top-color: var(--accent);
+      border-right-color: rgba(var(--accent-rgb), .74);
+      border-radius: 50%;
+      animation: spin .82s linear infinite;
+    }
+    .rendering-card strong { font-family: Oswald, sans-serif; font-size: 23px; letter-spacing: .07em; text-transform: uppercase; }
+    .rendering-card span { color: var(--muted); font-size: 12px; font-weight: 700; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .side-stack { display: grid; align-content: start; gap: 10px; }
+    .action-panel {
+      position: relative;
+      min-height: 151px;
+      padding: 16px 17px 17px 20px;
+      overflow: hidden;
+    }
+    .action-panel::before {
+      content: "";
+      position: absolute;
+      top: 0; bottom: 0; left: 0;
+      width: 5px;
+      background: var(--accent);
+    }
+    .panel-kicker {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-family: Oswald, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .action-copy { margin: 0; color: var(--text); font-size: 15px; font-weight: 700; line-height: 1.5; }
+
+    .time-panel { padding: 13px 12px; }
+    .time-grid { align-items: stretch; gap: 0; }
+    .time-item {
+      flex: 1;
+      min-width: 0;
+      padding: 0 12px;
+      border-right: 1px solid var(--line);
+    }
+    .time-item:first-child { padding-left: 0; }
+    .time-item:last-child { padding-right: 0; border-right: 0; }
+    .time-label { display: block; color: var(--faint); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .time-value { display: block; margin-top: 5px; color: var(--text); font-family: Oswald, sans-serif; font-size: 21px; line-height: 1.05; white-space: nowrap; }
+    .time-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .time-item.countdown .time-value { color: var(--accent); font-size: 30px; }
+
+    .hazard-panel, .source-panel { padding: 13px; }
+    .hazard-list { align-items: stretch; gap: 0; }
+    .hazard {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 9px;
+      border-right: 1px solid var(--line);
+    }
+    .hazard:first-child { padding-left: 0; }
+    .hazard:last-child { padding-right: 0; border-right: 0; }
+    .hazard-icon { width: 25px; height: 25px; flex: 0 0 auto; color: var(--accent); }
+    .hazard-icon svg { width: 25px; height: 25px; }
+    .hazard-label { display: block; color: var(--faint); font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .hazard-value { display: block; overflow: hidden; margin-top: 2px; color: var(--text); font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+
+    .source-line { gap: 9px; color: var(--muted); font-size: 12px; line-height: 1.42; }
+    .source-mark {
+      width: 31px;
+      height: 31px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(var(--accent-rgb), .44);
+      border-radius: 50%;
+      color: var(--accent);
+    }
+    .source-mark svg { width: 17px; height: 17px; }
+    .source-line strong { display: block; color: var(--text); font-size: 12px; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1.2fr .85fr .8fr;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      background: rgba(7, 16, 25, .96);
+    }
+
+    .detail-panel {
+      min-width: 0;
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      padding: 15px;
+    }
+    .detail-panel:last-child { border-right: 0; }
+    .detail-title {
+      margin: 0 0 9px;
+      color: var(--accent);
+      font-family: Oswald, sans-serif;
+      font-size: 15px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .detail-text { margin: 0; color: #d5dfe5; font-size: 13px; font-weight: 500; line-height: 1.55; white-space: pre-line; }
+
+    .tag-row { flex-wrap: wrap; gap: 6px; }
+    .tag {
+      border: 1px solid rgba(var(--accent-rgb), .42);
+      border-radius: 999px;
+      background: rgba(var(--accent-rgb), .11);
+      color: var(--text);
+      padding: 5px 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .055em;
+      text-transform: uppercase;
+    }
+
+    .location-list {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .location {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .location + .location::before { content: " "; display: inline-block; width: 3px; height: 3px; margin: 0 7px 3px 0; border-radius: 50%; background: var(--accent); }
+
+    .status-card {
+      min-height: 210px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed var(--line);
+      color: var(--muted);
+      text-align: center;
+      padding: 28px;
+      font-weight: 700;
+    }
+    .status-card.error { border-color: rgba(245,72,72,.55); color: #ffc1c1; }
+
+    .toast {
+      position: fixed;
+      z-index: 20;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(360px, calc(100vw - 36px));
+      border: 1px solid var(--accent);
+      background: #0c1823;
+      box-shadow: var(--shadow);
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+
+    @media (max-width: 920px) {
+      .detail-shell { padding: 15px; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
+      .detail-panel:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }
+      .detail-panel:nth-child(2) { border-right: 1px solid var(--line); }
+    }
+
+    @media (max-width: 620px) {
+      .page { width: 100%; padding: 0; }
+      .topbar { position: sticky; top: 0; z-index: 10; border-radius: 0; padding: 9px 10px; }
+      .brand img { width: 33px; height: 33px; }
+      .brand-name { font-size: 20px; }
+      .crumbs, .live-state, .top-button { display: none; }
+      .detail-shell { padding: 14px 10px 20px; border-left: 0; border-right: 0; }
+      .alert-title { font-size: 37px; }
+      .event-symbol { width: 28px; height: 28px; margin-top: 3px; }
+      .event-symbol svg { width: 27px; height: 27px; }
+      .alert-area { margin-left: 40px; font-size: 12px; }
+      .card-frame { padding: 7px; }
+      .time-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 0; }
+      .time-item { min-width: 0; padding: 0 10px; }
+      .time-item:first-child { padding-left: 0; }
+      .time-item:nth-child(2) { padding-right: 0; border-right: 0; }
+      .time-item.countdown { grid-column: 1 / -1; margin-top: 2px; padding: 10px 0 0; border-top: 1px solid var(--line); }
+      .hazard-list { flex-wrap: wrap; gap: 10px; }
+      .hazard { min-width: calc(50% - 5px); padding-left: 0; border-right: 0; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .detail-panel, .detail-panel:first-child, .detail-panel:nth-child(2) { grid-column: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .detail-panel:last-child { border-bottom: 0; }
+    }
+  </style>
+  <link rel="stylesheet" href="/warningcenter/public/warningdetail-atlas.css?v=20260822-1">
+</head>
+<body>
+  <header class="incident-nav">
+    <a class="incident-brand" id="brandLink" href="/warningcenter" aria-label="WeatherPower Warning Center"><img src="/public/assets/wp-logo.png" alt="WeatherPower" onerror="this.src='/warningcenter/public/assets/wp-logo.png'"><span><b>WeatherPower</b><small>Incident briefing</small></span></a>
+    <div class="incident-nav-actions"><span class="live-state"><i class="live-dot"></i><span id="liveStateText">Live product</span></span><button class="top-button" id="shareButton" type="button" title="Share this briefing" aria-label="Share this briefing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"/></svg></button><a class="back-link" id="backLink" href="/warningcenter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m6 6-6-6 6-6"/></svg>Warning atlas</a></div>
+    <a id="crumbLink" href="/warningcenter" hidden>Warning Center</a>
+  </header>
+  <main id="app" class="incident-app"><div class="status-card">Loading live incident briefing...</div></main>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script>
+    const app = document.getElementById('app');
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get('key') || '';
+    const state = {
+      apiBase: window.location.pathname.startsWith('/warningcenter') ? '/warningcenter' : '',
+      item: null,
+      fingerprint: '',
+      map: null,
+      mapReady: false,
+      radarMode: 'reflectivity'
+    };
+    const NEXRAD_REFLECTIVITY = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
+    const FALLBACK_BASES = ['/warningcenter', ''];
+    const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
+    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+
+    function appPath(path) {
+      return state.apiBase + path;
+    }
+
+    function formatDate(value, timezone) {
+      const stamp = Date.parse(value || '');
+      if (!Number.isFinite(stamp)) return 'Unknown';
+      const options = { month: 'short', day: 'numeric', year: 'numeric' };
+      if (timezone) options.timeZone = timezone;
+      try {
+        return new Date(stamp).toLocaleDateString([], options);
+      } catch {
+        delete options.timeZone;
+        return new Date(stamp).toLocaleDateString([], options);
+      }
+    }
+
+    function formatTime(value, timezone) {
+      const stamp = Date.parse(value || '');
+      if (!Number.isFinite(stamp)) return '--';
+      const options = { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' };
+      if (timezone) options.timeZone = timezone;
+      try {
+        return new Date(stamp).toLocaleTimeString([], options);
+      } catch {
+        delete options.timeZone;
+        return new Date(stamp).toLocaleTimeString([], options);
+      }
+    }
+
+    function remaining(value) {
+      const stamp = Date.parse(value || '');
+      if (!Number.isFinite(stamp)) return 'Active';
+      const minutes = Math.ceil((stamp - Date.now()) / 60000);
+      if (minutes <= 0) return 'Expired';
+      if (minutes < 60) return minutes + 'm';
+      const hours = Math.floor(minutes / 60);
+      return hours + 'h ' + (minutes % 60) + 'm';
+    }
+
+    function accent(item) {
+      return item.theme && (item.theme.accent || item.theme.primary) || '#f7bf2b';
+    }
+
+    function accentRgb(item) {
+      return item.theme && item.theme.rgb || '247, 191, 43';
+    }
+
+    function cardImageUrl(item) {
+      const path = item.card && (item.card.path || item.card.url);
+      if (!path) return '';
+      return /^https?:/i.test(path) ? path : appPath(path);
+    }
+
+    function iconFor(item) {
+      const text = clean((item.event || '') + ' ' + (item.title || '')).toLowerCase();
+      if (text.includes('tornado')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M6 9h12M8 13h8M10 17h4M12 17v3"/></svg>';
+      if (text.includes('flood')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15c2.2-2 4.4-2 6.6 0s4.4 2 6.6 0 4.4-2 4.4-2"/><path d="M3 19c2.2-2 4.4-2 6.6 0s4.4 2 6.6 0 4.4-2 4.4-2"/><path d="M12 3v8m0 0-3-3m3 3 3-3"/></svg>';
+      if (text.includes('watch')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>';
+      if (text.includes('discussion') || text.includes('outlook')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19c4-7 8-12 16-14"/><path d="M4 19c7 0 12-4 16-14"/></svg>';
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
+    }
+
+    function hazardIcon(label) {
+      const text = clean(label).toLowerCase();
+      if (text.includes('wind')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path d="M3 16h8"/></svg>';
+      if (text.includes('hail')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="7" r="3"/><circle cx="16" cy="12" r="3"/><path d="m8 13-2 6m8-2-2 4m6-3-1 3"/></svg>';
+      if (text.includes('motion')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h14"/><path d="m14 6 6 6-6 6"/></svg>';
+      if (text.includes('rain') || text.includes('flood')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 10a4 4 0 1 1 2-7 5 5 0 0 1 9 3 3 3 0 1 1 1 6H6Z"/><path d="m8 15-1 4m6-4-1 4m6-4-1 4"/></svg>';
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 21h20Z"/><path d="M12 9v5m0 3h.01"/></svg>';
+    }
+
+    function tagList(item) {
+      const tags = [
+        item.classification && item.classification.alertTag,
+        item.classification && item.classification.isWatch ? 'Watch' : '',
+        item.classification && item.classification.isEmergency ? 'Emergency' : '',
+        item.classification && item.classification.isPds ? 'PDS' : '',
+        item.classification && item.classification.isDestructive ? 'Destructive' : '',
+        item.radar && item.radar.site ? item.radar.site + ' radar' : '',
+        item.status === 'rendered' ? 'Rendered' : item.status
+      ].filter(Boolean);
+      return tags.length ? tags.map((tag) => '<span class="tag">' + esc(tag) + '</span>').join('') : '<span class="tag">Live product</span>';
+    }
+
+    function hazardList(item) {
+      const stats = (item.hazardStats || []).filter((stat) => clean(stat.label) && clean(stat.value));
+      if (!stats.length) return '';
+      return '<section class="brief-section"><h3>Threat metrics</h3><div class="hazard-matrix">' + stats.slice(0, 4).map((stat) => '<div class="hazard-tile"><span class="hazard-icon">' + hazardIcon(stat.label) + '</span><span><span class="hazard-label">' + esc(stat.label) + '</span><strong class="hazard-value">' + esc(stat.value) + '</strong></span></div>').join('') + '</div></section>';
+    }
+
+    function geometryFor(item) {
+      return item.geometry || item.feature && item.feature.geometry || null;
+    }
+
+    function geometryBounds(geometry) {
+      const bounds = new maplibregl.LngLatBounds();
+      let count = 0;
+      function visit(value) {
+        if (!Array.isArray(value)) return;
+        if (value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1]))) {
+          bounds.extend([Number(value[0]), Number(value[1])]);
+          count += 1;
+          return;
+        }
+        value.forEach(visit);
+      }
+      visit(geometry && geometry.coordinates);
+      return count ? bounds : null;
+    }
+
+    function firstSymbolLayerId(map) {
+      const layers = map.getStyle().layers || [];
+      const symbol = layers.find((layer) => layer.type === 'symbol');
+      return symbol && symbol.id;
+    }
+
+    function setDetailRadar(mode) {
+      if (!state.mapReady || !state.map) return;
+      const velocityAvailable = state.map.getLayer('detail-velocity');
+      if (mode === 'velocity' && !velocityAvailable) return;
+      state.radarMode = mode;
+      if (state.map.getLayer('detail-reflectivity')) state.map.setLayoutProperty('detail-reflectivity', 'visibility', mode === 'reflectivity' ? 'visible' : 'none');
+      if (velocityAvailable) state.map.setLayoutProperty('detail-velocity', 'visibility', mode === 'velocity' ? 'visible' : 'none');
+      const reflectivity = document.getElementById('detailReflectivity');
+      const velocity = document.getElementById('detailVelocity');
+      if (reflectivity) reflectivity.classList.toggle('active', mode === 'reflectivity');
+      if (velocity) velocity.classList.toggle('active', mode === 'velocity');
+    }
+
+    async function renderDetailMap(item) {
+      const target = document.getElementById('detailMap');
+      if (!target || typeof maplibregl === 'undefined') return;
+      if (state.map) {
+        state.map.remove();
+        state.map = null;
+        state.mapReady = false;
+      }
+      const config = await fetchApi('/api/maps/config');
+      if (!config.styleUrl) throw new Error('WeatherPower map style is unavailable');
+      const center = Array.isArray(item.center) && item.center.length >= 2 ? item.center : [-98.4, 38.5];
+      const map = new maplibregl.Map({
+        container: target,
+        style: config.styleUrl,
+        center,
+        zoom: Array.isArray(item.center) ? 7 : 3.2,
+        minZoom: 2,
+        maxZoom: 15,
+        attributionControl: false
+      });
+      state.map = map;
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-left');
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+      map.on('load', () => {
+        const before = firstSymbolLayerId(map);
+        const reflectivityUrl = item.radar && item.radar.reflectivityTileUrl || NEXRAD_REFLECTIVITY;
+        map.addSource('detail-reflectivity-source', { type: 'raster', tiles: [reflectivityUrl], tileSize: 256, scheme: 'xyz' });
+        map.addLayer({ id: 'detail-reflectivity', type: 'raster', source: 'detail-reflectivity-source', paint: { 'raster-opacity': Number(item.radar && item.radar.reflectivityOpacity) || .66, 'raster-resampling': 'nearest' } }, before);
+        const velocityUrl = clean(item.radar && item.radar.velocityTileUrl);
+        if (velocityUrl) {
+          map.addSource('detail-velocity-source', { type: 'raster', tiles: [velocityUrl], tileSize: 256, scheme: 'xyz' });
+          map.addLayer({ id: 'detail-velocity', type: 'raster', source: 'detail-velocity-source', layout: { visibility: 'none' }, paint: { 'raster-opacity': Number(item.radar && item.radar.velocityOpacity) || .76, 'raster-resampling': 'nearest' } }, before);
+        }
+        const geometry = geometryFor(item);
+        if (geometry) {
+          map.addSource('detail-alert-source', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry } });
+          map.addLayer({ id: 'detail-alert-fill', type: 'fill', source: 'detail-alert-source', paint: { 'fill-color': accent(item), 'fill-opacity': .22 } }, before);
+          map.addLayer({ id: 'detail-alert-shadow', type: 'line', source: 'detail-alert-source', paint: { 'line-color': '#020305', 'line-width': 8, 'line-opacity': .9 } }, before);
+          map.addLayer({ id: 'detail-alert-outline', type: 'line', source: 'detail-alert-source', paint: { 'line-color': accent(item), 'line-width': 3.5, 'line-opacity': 1 } }, before);
+          const bounds = geometryBounds(geometry);
+          if (bounds) {
+            const mobile = window.matchMedia('(max-width: 650px)').matches;
+            map.fitBounds(bounds, { padding: mobile ? { top: 190, right: 55, bottom: 235, left: 55 } : { top: 190, right: 390, bottom: 220, left: 230 }, maxZoom: 10, duration: 0 });
+          }
+        }
+        state.mapReady = true;
+        document.getElementById('detailReflectivity').addEventListener('click', () => setDetailRadar('reflectivity'));
+        const velocityButton = document.getElementById('detailVelocity');
+        velocityButton.disabled = !velocityUrl;
+        velocityButton.title = velocityUrl ? 'Show nearest-site base velocity' : 'Velocity is unavailable for this product';
+        velocityButton.addEventListener('click', () => setDetailRadar('velocity'));
+      });
+    }
+
+    function formatNumber(value) {
+      return Number.isFinite(Number(value)) ? Number(value).toLocaleString() : '--';
+    }
+
+    function render(item) {
+      const primary = accent(item);
+      document.documentElement.style.setProperty('--accent', primary);
+      document.documentElement.style.setProperty('--accent-rgb', accentRgb(item));
+      document.title = clean(item.event || item.title || 'Warning Detail') + ' | WeatherPower';
+      const cardImage = cardImageUrl(item);
+      const alertTitle = clean(item.event || item.title || 'Weather alert');
+      const source = clean(item.sourceText || item.office || 'National Weather Service');
+      const office = clean(item.office || 'NWS warning system');
+      const locations = Array.from(new Set((item.locations || []).map(clean).filter((location) => location && !/^[A-Z]{2}$/.test(location)))).slice(0, 18);
+      const eventDetail = clean(item.title && item.title !== item.event ? item.title : '');
+      const cardPreview = cardImage
+        ? '<img src="' + esc(cardImage) + '" alt="' + esc(alertTitle) + ' WeatherPower card">'
+        : item.status === 'pending'
+          ? '<div class="rendering-card" role="status" aria-live="polite"><i class="detail-spinner" aria-hidden="true"></i><strong>Rendering</strong><span>WeatherPower is building this card now.</span></div>'
+          : '<div class="rendering-card"><strong>Card unavailable</strong><span>The product is still live, but its image is not available.</span></div>';
+      const sourceBody = '<strong>' + esc(source) + '</strong>' + esc(office === source ? '' : office) + (item.radar && item.radar.siteName ? '<br>Radar: ' + esc(item.radar.siteName) : '');
+      const description = clean(item.description || item.instruction || '');
+      const additionalInfo = [
+        item.classification && item.classification.isEmergency ? 'Emergency designation is active.' : '',
+        item.classification && item.classification.isPds ? 'Particularly dangerous situation designation is active.' : '',
+        item.classification && item.classification.isDestructive ? 'Destructive threat designation is active.' : '',
+        eventDetail
+      ].filter(Boolean).join(' ');
+
+      const impacts = item.impacts || {};
+      const people = formatNumber(impacts.people);
+      const homes = formatNumber(impacts.homes);
+      const affectedArea = clean(item.areaDesc || item.state || 'United States');
+      const officialSummary = description || source + ' issued this ' + alertTitle + ' for ' + affectedArea + '. It remains active until ' + formatTime(item.expiresAt, item.timezone) + '. Continue to monitor local emergency information for updates.';
+      const locationMarkup = locations.length ? locations.map((location) => '<span class="location">' + esc(location) + '</span>').join('') : '<span class="location">' + esc(affectedArea) + '</span>';
+      app.innerHTML = `
+        <section class="incident-hero">
+          <div class="incident-map" id="detailMap" aria-label="Live radar and alert polygon"></div>
+          <div class="incident-title-block">
+            <span class="incident-kicker">Active incident briefing</span>
+            <h1 class="incident-title">${esc(alertTitle)}</h1>
+            <p class="incident-area">${esc(affectedArea)}</p>
+            <div class="incident-tags">${tagList(item)}</div>
+          </div>
+          <div class="radar-switcher" aria-label="Radar mode"><button class="active" id="detailReflectivity" type="button">Reflectivity</button><button id="detailVelocity" type="button">Velocity</button></div>
+          <aside class="incident-readout">
+            <div class="readout-row"><span>Issued</span><strong>${esc(formatTime(item.issuedAt, item.timezone))}</strong></div>
+            <div class="readout-row"><span>Expires</span><strong>${esc(formatTime(item.expiresAt, item.timezone))}</strong></div>
+            <div class="readout-row countdown"><span>Time left</span><strong id="incidentCountdown">${esc(remaining(item.expiresAt))}</strong></div>
+          </aside>
+          <section class="incident-action"><strong class="action-number">!</strong><div class="action-copy-block"><span>What to do now</span><p>${esc(clean(item.whatToDo || 'Follow instructions from local officials and stay weather aware.'))}</p></div><div class="action-source"><strong>${esc(source)}</strong>${esc(office === source ? '' : office)}<br>${esc(formatDate(item.issuedAt, item.timezone))}</div></section>
+        </section>
+        <section class="brief-body">
+          <header class="brief-intro"><div><span class="brief-index">01 / INCIDENT EVIDENCE</span><h2>Know the threat.<br>Know the place.</h2></div><div class="population-tape"><div class="population-stat"><span>People in area</span><strong>${esc(people)}</strong></div><div class="population-stat"><span>Homes in area</span><strong>${esc(homes)}</strong></div></div></header>
+          <div class="brief-layout">
+            <article class="brief-copy">
+              ${hazardList(item)}
+              <section class="brief-section"><h3>Official alert detail</h3><p>${esc(officialSummary)}</p></section>
+              <section class="brief-section"><h3>Affected locations</h3><div class="location-list">${locationMarkup}</div>${additionalInfo ? '<p style="margin-top:16px;">' + esc(additionalInfo) + '</p>' : ''}</section>
+            </article>
+            <aside class="evidence-stack">
+              <div class="evidence-label"><span>WeatherPower card</span><small>${item.status === 'pending' ? 'Rendering now' : 'Issued image'}</small></div>
+              <div class="evidence-card">${cardPreview}</div>
+              <section class="source-block"><div class="source-line"><span class="source-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0 1 16 0c0 4.5-3.5 8-8 8s-8-3.5-8-8Z"/><path d="M8 12a4 4 0 0 1 8 0c0 2.2-1.8 4-4 4s-4-1.8-4-4Z"/><path d="M12 4v4m0 8v4"/></svg></span><span>${sourceBody}</span></div><p class="source-note">Population values are estimates from ${esc(impacts.sourceLabel || impacts.source || 'available public data')} and may not represent the exact number of people currently present.</p></section>
+            </aside>
+          </div>
+        </section>`;
+      document.getElementById('liveStateText').textContent = item.status === 'pending' ? 'Card rendering' : 'Live product';
+      state.item = item;
+      renderDetailMap(item).catch((error) => {
+        const target = document.getElementById('detailMap');
+        if (target) target.innerHTML = '<div class="status-card error">Live map unavailable: ' + esc(error.message) + '</div>';
+      });
+    }
+
+    async function fetchApi(path) {
+      const bases = state.apiBase ? [state.apiBase].concat(FALLBACK_BASES.filter((base) => base !== state.apiBase)) : FALLBACK_BASES;
+      let lastError;
+      for (const base of bases) {
+        try {
+          const response = await fetch(base + path, { headers: { Accept: 'application/json' } });
+          if (!response.ok) { lastError = new Error(path + ' returned ' + response.status); continue; }
+          if (!(response.headers.get('content-type') || '').includes('json')) { lastError = new Error(path + ' returned non-JSON content'); continue; }
+          state.apiBase = base;
+          return response.json();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error(path + ' failed');
+    }
+
+    function updateLinks() {
+      const center = state.apiBase || '/warningcenter';
+      document.getElementById('backLink').href = center;
+      document.getElementById('brandLink').href = center;
+      document.getElementById('crumbLink').href = center;
+    }
+
+    async function load() {
+      if (!key) {
+        app.innerHTML = '<div class="status-card error">No warning key was provided.</div>';
+        return;
+      }
+      const payload = await fetchApi('/api/warnings/rendered/' + encodeURIComponent(key));
+      const fingerprint = [payload.key, payload.status, payload.card && payload.card.path, payload.expiresAt].join('|');
+      if (fingerprint !== state.fingerprint) {
+        state.fingerprint = fingerprint;
+        render(payload);
+      }
+      const countdown = document.getElementById('incidentCountdown');
+      if (countdown) countdown.textContent = remaining(payload.expiresAt);
+      updateLinks();
+    }
+
+    function showToast(message) {
+      const existing = document.querySelector('.toast');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      window.setTimeout(() => toast.remove(), 2600);
+    }
+
+    document.getElementById('shareButton').addEventListener('click', async () => {
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: document.title, url: window.location.href });
+          return;
+        }
+        await navigator.clipboard.writeText(window.location.href);
+        showToast('Warning detail link copied.');
+      } catch (error) {
+        showToast('Unable to copy the link.');
+      }
+    });
+
+    load().catch((error) => {
+      app.innerHTML = '<div class="status-card error">' + esc(error.message) + '</div>';
+      document.getElementById('liveStateText').textContent = 'Feed error';
+    });
+    window.setInterval(() => load().catch(() => {}), 5000);
+  </script>
+</body>
+</html>
