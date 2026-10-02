@@ -85,6 +85,16 @@ export const pruneShorts = async () => {
     }
   }
   if (changed) await save();
+  // Remove video files that no store entry references (crashed renders, manual test renders).
+  const referenced = new Set(Object.values(store.items).flatMap((entry) => [entry.short, ...(entry.history || [])])
+    .flatMap((short) => [short?.path, short?.posterPath]).filter(Boolean).map((p) => path.basename(p)));
+  const dir = path.join(projectRoot, 'cards', 'shorts');
+  for (const file of await fs.readdir(dir).catch(() => [])) {
+    if (referenced.has(file)) continue;
+    const filePath = path.join(dir, file);
+    const stat = await fs.stat(filePath).catch(() => null);
+    if (stat && stat.mtimeMs < cutoff) await fs.rm(filePath, { force: true });
+  }
 };
 
 const publicEntry = (key, entry) => entry && ({

@@ -82,7 +82,8 @@ export const config = {
     batchCooldownMs: Math.round(clamp(number(process.env.AUTO_RENDER_BATCH_COOLDOWN_MS, 2000), 0, 30000))
   },
   cardCleanup: {
-    enabled: bool(process.env.CARD_CLEANUP_ENABLED, false),
+    // On by default; set CARD_CLEANUP_ENABLED=false only to keep every historical card file.
+    enabled: bool(process.env.CARD_CLEANUP_ENABLED, true),
     retentionHours: Math.max(1, number(process.env.CARD_RETENTION_HOURS, 24))
   },
   forecast: {

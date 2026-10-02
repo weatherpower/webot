@@ -64,7 +64,8 @@ const STATE_TIMEZONES = {
 };
 
 const isValidTimezone = (timezone) => {
-  if (!timezone) return false;
+  // tz-lookup returns nautical Etc/GMT zones over open water; NWS products never use those.
+  if (!timezone || /^Etc\//.test(timezone)) return false;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
     return true;
@@ -88,20 +89,21 @@ const fallbackTimezoneForState = (state = '') => {
   return codes.map((code) => STATE_TIMEZONES[code]).find(Boolean) || 'America/Chicago';
 };
 
-export const resolveAlertTimezone = ({ timezone, center, polygon, state } = {}) => {
+export const resolveAlertTimezone = ({ timezone, center, polygon, state, office } = {}) => {
   if (isValidTimezone(timezone)) return timezone;
 
   const polygonCenter = Array.isArray(polygon) && polygon.length >= 4 ? centroid(polygon) : null;
   const point = validCenter(center) || validCenter(polygonCenter);
   if (point) {
     try {
-      return tzLookup(point[1], point[0]);
+      const zone = tzLookup(point[1], point[0]);
+      if (isValidTimezone(zone)) return zone;
     } catch {
       // Fall through to the product's state when coordinates are unavailable.
     }
   }
 
-  return fallbackTimezoneForState(state);
+  return fallbackTimezoneForState(`${state || ''} ${office || ''}`);
 };
 
 export const getFormatter = (timezone, options) => {
@@ -185,7 +187,8 @@ export const normalizeWarning = (input = {}) => {
     timezone: input.timezone,
     center: sourceCenter,
     polygon: sourcePolygon,
-    state: input.state || warning.state
+    state: input.state || warning.state,
+    office: input.office
   });
   warning.title = String(warning.title || `${warning.event || 'WARNING'} IN ${warning.state || 'YOUR AREA'}`).toUpperCase();
   warning.office = String(warning.office || 'NWS');

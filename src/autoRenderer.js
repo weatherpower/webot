@@ -708,7 +708,9 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
         items
       };
       await saveRenderedState();
-      cleanupUnusedCards(items).catch((error) => {
+      cleanupUnusedCards(items).then((result) => {
+        if (result?.deleted) console.log(`Card cleanup removed ${result.deleted} files (${Math.round(result.bytesDeleted / 1048576)} MB)`);
+      }).catch((error) => {
         console.warn(`Card cleanup failed: ${error.message}`);
       });
       return state;

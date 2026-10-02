@@ -28,7 +28,7 @@ const html = warningCardHtml({
 });
 
 assert.match(html, /TORNADO WARNING IN WISCONSIN/);
-assert.match(html, /See on <strong>WEATHERPOWER\.APP/);
+assert.match(html, /class="wp-brand">[^]*?WEATHERPOWER\.APP/);
 assert.match(html, /maplibre-gl/);
 assert.match(html, /WeatherPower Tornado ID/);
 assert.match(html, /Rotation detection/);

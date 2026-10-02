@@ -9,12 +9,12 @@ import { cardsDir, chromiumTmpDir, ensureRuntimeDirs, publicDir } from './paths.
 import { normalizeWarning } from './warning.js';
 import { enrichWarningPopulation } from './population.js';
 import { resolveNearestRadar } from './radar.js';
-import { SHORT_FORMATS, warningShortHtml } from './shortHtml.js';
+import { END_CARD_SECONDS, SHORT_FORMATS, warningShortHtml } from './shortHtml.js';
 
 export const shortsDir = path.join(cardsDir, 'shorts');
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
 const IEM_COMPOSITE_META = 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json';
-const LOOP_FRAMES = 11;
+const LOOP_FRAMES = 18;
 const LOOP_STEP_MINUTES = 5;
 
 const resolveFfmpegPath = async () => {
@@ -55,7 +55,7 @@ export const buildRadarPlan = async (warning, { duration = 15 } = {}) => {
   });
   const reflectivity = {
     kind: 'reflectivity', legend: 'reflectivity', title: 'RADAR', start: 0,
-    frames: loopFrames, step: 0.3, hold: 0.9, opacity: 0.8, maxzoom: 11
+    frames: loopFrames, step: 0.2, hold: 0.8, opacity: 0.92, maxzoom: 11
   };
 
   let second = null;
@@ -75,14 +75,14 @@ export const buildRadarPlan = async (warning, { duration = 15 } = {}) => {
       second = {
         kind: 'velocity', legend: 'velocity', title: `${site} VELOCITY`,
         frames: [{ id: 'velocity', url: `${IEM_TILES}/ridge::${site}-N0U-0/{z}/{x}/{y}.png`, time: Date.now() }],
-        step: 1, hold: 0, opacity: 0.85, maxzoom: 12
+        step: 1, hold: 0, opacity: 0.72, maxzoom: 12
       };
     }
   }
 
   const segments = [reflectivity];
   if (second) {
-    second.start = Math.round(duration * 0.56 * 10) / 10;
+    second.start = Math.round((duration - END_CARD_SECONDS) * 0.6 * 10) / 10;
     segments.push(second);
   }
   return { valid, segments };
@@ -198,7 +198,7 @@ export const renderWarningShortDirect = async (rawWarning, {
     };
     encoder = await startEncoder({ outputPath: tempPath, fps, size });
     const totalFrames = Math.round(duration * fps);
-    const posterFrame = Math.round(Math.min(duration - 1, 6.2) * fps);
+    const posterFrame = Math.round(Math.min(duration - END_CARD_SECONDS - 0.5, 5.6) * fps);
     for (let frame = 0; frame < totalFrames; frame += 1) {
       const t = frame / fps;
       await page.evaluate((seconds) => window.__seek(seconds), t);

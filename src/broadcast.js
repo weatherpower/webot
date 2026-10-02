@@ -33,9 +33,11 @@ const VTEC_TAGS = {
 };
 
 export const stateCodesFor = (warning = {}) => {
+  // UGC codes are authoritative: marine zones (GMZ, AMZ, PZZ...) carry no state at all.
+  const ugc = (warning.ugc || []).map((code) => String(code).slice(0, 2));
+  if (ugc.length) return Array.from(new Set(ugc.filter((code) => STATE_NAMES[code])));
   const codes = [
     ...(warning.stateCodes || []),
-    ...(warning.ugc || []).map((code) => String(code).slice(0, 2)),
     ...(String(warning.areaDesc || '').match(/,\s*([A-Z]{2})(?=;|$)/g) || []).map((match) => match.replace(/[^A-Z]/g, '')),
     ...(String(warning.state || '').match(/\b[A-Z]{2}\b/g) || [])
   ];
@@ -47,9 +49,9 @@ export const placeFor = (warning = {}) => {
   if (codes.length === 1) return STATE_NAMES[codes[0]].toUpperCase();
   if (codes.length === 2) return `${STATE_NAMES[codes[0]]} & ${STATE_NAMES[codes[1]]}`.toUpperCase();
   if (codes.length > 2) return `${codes.length} STATES`;
-  if (warning.state && !/your area/i.test(warning.state)) return String(warning.state).toUpperCase();
-  const firstArea = String(warning.areaDesc || '').split(';')[0].trim();
-  return firstArea ? firstArea.toUpperCase() : 'YOUR AREA';
+  if ((warning.ugc || []).length) return '';
+  const stateName = Object.values(STATE_NAMES).find((name) => name.toLowerCase() === String(warning.state || '').trim().toLowerCase());
+  return stateName ? stateName.toUpperCase() : '';
 };
 
 export const eventLabelFor = (warning = {}) => {
@@ -79,7 +81,77 @@ export const headlineFor = (warning = {}) => {
     const label = `MESOSCALE DISCUSSION${number ? ` #${number}` : ''}`;
     return { event: label, place, full: `${label} · ${place}` };
   }
-  return { event, place, full: `${event} IN ${place}` };
+  return { event, place, full: place ? `${event} IN ${place}` : event };
+};
+
+const normalizeText = (value) => String(value || '').toUpperCase().replace(/&AMP;/g, '&').replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+// True when one line would just repeat the other (e.g. headline place vs. area line).
+export const isDuplicateText = (a, b) => {
+  const na = normalizeText(a);
+  const nb = normalizeText(b);
+  if (!na || !nb) return false;
+  if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+  const ta = new Set(na.split(' ').filter((word) => word.length > 2));
+  const tb = nb.split(' ').filter((word) => word.length > 2);
+  if (!tb.length || !ta.size) return false;
+  const shared = tb.filter((word) => ta.has(word)).length;
+  return shared / Math.min(ta.size, tb.length) >= 0.7;
+};
+
+const hasFeatures = (collection) => Boolean(collection?.features?.some((feature) => feature?.geometry));
+
+// NHC modules are only allowed when the alert was matched to a real NHC storm with map data.
+export const hasNhcData = (warning = {}) => {
+  const tropical = warning.tropical;
+  if (!tropical || tropical.unavailable) return false;
+  if (!tropical.name && !tropical.advisoryNumber) return false;
+  return hasFeatures(tropical.cone) || hasFeatures(tropical.forecastTrack);
+};
+
+const svgPattern = (svg) => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+const PATTERNS = {
+  stripes: 'repeating-linear-gradient(135deg, rgba(0,0,0,.2) 0 12px, transparent 12px 26px)',
+  chevrons: 'repeating-linear-gradient(60deg, rgba(0,0,0,.16) 0 8px, transparent 8px 22px), repeating-linear-gradient(-60deg, rgba(0,0,0,.1) 0 8px, transparent 8px 22px)',
+  waves: svgPattern('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="18"><path d="M0 9c6-6 18-6 24 0s18 6 24 0" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="3"/></svg>'),
+  snow: svgPattern('<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34"><g fill="rgba(255,255,255,.28)"><circle cx="6" cy="8" r="2.2"/><circle cx="24" cy="20" r="1.6"/><circle cx="14" cy="29" r="1.2"/></g></svg>'),
+  streaks: 'repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 2px, transparent 2px 9px)',
+  rings: 'repeating-radial-gradient(circle at 92% 50%, rgba(0,0,0,.18) 0 6px, transparent 6px 18px)',
+  embers: 'linear-gradient(0deg, rgba(0,0,0,.28), transparent 70%)',
+  grid: 'repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 16px), repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 1px, transparent 1px 16px)',
+  dots: 'radial-gradient(rgba(0,0,0,.18) 1.5px, transparent 1.6px) 0 0 / 12px 12px',
+  sky: 'linear-gradient(100deg, rgba(255,255,255,.18), transparent 60%)',
+  none: 'none'
+};
+
+// Distinct on-air look per hazard family: header pattern, kicker label and bar style.
+export const identityFor = (warning = {}) => {
+  const c = warning.classification || {};
+  const family = c.family || 'weather';
+  const byFamily = {
+    tornado: ['TORNADO', 'stripes'],
+    severe: ['SEVERE STORM', 'chevrons'],
+    'flash-flood': ['FLASH FLOODING', 'waves'],
+    flood: ['FLOODING', 'waves'],
+    'storm-surge': ['STORM SURGE', 'waves'],
+    winter: ['WINTER WEATHER', 'snow'],
+    fire: ['FIRE WEATHER', 'embers'],
+    wind: ['HIGH WIND', 'streaks'],
+    'extreme-wind': ['EXTREME WIND', 'streaks'],
+    marine: ['MARINE', 'streaks'],
+    hurricane: ['TROPICAL', 'rings'],
+    'tropical-storm': ['TROPICAL', 'rings'],
+    'tropical-cyclone': ['TROPICAL', 'rings'],
+    discussion: ['STORM PREDICTION CENTER', 'grid'],
+    outlook: ['STORM PREDICTION CENTER', 'grid'],
+    forecast: ['WEATHERPOWER FORECAST', 'sky'],
+    statement: ['WEATHER STATEMENT', 'dots']
+  };
+  const [kicker, pattern] = byFamily[family] || ['WEATHER ALERT', 'dots'];
+  const style = c.isEmergency || (c.isPds && !c.isWatch) ? 'emergency'
+    : c.isWatch ? 'watch'
+      : 'warning';
+  return { family, kicker: c.isWatch && !/WATCH/.test(kicker) ? `${kicker} WATCH` : kicker, pattern: PATTERNS[pattern], style };
 };
 
 const unitWord = (codes = []) => (codes.length === 1 && codes[0] === 'LA' ? ['PARISH', 'PARISHES'] : ['COUNTY', 'COUNTIES']);
