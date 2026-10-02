@@ -13,9 +13,10 @@ import { cleanupUnusedCards } from './cardCleanup.js';
 import { appendLog } from './logStore.js';
 import { postCardToDiscord } from './posters/discord.js';
 import { enrichWarningTropical } from './nhc.js';
+import { queueAutoShorts } from './shorts.js';
 
 const statePath = path.join(dataDir, 'rendered-alerts.json');
-const RENDER_INDEX_VERSION = '2026-07-29-alert-timezones-v4';
+const RENDER_INDEX_VERSION = '2026-10-02-broadcast-cards-v5';
 
 let state = {
   status: 'idle',
@@ -206,6 +207,10 @@ const toItem = ({ warning, render, hash, status = 'rendered', error = null }) =>
   title: warning.title,
   event: warning.event,
   state: warning.state,
+  stateCodes: warning.stateCodes,
+  ugc: (warning.ugc || []).slice(0, 60),
+  vtecAction: warning.vtecAction,
+  messageType: warning.messageType,
   areaDesc: warning.areaDesc,
   office: warning.office,
   expiresAt: warning.expiresAt,
@@ -699,6 +704,9 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
         items
       };
       await saveRenderedState();
+      queueAutoShorts(activeWarnings).catch((error) => {
+        console.warn(`Auto shorts failed: ${error.message}`);
+      });
       cleanupUnusedCards(items).catch((error) => {
         console.warn(`Card cleanup failed: ${error.message}`);
       });

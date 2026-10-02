@@ -28,7 +28,7 @@ const resolveFfmpegPath = async () => {
   return 'ffmpeg';
 };
 
-const compositeValidTime = async () => {
+export const compositeValidTime = async () => {
   try {
     const response = await fetch(IEM_COMPOSITE_META, { signal: AbortSignal.timeout(8000) });
     const body = await response.json();

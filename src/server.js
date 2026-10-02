@@ -22,6 +22,8 @@ import { deleteWeWatch, listWeWatches, saveWeWatch } from './weWatchStore.js';
 import { publicWarningCenterFeed } from './publicFeed.js';
 import { generateForecastSearchCards } from './forecastSearch.js';
 import { geocodeMapRequest, publicMapConfig, routeMapRequest } from './mapServices.js';
+import { apiV3Router } from './apiV3.js';
+import { shortsStatus } from './shorts.js';
 
 const app = express();
 
@@ -71,14 +73,16 @@ app.use((req, res, next) => {
     '/api/warnings/rendered',
     '/api/dashboard/reports'
   ];
-  const isPublicGet = req.method === 'GET' && (
+  const isPublicGet = (req.method === 'GET' || req.method === 'HEAD') && (
     publicGetPaths.includes(req.path)
     || req.path.startsWith('/public/')
     || req.path.startsWith('/cards/')
     || req.path.startsWith('/api/warnings/rendered/')
+    || req.path.startsWith('/api/v3/')
   );
+  const isPublicShortRequest = req.method === 'POST' && req.path === '/api/v3/short/request';
 
-  if (isPublicGet) {
+  if (isPublicGet || isPublicShortRequest) {
     next();
     return;
   }
@@ -145,7 +149,8 @@ app.get('/api/health', async (req, res, next) => {
         spc: base.spc,
         radar: base.radar,
         autoRender: base.autoRender,
-        population: base.population
+        population: base.population,
+        shorts: shortsStatus()
       });
       return;
     }
@@ -198,6 +203,8 @@ app.get('/api/warnings/rendered/:key', async (req, res, next) => {
     next(error);
   }
 });
+
+app.use('/api/v3', apiV3Router());
 
 app.get('/api/sample-warning', (req, res) => {
   res.json(sampleWarning);

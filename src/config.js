@@ -117,6 +117,17 @@ export const config = {
     firebaseWeWatchesBearer: process.env.FIREBASE_WEWATCHES_BEARER || '',
     requestTimeoutMs: number(process.env.CUSTOM_PRODUCTS_TIMEOUT_MS, 7000)
   },
+  shorts: {
+    enabled: bool(process.env.SHORTS_ENABLED, true),
+    autoEnabled: bool(process.env.SHORTS_AUTO_ENABLED, true),
+    format: ['vertical', 'square'].includes(process.env.SHORTS_FORMAT) ? process.env.SHORTS_FORMAT : 'vertical',
+    autoEvents: new RegExp(process.env.SHORTS_AUTO_EVENTS || 'tornado warning|flash flood warning|severe thunderstorm warning|hurricane warning|extreme wind warning|storm surge warning', 'i'),
+    autoMaxPerCycle: Math.round(clamp(number(process.env.SHORTS_AUTO_MAX_PER_CYCLE, 2), 0, 10)),
+    maxQueue: Math.round(clamp(number(process.env.SHORTS_MAX_QUEUE, 8), 1, 50)),
+    publicRequestsPerWindow: Math.round(clamp(number(process.env.SHORTS_PUBLIC_REQUESTS_PER_WINDOW, 2), 0, 10)),
+    retentionHours: Math.max(1, number(process.env.SHORTS_RETENTION_HOURS, 24)),
+    timeoutMs: Math.round(clamp(number(process.env.SHORTS_TIMEOUT_MS, 15 * 60 * 1000), 60000, 60 * 60 * 1000))
+  },
   controllerToken: process.env.CONTROLLER_TOKEN || '',
   dryRunDefault: bool(process.env.DRY_RUN_DEFAULT, false)
 };
