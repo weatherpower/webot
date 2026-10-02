@@ -240,7 +240,7 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', commands: [] };
 let control = null;
 
 const loadControl = async () => {
@@ -420,6 +420,12 @@ export const applyLiveCommand = async (body = {}) => {
       current.tts = tts;
       break;
     }
+    // auto = WeBot talks once the WIS reaches 100; on = "Start talking"; off = quiet.
+    case 'talk':
+      current.talk = ['auto', 'on', 'off'].includes(body.mode) ? body.mode : 'auto';
+      // Choosing to hear him also turns the master voice switch back on.
+      if (current.talk !== 'off') current.voice = true;
+      break;
     case 'theme':
       current.theme = THEMES.includes(body.theme) ? body.theme : 'auto';
       break;

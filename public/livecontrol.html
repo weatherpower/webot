@@ -121,6 +121,11 @@
         <div class="row"><button class="btn primary" id="say-btn">Say it</button><span class="status" id="say-count">0 / 300</span></div>
         <div class="row chips" id="quick"></div>
         <div class="row">
+          <span class="status">TALK</span>
+          <div class="seg" id="talk-mode"><button data-v="auto">Auto (WIS 100+)</button><button data-v="on">Start talking</button><button data-v="off">Quiet</button></div>
+        </div>
+        <p class="status" id="talk-line" style="margin:6px 0 0"></p>
+        <div class="row">
           <button class="btn" id="voice">Voice</button>
           <button class="btn" id="sound">Sounds</button>
         </div>
@@ -329,11 +334,15 @@
       document.querySelectorAll('#music-src button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.source || 'auto'))));
       document.querySelectorAll('#music-mood button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.mood || 'auto'))));
       const pu = control.puter || {};
-      $('puter-line').innerHTML = pu.linked ? '<b style="color:var(--ok)">LINKED</b>' + (pu.user ? ' · ' + esc(pu.user) : '') + ' · OBS uses it automatically' : 'Not linked · OBS can\'t sign in by itself';
+      $('puter-line').innerHTML = pu.linked ? '<b style="color:var(--ok)">LINKED</b>' + (pu.user ? ' · ' + esc(pu.user) : '') + ' · used by OBS' : 'Not linked';
       $('puter-link').textContent = pu.linked ? 'Re-link' : 'Sign in & link for OBS';
       $('puter-unlink').hidden = !pu.linked;
       renderCamControl();
       renderThemes();
+      const talk = control.talk || 'auto';
+      document.querySelectorAll('#talk-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === talk)));
+      $('talk-line').innerHTML = (talk === 'on' ? 'WeBot talks about everything on screen.' : talk === 'off' ? 'WeBot stays quiet (typed "Say it" lines still play).' : 'WeBot stays quiet on calm days and starts talking once the WIS reaches 100.')
+        + (control.stream?.tts ? ' · Stream: <b>' + esc(control.stream.tts) + '</b>' : '');
       const st = control.stream;
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
@@ -396,6 +405,10 @@
       const name = (key) => (THEME_LIST.find(([k]) => k === key) || [])[1] || key;
       $('theme-line').innerHTML = onAir ? 'ON AIR: <b style="color:var(--ok)">' + esc(name(onAir).toUpperCase()) + '</b>' + (pick === 'auto' ? ' · picked by the weather' : '') : 'The stream will report its look once it\'s on air.';
     };
+    $('talk-mode').addEventListener('click', (e) => {
+      const v = e.target.closest('button')?.dataset.v;
+      if (v) act({ action: 'talk', mode: v }, v === 'on' ? 'WeBot is talking' : v === 'off' ? 'WeBot is quiet' : 'WeBot talks at WIS 100+');
+    });
     $('themes').addEventListener('click', (e) => {
       const key = e.target.closest('button')?.dataset.theme;
       if (key) act({ action: 'theme', theme: key }, 'Look: ' + (THEME_LIST.find(([k]) => k === key) || [])[1]);

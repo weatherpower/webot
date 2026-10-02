@@ -410,3 +410,11 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
   the first click or key press anywhere, and WeBot's opening line waits for it. Pinning an alert in Live
   Control switches the stream right away.
 - `WARNING_DATA_DIR` runs a second (test) server with its own settings and state.
+
+### Quiet on calm days
+
+- WeBot only talks when the Weather Intensity Score is 100 or higher (any tornado warning puts it there).
+  Live Control → WeBot → Talk: **Auto (WIS 100+)**, **Start talking** (always talk), **Quiet**. Typed
+  "Say it" lines always play. Control action `talk` (`auto` | `on` | `off`). No opening "WeBot here" line.
+- Calm days (WIS under 100, no tornado warnings) are slow and chill: scenes hold 1–3 minutes, mostly the
+  national radar map with the now-playing bar, fewer alert hops.

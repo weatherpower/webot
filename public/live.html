@@ -372,6 +372,13 @@
     };
     const focusState = () => S.control.state || OPT.state;
     const voiceOn = () => OPT.voice && S.control.voice !== false;
+    // WeBot only talks when the weather is serious (WIS 100+, e.g. any tornado warning), or when Live
+    // Control says "Start talking". Quiet mode silences him; typed "Say it" lines always speak.
+    const wisScore = () => (S.live?.wis?.loaded ? S.live.wis.score : 0);
+    const talkMode = () => S.control.talk || 'auto';
+    const talkAllowed = () => talkMode() === 'on' || (talkMode() === 'auto' && wisScore() >= 100);
+    // Calm day: below WIS 100 and no tornado warnings. The show slows down and stays mellow.
+    const isCalm = () => wisScore() < 100 && !(S.live?.tallies?.tor);
     const soundOn = () => OPT.sound && S.control.sound !== false;
     const byKey = (key) => S.alerts.find((a) => a.key === key);
     const stateLine = (a) => (a.states || []).map((s) => STATE_NAMES[s] || s).join(' & ');
@@ -562,7 +569,6 @@
       try { await puter.auth.signIn(); } catch (error) { console.warn('Puter sign-in:', error?.message || error); }
       pt.state = puter.auth.isSignedIn() ? 'ready' : 'signed-out';
       puterGate();
-      if (pt.state === 'ready') say('WeBot here with my new voice. Let’s keep an eye on the weather together.');
     });
     const puterAudio = (text, cfg) => {
       const key = cfg.openaiVoice + '|' + cfg.speed + '|' + text;
@@ -718,8 +724,9 @@
     };
     // Sentences go out one at a time: Chrome cuts off long single utterances, and short lines
     // let the neural voice start talking sooner.
-    const say = (text) => {
+    const say = (text, opts = {}) => {
       if (!text) return;
+      if (!opts.force && !talkAllowed()) return;
       if (!voiceOn() || !(canNeural() || speechWorks()) || (actx && actx.state !== 'running')) {
         bot.classList.add('talk');
         setTimeout(() => bot.classList.remove('talk'), Math.min(6000, 1200 + text.length * 30));
@@ -734,7 +741,7 @@
       parts.map((p) => p.trim()).filter(Boolean).forEach((p) => {
         const audio = synth(p);
         audio?.catch(() => {});
-        speech.queue.push({ text: p, audio });
+        speech.queue.push({ text: p, audio, force: Boolean(opts.force) });
       });
       pumpSpeech();
     };
@@ -1547,6 +1554,11 @@
     };
     const outlooks = () => S.alerts.filter((a) => a.group === 'outlooks' && /day 1/i.test(a.eventLabel || '') && a.geometry);
     const dwellFor = (shot) => {
+      // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
+      if (isCalm() && !shot.breaking && !shot.fresh) {
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, think: 13 };
+        return (CALM[shot.type] || 90) * OPT.speed * 1000;
+      }
       let s = 15;
       if (shot.type === 'alert') {
         const a = shot.alert;
@@ -1767,8 +1779,14 @@
         // The national radar + surface map is the quiet-day staple (like Ryan's).
         surface: S.surface ? (busy ? 0.8 : 2) : 0
       };
+      const calm = isCalm();
+      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5 });
       const recent = S.kinds || [];
-      Object.keys(w).forEach((k) => { if (k !== 'alert' && recent.slice(-3).includes(k)) w[k] *= k === recent[recent.length - 1] ? 0 : 0.25; });
+      Object.keys(w).forEach((k) => {
+        if (k === 'alert' || !recent.slice(-3).includes(k)) return;
+        // On calm days the radar map may come back sooner; nothing else repeats back to back.
+        w[k] *= k === recent[recent.length - 1] ? (calm && k === 'surface' ? 0.5 : 0) : 0.25;
+      });
       if (recent.length >= 2 && recent.slice(-2).every((k) => k === 'alert')) w.alert *= 0.3;
       const total = Object.values(w).reduce((a, b) => a + b, 0);
       if (!total) return 'national';
@@ -2421,7 +2439,7 @@
     };
     const loadLive = async () => {
       // The query is a heartbeat for the control panel: what is playing and which voice is on.
-      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: voiceOn() ? ttsLabel() : 'voice off', theme: S.themeKey || '' }));
+      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '' }));
       const prevRev = S.control.rev;
       const prevCtl = S.control;
       S.live = body;
@@ -2436,7 +2454,7 @@
       } else {
         for (const cmd of (S.control.commands || []).filter((c) => c.id > S.lastCmd)) {
           S.lastCmd = cmd.id;
-          if (cmd.type === 'say') say(cmd.text);
+          if (cmd.type === 'say') say(cmd.text, { force: true });
           else if (cmd.type === 'next') nextShot(true);
           else if (cmd.type === 'reload') location.reload();
           else if (cmd.type === 'music-next') musicNext();
@@ -2448,6 +2466,7 @@
       }
       if (ttsCfg().engine === 'neural' && OPT.voice) startNeural();
       if (ttsCfg().engine === 'puter' && OPT.voice) startPuter();
+      if (!talkAllowed() && speech.queue.some((item) => !item.force)) speech.queue = speech.queue.filter((item) => item.force);
       const linkedAt = S.control.puter?.linkedAt || null;
       if (linkedAt !== S.puterLinkedAt) { S.puterLinkedAt = linkedAt; if (['ready', 'signed-out'].includes(pt.state)) linkPuter(); }
       applyCameraControl();
@@ -2521,15 +2540,6 @@
       loadSurface().catch(() => {});
       poll(loadSurface, 15 * 60 * 1000);
       poll(loadTropics, 5 * 60 * 1000);
-      // Give the neural voice a moment to load so the first line is in WeBot's real voice.
-      const hello = Date.now();
-      const intro = () => {
-        if ((neural.state === 'loading' || pt.state === 'loading') && Date.now() - hello < 25000) { setTimeout(intro, 1000); return; }
-        // Hold the opening line until sound is actually playing (a browser may need a click first).
-        if (actx && actx.state !== 'running' && Date.now() - hello < 10 * 60 * 1000) { setTimeout(intro, 1000); return; }
-        say('WeBot here, and WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.');
-      };
-      setTimeout(intro, 2500);
     };
     boot().catch((error) => { $('boot').textContent = 'WEATHERPOWER LIVE · RECONNECTING…'; console.error(error); setTimeout(() => location.reload(), 15000); });
     // Long-running stream: a reload every 6 hours keeps browser memory in check.
