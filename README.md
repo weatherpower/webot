@@ -360,3 +360,20 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
 - **Tropics** (`GET /api/v3/tropics`, NOAA NHC): every active storm with its cone, forecast track and
   points, past track, model spaghetti tracks and coastal watches/warnings; WeBot reads each storm once
   per advisory. With no storms it shows the NHC 7-day outlook areas. Control panel: **Tropics** mode.
+
+### WeBot talks on every shot, national radar map, live cameras
+
+- **Commentary:** WeBot says something on every segment, built from the data on screen: the alert
+  (place, expiry, the NWS storm-location line, hail/wind/tornado tags, nearby storm reports, radar
+  site, people inside), "back to…" updates on repeat visits, the national overview, SPC outlook,
+  storm reports, tropics, the surface map and model checks. Lines never queue up behind each other,
+  and the show waits up to 15 seconds for him to finish (a breaking alert or Skip still cuts in).
+- **National radar + surface map** (`GET /api/v3/surface`, NWS WPC coded surface bulletin): highs and
+  lows with millibars, cold/warm/stationary/occluded fronts and troughs over the national radar. On
+  quiet days it comes up often; the bottom bar becomes "NOW PLAYING · song · ARTIST NAME · MODE".
+  Control panel: **Radar map** mode.
+- **Live cameras** from the WeatherPower Traffic camera network (Camera Wall `/api/cameras`): during
+  an alert zoom the nearest camera within 30 miles shows in a LIVE box with a marker on the map.
+  Set `CAMERA_API_USER` / `CAMERA_API_PASS` (a viewer account in WeatherPower Traffic) and optionally
+  `CAMERA_API_BASE` (default `http://127.0.0.1:8778`). Only public feeds (state DOT cameras) are used
+  unless `CAMERA_ALLOW_LOCAL=true`. `GET /api/v3/cameras/near?lat=&lon=&miles=`.

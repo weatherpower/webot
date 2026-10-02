@@ -72,6 +72,25 @@
     .card dd.prose { font-family: "WP Sans"; font-size: 17px; font-weight: 500; line-height: 1.42; text-transform: none; color: #e3e8f1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
     .rows { padding: 6px 26px 26px; }
     .rowi { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .hlmk { display: grid; justify-items: center; line-height: 1; pointer-events: none; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+    .hlmk b { font: 700 38px "WP Display"; }
+    .hlmk small { font: 700 12px "WP Mono"; letter-spacing: .04em; margin-top: 2px; }
+    .hlmk.h { color: #4f8bff; }
+    .hlmk.l { color: #ff3b3b; }
+    .cam { position: absolute; right: 32px; top: 340px; width: 520px; z-index: 12; display: none; background: rgba(9,16,30,.94); border: 1px solid rgba(255,255,255,.12); border-top: 3px solid #33d4ff; box-shadow: 0 18px 40px rgba(0,0,0,.5); }
+    .cam.show { display: block; animation: camin .5s ease; }
+    @keyframes camin { from { opacity: 0; transform: translateY(12px); } }
+    .cam .feed { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+    .cam .feed img, .cam .feed video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cam .cap { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+    .cam .cap .live { flex: none; font: 700 12px "WP Mono"; letter-spacing: .12em; color: #fff; background: #d81f2a; padding: 3px 7px; }
+    .cam .cap .live::before { content: "● "; animation: blinkdot 1.2s steps(2) infinite; }
+    @keyframes blinkdot { 50% { opacity: .2; } }
+    .cam .cap b { font: 600 17px "WP Display"; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .cam .cap small { margin-left: auto; flex: none; font: 600 11px "WP Mono"; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+    .cammk { display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+    .cammk i { width: 18px; height: 18px; border-radius: 50%; background: #33d4ff; border: 3px solid #fff; box-shadow: 0 0 0 10px rgba(51,212,255,.25), 0 0 0 22px rgba(51,212,255,.12); }
+    .cammk span { font: 700 12px "WP Mono"; letter-spacing: .08em; color: #fff; background: rgba(9,16,30,.9); padding: 4px 8px; border: 1px solid rgba(255,255,255,.18); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
     .tcmk { display: flex; align-items: center; gap: 10px; pointer-events: none; }
     .tcmk i { display: grid; place-items: center; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; background: var(--tc, #ff9f2a); color: #111; font: 700 20px "WP Display"; font-style: normal; border: 3px solid #fff; box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 0 24px var(--tc, #ff9f2a); animation: tcspin 3s linear infinite; }
     .tcmk i b { animation: tcspin 3s linear infinite reverse; }
@@ -216,6 +235,7 @@
     </section>
 
     <div class="reportchip" id="reportchip"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span id="rc-n">0</span><small>STORM REPORTS · 3 HRS</small></div>
+    <div class="cam" id="cam" aria-hidden="true"><div class="feed" id="cam-feed"></div><div class="cap"><span class="live">LIVE</span><b id="cam-name"></b><small id="cam-sub"></small></div></div>
     <div class="np" id="np"></div>
     <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
 
@@ -1414,6 +1434,7 @@
       else if (shot.type === 'think') s = 13;
       else if (shot.type === 'models') s = 32;
       else if (shot.type === 'tropics') s = 26;
+      else if (shot.type === 'surface') s = 22;
       else s = 14;
       return s * OPT.speed * 1000;
     };
@@ -1461,6 +1482,7 @@
       setMood('calm');
       card.classList.remove('show');
       fly(CONUS, { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: 5, duration: 5200 });
+      chatter(pick(['Let me zoom out and think for a second.', 'Hang on, let me see what the models are saying.', 'Let me pull up the models real quick.', 'Time to check in on the computer models.']));
       setNow({ k: 'WEBOT', title: 'Checking the models', color: '#1a8cff', crawl: 'HRRR · NAM 3KM · GFS · ECMWF · WEATHERPOWER MODEL STUDIO · SIMULATED RADAR · CAPE · RAIN · TEMPERATURE · WIND' });
       S.pendingModel = null;
       S.modelRequestPending = true;
@@ -1557,9 +1579,14 @@
       say(seg.take, { label: 'MODEL CHECK' });
     };
 
-    const nextShot = () => {
+    const nextShot = (force) => {
       clearTimeout(S.shotTimer);
       if (S.inBreaking) return;
+      // Let WeBot finish what he's saying before cutting away (up to 15 more seconds).
+      if (!force && !S.breaking.length && !S.fresh.length && speech.busy && Date.now() - S.shotStart < S.shotDur + 15000) {
+        S.shotTimer = setTimeout(nextShot, 1200);
+        return;
+      }
       let shot = null;
       if (S.breaking.length) {
         const b = S.breaking.shift();
@@ -1597,6 +1624,7 @@
       if (shot.type === 'outlook' && !outlooks().length) shot = { type: 'national' };
       if (shot.type === 'reports' && (S.live?.reports || []).length < 5) shot = { type: 'national' };
       if (shot.type === 'tropics' && !tropicsActive()) shot = { type: 'national' };
+      if (shot.type === 'surface' && !S.surface) shot = { type: 'national' };
       runShot(shot);
     };
 
@@ -1612,7 +1640,9 @@
         national: 1.2,
         outlook: outlooks().length ? 1 : 0,
         reports: (S.live?.reports || []).length >= 5 ? 1.2 : 0,
-        tropics: tropicsActive() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0
+        tropics: tropicsActive() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
+        // The national radar + surface map is the quiet-day staple (like Ryan's).
+        surface: S.surface ? (busy ? 0.8 : 2) : 0
       };
       const recent = S.kinds || [];
       Object.keys(w).forEach((k) => { if (k !== 'alert' && recent.slice(-3).includes(k)) w[k] *= k === recent[recent.length - 1] ? 0 : 0.25; });
@@ -1660,6 +1690,17 @@
       if (shot.type !== 'think') setThinking(false);
       if (shot.type !== 'models') hideModels();
       if (shot.type !== 'tropics') hideTropics();
+      if (shot.type !== 'surface') hideSurface();
+      hideCam();
+      if (shot.type === 'surface') {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(false);
+        surfaceShot();
+        renderRadarPanel();
+        $('rp').classList.add('show');
+        return;
+      }
       if (shot.type === 'tropics') {
         setSelected('');
         clearLocal();
@@ -1703,7 +1744,10 @@
           S.velTimer = setTimeout(() => { if (S.shot === shot) setVelocity(true); }, S.shotDur * 0.5);
           setTimeout(() => { if (S.shot === shot) setVelocity(false); }, S.shotDur * 0.85);
         }
+        showCamFor(a, shot);
+        if (!shot.fresh && !shot.breaking) chatter(alertTalk(a, shot));
         if (shot.fresh && !S.spoken.has(a.key)) {
+          talked.set(a.key, { at: Date.now(), reports: reportsNear(a).length });
           S.spoken.add(a.key);
           say(spokenAlert(a, 'New ' + a.event.toLowerCase() + '. '), { label: 'NEW ALERT' });
         }
@@ -1734,6 +1778,11 @@
       const stBounds = st2 ? bboxOf({ type: 'GeometryCollection', geometries: pool.map((a) => a.geometry).filter(Boolean) }) : null;
       fly(stBounds || CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 7 });
       setNow({ k: 'OVERVIEW', title: (st2 ? (STATE_NAMES[st2] || st2) : 'Nationwide') + ': ' + pool.length + ' active alerts', color: '#1a8cff', crawl: top.map(([event, e]) => e.n + ' ' + event).join(' · ') });
+      const common = [...byEvent.entries()].sort((x, y) => y[1].n - x[1].n).slice(0, 3).map(([event, e]) => e.n + ' ' + (e.n === 1 ? event.toLowerCase() : plural(event.toLowerCase())));
+      const wis = S.live?.wis;
+      chatter(pick(['Here’s the big picture.', 'Let’s zoom out and look at the whole country.', 'Time for a look across the country.']) + ' There are ' + pool.length + ' active alerts' + (st2 ? ' in ' + (STATE_NAMES[st2] || st2) : ' nationwide') + '.'
+        + (common.length ? ' The most common: ' + listWords(common) + '.' : '')
+        + (wis?.loaded && Math.random() < 0.5 ? ' The Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.' : ''));
     };
     const outlookShot = () => {
       const list = outlooks();
@@ -1744,6 +1793,10 @@
         + '<div class="rows">' + risks.map((r) => '<div class="rowi" style="--rc:' + esc(r.a.accent || r.a.color) + '"><i></i><b>' + esc(RISK_NAMES[r.risk] || r.risk) + '</b><span>' + esc(r.risk) + '</span></div>').join('') + '</div>', top?.a.color || '#55bb55');
       fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 6 });
       setNow({ k: 'OUTLOOK', title: 'Storm Prediction Center: ' + (RISK_NAMES[top?.risk] || 'Day 1 outlook'), color: top?.a.color || '#55bb55', crawl: risks.map((r) => RISK_NAMES[r.risk] || r.risk).join(' · ') });
+      if (top) {
+        const risk = (RISK_NAMES[top.risk] || top.risk).toLowerCase();
+        chatter('Here’s the Storm Prediction Center’s day one outlook. ' + (top.risk === 'TSTM' ? 'Just general thunderstorms today, nothing organized.' : 'The highest risk today is ' + article(risk) + ' ' + risk + ' for severe storms.'));
+      }
     };
     const reportsShot = () => {
       const reports = [...(S.live?.reports || [])].sort((x, y) => Date.parse(y.time) - Date.parse(x.time));
@@ -1752,6 +1805,7 @@
         + '<div class="rows">' + latest.map((r) => '<div class="rowi" style="--rc:' + (REPORT_COLORS[r.type] || '#fff') + '"><i></i><b>' + esc(reportLabel(r) + ' · ' + r.city + ', ' + r.state) + '</b><span>' + esc(ago(r.time)) + '</span></div>').join('') + '</div>', '#ffd34d');
       const b = bboxOf({ type: 'MultiPoint', coordinates: reports.map((r) => [r.lon, r.lat]) });
       fly(b, { padding: { top: 160, bottom: 150, left: 620, right: 640 }, maxZoom: 7 });
+      if (reports[0]) chatter(pick(['Let’s look at storm reports.', 'Here are the latest storm reports.']) + ' There ' + (reports.length === 1 ? 'has been one' : 'have been ' + reports.length) + ' in the last three hours. The most recent: ' + reportWords(reports[0]) + ' near ' + reportCity(reports[0]) + ', ' + (STATE_NAMES[reports[0].state] || reports[0].state) + ', ' + agoWords(reports[0].time) + '.');
       setNow({ k: 'REPORTS', title: reports.length + ' storm reports in the last 3 hours', color: '#ffd34d', crawl: latest.map((r) => r.type + ' · ' + r.city + ', ' + r.state + (r.remark ? ' — ' + r.remark : '')).join('   ◆   ') });
     };
 
@@ -1844,10 +1898,12 @@
         });
         // Talk about each storm once per advisory.
         const said = st.id + ':' + st.advisoryNumber;
-        if (!S.spoken.has(said)) {
+        if (S.spoken.has(said)) {
+          chatter(pick(['Another look at ', 'Checking back on ', 'Here’s ']) + stormTitle(st) + (mph != null ? ', still ' + mph + ' miles per hour' : '') + (st.movementCompass ? ' and moving ' + compassWords(st.movementCompass) : '') + '.');
+        } else {
           S.spoken.add(said);
           let text = (S.tcIdx === 0 ? 'Let’s check the tropics. ' : 'Next up in the tropics. ') + stormTitle(st) + ' is ' + (st.category ? article(String(st.category)) + ' category ' + st.category + ' hurricane' : 'a ' + st.classificationLabel.toLowerCase()) + ' in the ' + st.basin + (mph != null ? ', with maximum sustained winds of ' + mph + ' miles per hour' : '') + '.';
-          if (st.movementCompass) text += ' It is moving ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' }[st.movementCompass] || st.movementCompass.split('').map((c) => ({ N: 'north', S: 'south', E: 'east', W: 'west' })[c]).join(' ')) + ' at ' + st.movementSpeedMph + ' miles per hour.';
+          if (st.movementCompass) text += ' It is moving ' + compassWords(st.movementCompass) + ' at ' + st.movementSpeedMph + ' miles per hour.';
           if (peak && mph != null && peak >= mph + 10) text += ' The National Hurricane Center forecasts it to strengthen, peaking near ' + peak + ' miles per hour.';
           else if (peak && mph != null && peak <= mph) text += ' The National Hurricane Center forecasts it to hold steady or weaken.';
           if (wwTypes.length) text += ' ' + wwTypes.map((k) => WW_NAMES[k] + 's').join(' and ') + ' are in effect along the coast.';
@@ -1871,6 +1927,235 @@
         const top = areas[0].properties;
         say('Let’s check the tropics. There are no named storms right now. The National Hurricane Center is watching ' + areas.length + ' area' + (areas.length === 1 ? '' : 's') + '. The best chance is in the ' + top.basin + ', with a ' + parseInt(top.prob7day, 10) + ' percent chance of development over the next 7 days.');
       }
+    };
+
+    /* ---------------- WeBot talks on every shot ---------------- */
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    // Commentary never piles up: if WeBot is still talking, the new line is skipped.
+    const chatter = (text) => { if (text && !speech.busy && !speech.queue.length) say(text); };
+    const listWords = (items) => (items.length <= 1 ? items[0] || '' : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1]);
+    const plural = (w) => (/[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(s|ch|sh|x)$/.test(w) ? w + 'es' : w + 's');
+    const COMPASS = { N: 'north', S: 'south', E: 'east', W: 'west' };
+    const compassWords = (c) => (c.length === 3 ? COMPASS[c[0]] + ' ' + COMPASS[c[1]] + COMPASS[c[2]] : c.split('').map((x) => COMPASS[x]).join(''));
+    const titleCase = (text) => String(text || '')
+      .replace(/\bAFB\b/g, 'Air Force Base')
+      .replace(/\s*&\s*/g, ' and ')
+      .replace(/\b[A-Z][A-Z'.]+\b/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+    const placeOf = (a) => titleCase((a.area && a.area.length <= 60 ? a.area : stateLine(a) || a.place || a.area || '')
+      .replace(/,\s*([A-Z]{2})\b/g, (m, st) => ', ' + (STATE_NAMES[st] || st)).replace(/\s*\/\s*/g, ' and '));
+    const minutesLeft = (iso) => {
+      const m = Math.round((Date.parse(iso || '') - Date.now()) / 60000);
+      if (!Number.isFinite(m) || m <= 0) return '';
+      if (m < 60) return m + ' minute' + (m === 1 ? '' : 's');
+      const h = Math.floor(m / 60);
+      return h + ' hour' + (h === 1 ? '' : 's') + (m % 60 >= 10 ? ' and ' + (m % 60) + ' minutes' : '');
+    };
+    const agoWords = (iso) => {
+      const m = Math.round((Date.now() - Date.parse(iso || '')) / 60000);
+      return !Number.isFinite(m) ? '' : m < 2 ? 'just now' : m < 60 ? m + ' minutes ago' : Math.floor(m / 60) + ' hour' + (m >= 120 ? 's' : '') + ' ago';
+    };
+    const HAIL_NAMES = [[4.5, 'softball'], [4, 'grapefruit'], [3, 'teacup'], [2.75, 'baseball'], [2.5, 'tennis ball'], [2, 'hen egg'], [1.75, 'golf ball'], [1.5, 'ping pong ball'], [1.25, 'half dollar'], [1, 'quarter'], [0.88, 'nickel'], [0.75, 'penny']];
+    const hazardWords = (a) => (a.hazards || []).map((h) => {
+      const v = String(h.value || '');
+      const label = String(h.label || '').toUpperCase();
+      if (label === 'HAIL') {
+        const n = parseFloat(v);
+        const name = n && (HAIL_NAMES.find(([size]) => n >= size - 0.01) || [])[1];
+        return n ? (name ? name + ' size hail' : n + ' inch hail') : '';
+      }
+      if (label === 'WIND' || label === 'GUSTS') { const n = parseInt(v, 10); return n ? 'wind gusts up to ' + n + ' miles per hour' : ''; }
+      if (label === 'TORNADO') return /OBSERVED/i.test(v) ? 'an observed tornado' : /RADAR/i.test(v) ? 'a radar indicated tornado' : /POSSIBLE/i.test(v) ? 'a possible tornado' : '';
+      return '';
+    }).filter(Boolean);
+    const reportCity = (r) => String(r.city || '').replace(/^\d+(\.\d+)?\s+[NSEW]{1,3}\s+/, '');
+    const reportWords = (r) => {
+      const m = r.magnitude;
+      switch (r.type) {
+        case 'Hail': return (m ? m + ' inch ' : '') + 'hail';
+        case 'Wind': case 'Marine Wind': return m ? 'a ' + m + ' mile per hour wind gust' : 'damaging wind';
+        case 'Rain': return (m ? m + ' inches of ' : '') + 'rain';
+        case 'Snow': return (m ? m + ' inches of ' : '') + 'snow';
+        case 'Tornado': return 'a tornado';
+        case 'Funnel Cloud': return 'a funnel cloud';
+        case 'Flood': return 'flooding';
+        case 'Damage': return 'storm damage';
+        default: return String(r.type || 'a report').toLowerCase();
+      }
+    };
+    const reportsNear = (a) => {
+      const b = bboxOf(a.geometry);
+      if (!b) return [];
+      return (S.live?.reports || []).filter((r) => r.lon >= b[0][0] - 0.3 && r.lon <= b[1][0] + 0.3 && r.lat >= b[0][1] - 0.3 && r.lat <= b[1][1] + 0.3)
+        .sort((x, y) => Date.parse(y.time) - Date.parse(x.time));
+    };
+    const talked = new Map();
+    const alertTalk = (a, shot) => {
+      const prev = talked.get(a.key);
+      if (shot.pinned && prev && Date.now() - prev.at < 3 * 60 * 1000) return '';
+      const place = placeOf(a);
+      const ev = a.event.toLowerCase();
+      const left = minutesLeft(a.expiresAt);
+      const reports = reportsNear(a);
+      talked.set(a.key, { at: Date.now(), reports: reports.length });
+      if (prev && Date.now() - prev.at < 30 * 60 * 1000) {
+        let t = pick(['Back to', 'Another look at', 'Still watching', 'Checking back on']) + ' the ' + ev + ' for ' + place + '.';
+        if (left) t += ' It expires in ' + left + '.';
+        const fresh = reports.length - prev.reports;
+        if (fresh > 0) t += ' There ' + (fresh === 1 ? 'is a new storm report' : 'are ' + fresh + ' new storm reports') + ' nearby: ' + reportWords(reports[0]) + ' near ' + reportCity(reports[0]) + '.';
+        return t;
+      }
+      let t = pick(['Let’s go to ', 'Taking a look at ', 'Now over to ', 'Checking in on ', 'Heading to ']) + place + ', where ' + article(ev) + ' ' + ev + ' is in effect' + (a.times?.expires ? ' until ' + a.times.expires : '') + '.';
+      if (a.summary && /^at \d/i.test(a.summary)) t += ' ' + a.summary.split(/(?<=\.)\s/)[0];
+      const hz = hazardWords(a);
+      if (hz.length) t += ' ' + pick(['This storm could bring ', 'Hazards include ', 'Expect ']) + listWords(hz) + '.';
+      if (reports.length) t += ' There ' + (reports.length === 1 ? 'has been one storm report' : 'have been ' + reports.length + ' storm reports') + ' nearby in the last three hours, most recently ' + reportWords(reports[0]) + ' near ' + reportCity(reports[0]) + '.';
+      const site = nearestSite(centerOf(a));
+      if (site && Math.random() < 0.45) t += ' This is the ' + titleCase(site.name) + ' radar.';
+      if (a.people && a.rank <= 4) t += ' About ' + shortNum(a.people).replace('K', ' thousand').replace('M', ' million') + ' people are inside it.';
+      if (a.rank <= 2) t += ' If you are in this area, take shelter now.';
+      return t;
+    };
+
+    /* ---------------- live cameras (WeatherPower Traffic camera network) ---------------- */
+    const camCache = new Map();
+    let hlsReady = null;
+    const loadHls = () => hlsReady || (hlsReady = new Promise((resolve, reject) => {
+      const tag = document.createElement('script');
+      tag.src = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js';
+      tag.onload = () => resolve(window.Hls);
+      tag.onerror = reject;
+      document.head.appendChild(tag);
+    }));
+    const hideCam = () => {
+      clearTimeout(S.camTimer);
+      clearInterval(S.camRefresh);
+      S.camHls?.destroy?.();
+      S.camHls = null;
+      S.camMarker?.remove();
+      S.camMarker = null;
+      $('cam').classList.remove('show');
+      $('cam-feed').innerHTML = '';
+    };
+    const camImage = (url, fallback) => {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.src = url;
+      img.onerror = () => { if (fallback && img.src !== fallback) img.src = fallback; else hideCam(); };
+      return img;
+    };
+    const showCamFor = (a, shot) => {
+      if (S.camsOff) return;
+      const c = centerOf(a);
+      if (!c) return;
+      S.camTimer = setTimeout(async () => {
+        if (S.shot !== shot) return;
+        let body = camCache.get(a.key);
+        if (!body) {
+          try { body = await getJson('/api/v3/cameras/near?lat=' + c[1].toFixed(3) + '&lon=' + c[0].toFixed(3) + '&miles=30&limit=1'); } catch { return; }
+          camCache.set(a.key, body);
+          if (camCache.size > 80) camCache.delete(camCache.keys().next().value);
+        }
+        if (!body.configured) { S.camsOff = true; return; }
+        const cam = body.cameras?.[0];
+        if (!cam || S.shot !== shot) return;
+        const feed = $('cam-feed');
+        feed.innerHTML = '';
+        if (cam.kind === 'hls') {
+          const video = document.createElement('video');
+          video.muted = true; video.autoplay = true; video.playsInline = true;
+          feed.appendChild(video);
+          const bail = () => { feed.innerHTML = ''; if (cam.snapshot) feed.appendChild(camImage(cam.snapshot)); else hideCam(); };
+          if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = cam.feed; video.onerror = bail; }
+          else {
+            try {
+              const Hls = await loadHls();
+              if (!Hls?.isSupported()) { bail(); return; }
+              S.camHls = new Hls({ maxBufferLength: 10 });
+              S.camHls.on(Hls.Events.ERROR, (e, data) => { if (data.fatal) bail(); });
+              S.camHls.loadSource(cam.feed);
+              S.camHls.attachMedia(video);
+            } catch { bail(); return; }
+          }
+        } else {
+          feed.appendChild(camImage(cam.feed));
+          // Still cameras refresh every 20 seconds.
+          S.camRefresh = setInterval(() => {
+            const img = feed.querySelector('img');
+            if (img) img.src = cam.feed + (cam.feed.includes('?') ? '&' : '?') + '_wp=' + Date.now();
+          }, 20000);
+        }
+        $('cam-name').textContent = cam.name;
+        $('cam-sub').textContent = [cam.agency, cam.miles != null ? cam.miles + ' MI' : ''].filter(Boolean).join(' · ');
+        $('cam').classList.add('show');
+        const el = document.createElement('div');
+        el.className = 'cammk';
+        el.innerHTML = '<i></i><span>' + esc(cam.name) + '</span>';
+        S.camMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([cam.lon, cam.lat]).addTo(S.map);
+        if (Math.random() < 0.5) setTimeout(() => S.shot === shot && chatter('Here’s a live look from the ' + titleCase(cam.name) + ' camera.'), 6000);
+      }, 2600);
+    };
+
+    /* ---------------- national radar + WPC surface map ---------------- */
+    const loadSurface = async () => { S.surface = await getJson('/api/v3/surface'); };
+    const ensureSurfaceLayers = () => {
+      const map = S.map;
+      if (map.getSource('sfc')) return;
+      map.addSource('sfc', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      const color = ['match', ['get', 'type'], 'COLD', '#3f7bff', 'WARM', '#ff3b3b', 'STNRY', '#ff3b3b', 'OCFNT', '#b44dff', 'DRYLINE', '#c8a46e', '#ff9f2a'];
+      map.addLayer({ id: 'sfc-halo', type: 'line', source: 'sfc', filter: ['!=', ['get', 'type'], 'TROF'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#000', 'line-opacity': 0.45, 'line-width': 7 } }, 'a-case');
+      map.addLayer({ id: 'sfc-front', type: 'line', source: 'sfc', filter: ['!=', ['get', 'type'], 'TROF'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': color, 'line-width': 4 } }, 'a-case');
+      // Stationary fronts alternate red and blue.
+      map.addLayer({ id: 'sfc-stnry', type: 'line', source: 'sfc', filter: ['==', ['get', 'type'], 'STNRY'], paint: { 'line-color': '#3f7bff', 'line-width': 4, 'line-dasharray': [2, 2] } }, 'a-case');
+      map.addLayer({ id: 'sfc-trof', type: 'line', source: 'sfc', filter: ['==', ['get', 'type'], 'TROF'], paint: { 'line-color': '#ff9f2a', 'line-width': 2.2, 'line-dasharray': [3, 2.5], 'line-opacity': 0.9 } }, 'a-case');
+    };
+    const SFC_LAYERS = ['sfc-halo', 'sfc-front', 'sfc-stnry', 'sfc-trof'];
+    const hideSurface = () => {
+      (S.hlMarkers || []).forEach((m) => m.remove());
+      S.hlMarkers = [];
+      if (S.styleReady && S.map.getSource('sfc')) SFC_LAYERS.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+    };
+    const inView = (p) => p.lat > 15 && p.lat < 60 && p.lon > -140 && p.lon < -52;
+    const inConus = (p) => p.lat > 24 && p.lat < 50 && p.lon > -125 && p.lon < -66;
+    const placeNear = (lon, lat) => { const site = nearestSite([lon, lat]); return site ? titleCase(site.name) + ', ' + (STATE_NAMES[site.state] || site.state) : ''; };
+    const surfaceShot = () => {
+      const sf = S.surface;
+      setMood('calm');
+      ensureSurfaceLayers();
+      S.map.getSource('sfc').setData(sf.fronts);
+      SFC_LAYERS.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'visible'));
+      ['a-fill', 'a-case', 'a-line', 'w-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+      S.hlMarkers = [...sf.highs.filter(inView).map((p) => ['h', p]), ...sf.lows.filter(inView).map((p) => ['l', p])].map(([kind, p]) => {
+        const el = document.createElement('div');
+        el.className = 'hlmk ' + kind;
+        el.innerHTML = '<b>' + kind.toUpperCase() + '</b><small>' + p.mb + ' mb</small>';
+        return new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([p.lon, p.lat]).addTo(S.map);
+      });
+      fly(CONUS, { padding: { top: 110, bottom: 110, left: 140, right: 300 }, maxZoom: 5 });
+      // Bottom line: what's playing (like Ryan's quiet-mode bar), or the surface map itself.
+      const wisMode = S.live?.wis?.loaded ? S.live.wis.label.toUpperCase() : 'LIVE';
+      if (M.mode && M.playing) {
+        const [song, artist] = M.playing.includes(' · ') ? M.playing.split(' · ') : M.playing.split(' — ');
+        setNow({ k: 'NOW PLAYING', title: song, color: '#1a8cff', crawl: 'ARTIST NAME · ' + (artist || 'WEBOT RADIO').toUpperCase() + '      ◆      MODE · ' + wisMode + '      ◆      SURFACE MAP · NWS WEATHER PREDICTION CENTER' });
+      } else {
+        setNow({ k: 'NATIONAL RADAR', title: 'Radar and surface map', color: '#1a8cff', crawl: 'HIGHS, LOWS AND FRONTS · NWS WEATHER PREDICTION CENTER · MODE · ' + wisMode });
+      }
+      // WeBot's take, from the analysis itself.
+      const high = sf.highs.filter(inConus).sort((a, b) => b.mb - a.mb)[0];
+      const low = sf.lows.filter(inConus).sort((a, b) => a.mb - b.mb)[0];
+      const cold = sf.fronts.features.filter((x) => x.properties.type === 'COLD')
+        .map((x) => ({ x, pts: x.geometry.coordinates.filter(([lon, lat]) => inConus({ lon, lat })) }))
+        .filter((c) => c.pts.length >= 2).sort((a, b) => b.pts.length - a.pts.length)[0];
+      let text = pick(['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.']);
+      if (high) text += ' High pressure near ' + placeNear(high.lon, high.lat) + ', at ' + high.mb + ' millibars, is keeping things calm there.';
+      if (low) text += ' The strongest low over the lower 48 is near ' + placeNear(low.lon, low.lat) + ', at ' + low.mb + ' millibars.';
+      if (cold) {
+        const a = cold.pts[0];
+        const b = cold.pts[cold.pts.length - 1];
+        const from = placeNear(a[0], a[1]);
+        const to = placeNear(b[0], b[1]);
+        if (from && to && from !== to) text += ' A cold front stretches from ' + from + ' to ' + to + '.';
+      }
+      chatter(text);
     };
 
     /* ---------------- breaking + speech text ---------------- */
@@ -1952,7 +2237,7 @@
         for (const cmd of (S.control.commands || []).filter((c) => c.id > S.lastCmd)) {
           S.lastCmd = cmd.id;
           if (cmd.type === 'say') say(cmd.text);
-          else if (cmd.type === 'next') nextShot();
+          else if (cmd.type === 'next') nextShot(true);
           else if (cmd.type === 'reload') location.reload();
           else if (cmd.type === 'music-next') musicNext();
           else if (cmd.type === 'test-breaking') {
@@ -1968,7 +2253,7 @@
       if (prevRev >= 0 && prevRev !== S.control.rev && (prevCtl.pin !== S.control.pin || prevCtl.mode !== S.control.mode || prevCtl.state !== S.control.state)) {
         S.recent = [];
         buildHeadlines();
-        nextShot();
+        nextShot(true);
       }
     };
     const loadRadar = async () => {
@@ -2030,6 +2315,8 @@
       poll(loadLive, 6000);
       poll(loadRadar, 120000);
       loadTropics().catch(() => {});
+      loadSurface().catch(() => {});
+      poll(loadSurface, 15 * 60 * 1000);
       poll(loadTropics, 5 * 60 * 1000);
       // Give the neural voice a moment to load so the first line is in WeBot's real voice.
       const hello = Date.now();

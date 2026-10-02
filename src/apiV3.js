@@ -16,6 +16,8 @@ import {
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
 import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
+import { surfaceAnalysis } from './surface.js';
+import { camerasNear } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -305,6 +307,26 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=60');
       res.json(await siteRadar(req.query.site));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // WPC surface analysis (highs, lows, fronts) for the national radar shot.
+  router.get('/surface', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json(await surfaceAnalysis());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Nearest live cameras from the WeatherPower Traffic camera network.
+  router.get('/cameras/near', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json(await camerasNear({ lat: req.query.lat, lon: req.query.lon, miles: req.query.miles, limit: req.query.limit }));
     } catch (error) {
       next(error);
     }

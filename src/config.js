@@ -146,6 +146,14 @@ export const config = {
     instructions: process.env.OPENAI_TTS_INSTRUCTIONS || 'You are WeBot, a friendly robot weather broadcaster on a live stream. Speak clearly and calmly, upbeat but serious about dangerous weather.',
     dailyChars: Math.round(Math.max(0, number(process.env.OPENAI_TTS_DAILY_CHARS, 150000)))
   },
+  // WeatherPower Traffic camera network (Camera Wall). Use a viewer account from that app.
+  cameras: {
+    baseUrl: process.env.CAMERA_API_BASE || 'http://127.0.0.1:8778',
+    username: process.env.CAMERA_API_USER || '',
+    password: process.env.CAMERA_API_PASS || '',
+    noAuth: bool(process.env.CAMERA_API_NO_AUTH, false),
+    allowLocal: bool(process.env.CAMERA_ALLOW_LOCAL, false)
+  },
   controllerToken: process.env.CONTROLLER_TOKEN || '',
   dryRunDefault: bool(process.env.DRY_RUN_DEFAULT, false)
 };
