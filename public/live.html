@@ -77,10 +77,9 @@
     .tcmk i b { animation: tcspin 3s linear infinite reverse; }
     .tcmk span { font-family: "WP Display"; font-size: 24px; font-weight: 700; color: #fff; background: rgba(9,16,30,.86); padding: 4px 12px; border-left: 4px solid var(--tc, #ff9f2a); text-transform: uppercase; white-space: nowrap; }
     @keyframes tcspin { to { transform: rotate(360deg); } }
-    .spotmk { display: flex; align-items: center; gap: 8px; pointer-events: none; }
-    .spotmk i { width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #c99a3c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(0,0,0,.45); }
-    .spotmk.top i { background: #ffd34d; width: 18px; height: 18px; margin-left: -9px; }
-    .spotmk span { font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .1em; color: #fff; background: rgba(9,16,30,.86); padding: 4px 8px; border-left: 3px solid #ffd34d; white-space: nowrap; }
+    .spotpin { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #c99a3c; color: #111; font: 700 17px "WP Display"; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(0,0,0,.5); pointer-events: none; }
+    .spotpin.lead { background: #ffd34d; width: 36px; height: 36px; font-size: 20px; }
+    .rowi .n { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--rc); color: #111; font: 700 15px "WP Display"; }
     .rowi i { flex: none; width: 10px; height: 10px; background: var(--rc); }
     .rowi b { font-family: "WP Display"; font-size: 22px; font-weight: 500; text-transform: uppercase; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .rowi span { font-family: "WP Mono"; font-size: 13px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; text-transform: uppercase; }
@@ -1481,10 +1480,11 @@
     const showSpotMarkers = (seg) => {
       (S.spotMarkers || []).forEach((m) => m.remove());
       S.spotMarkers = (seg.spots || []).slice(0, 4).map((sp, k) => {
+        // Numbered pins match the numbered rows on the card, so labels never pile up on the map.
         const el = document.createElement('div');
-        el.className = 'spotmk' + (k === 0 ? ' top' : '');
-        el.innerHTML = '<i></i><span>' + esc(sp.place.split(',')[0].toUpperCase()) + ' · ' + esc(sp.display) + '</span>';
-        return new maplibregl.Marker({ element: el, anchor: 'left' }).setLngLat([sp.lon, sp.lat]).addTo(S.map);
+        el.className = 'spotpin' + (k === 0 ? ' lead' : '');
+        el.textContent = String(k + 1);
+        return new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([sp.lon, sp.lat]).addTo(S.map);
       });
     };
     const hideModels = () => {
@@ -1525,7 +1525,7 @@
       $('rp-lbl').innerHTML = legendLabels(f.legend || [], f.units).map((l) => '<span>' + esc(String(l).toUpperCase()) + '</span>').join('');
       $('rp-state').textContent = 'MODEL STUDIO';
       const shortPlace = (p) => String(p || '').replace(/, ([A-Za-z .]+)$/, (m, st) => ', ' + (Object.keys(STATE_NAMES).find((k) => STATE_NAMES[k] === st) || st));
-      const spotRows = (seg.spots || []).slice(0, 4).map((sp, k) => '<div class="rowi" style="--rc:' + (k === 0 ? '#ffd34d' : '#8a6a2a') + '"><i></i><b>' + esc(shortPlace(sp.place)) + '</b><em>' + esc(sp.display) + '</em></div>').join('');
+      const spotRows = (seg.spots || []).slice(0, 4).map((sp, k) => '<div class="rowi" style="--rc:' + (k === 0 ? '#ffd34d' : '#c99a3c') + '"><span class="n">' + (k + 1) + '</span><b>' + esc(shortPlace(sp.place)) + '</b><em>' + esc(sp.display) + '</em></div>').join('');
       const rows = seg.compare.map((c) => '<div class="rowi" style="--rc:' + (c.model === seg.model ? '#1a8cff' : '#5d6f8d') + '"><i></i><b>' + esc(c.name) + '</b>' + (c.value == null ? '<span>' + esc(c.note || 'n/a') + '</span>' : '<em>' + esc(c.display) + '</em>') + '</div>').join('');
       const horizon = seg.horizonH <= 24 ? 'NEXT ' + seg.horizonH + ' HRS' : 'NEXT ' + Math.round(seg.horizonH / 24) + ' DAYS';
       const skewt = S.soundings && ['cape', 'refc', 'uh'].includes(f.key) && seg.spot
@@ -1538,7 +1538,7 @@
         + '<div class="rows">' + rows + '</div>' + skewt, '#1a8cff');
       showSpotMarkers(seg);
       setNow({ k: 'MODELS', title: seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name) + ' · ' + horizon, color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
-      fly(CONUS, { padding: { top: 110, bottom: 100, left: 580, right: 110 }, maxZoom: 5.2, duration: 2400 });
+      fly(CONUS, { padding: { top: 120, bottom: 130, left: 580, right: 300 }, maxZoom: 5.2, duration: 2400 });
       // Loop through the frames that have finished loading; hold on the last one.
       let i = 0;
       let hold = 0;
