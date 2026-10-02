@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
-import { dataDir, ensureRuntimeDirs, replaceFile } from './paths.js';
+import { dataDir, ensureRuntimeDirs, publicDir, replaceFile } from './paths.js';
 import { fetchStormReports } from './localWeather.js';
 
 const IEM = 'https://mesonet.agron.iastate.edu';
@@ -221,17 +221,72 @@ export const siteRadar = async (siteInput) => {
 
 /* ---------------- stream control ---------------- */
 
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, commands: [] };
+export const MUSIC_SOURCES = ['auto', 'radio', 'files'];
+export const MUSIC_MOODS = ['auto', 'calm', 'chill', 'tense'];
+export const TTS_ENGINES = ['neural', 'openai', 'browser'];
+// Kokoro voices (free, run inside the stream page). The af_/am_ ones are American, bf_/bm_ British.
+export const NEURAL_VOICES = [
+  'am_michael', 'am_fenrir', 'am_puck', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'am_adam',
+  'af_heart', 'af_bella', 'af_nicole', 'af_aoede', 'af_kore', 'af_sarah', 'af_nova', 'af_sky', 'af_alloy', 'af_jessica', 'af_river',
+  'bm_george', 'bm_fable', 'bm_lewis', 'bm_daniel', 'bf_emma', 'bf_isabella', 'bf_alice', 'bf_lily'
+];
+export const OPENAI_VOICES = ['onyx', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'sage', 'shimmer', 'alloy', 'verse'];
+
+const DEFAULT_MUSIC = { on: true, volume: 35, source: 'auto', mood: 'auto', duck: true };
+const DEFAULT_TTS = { engine: 'neural', voice: 'am_michael', openaiVoice: 'onyx', speed: 1 };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, commands: [] };
 let control = null;
 
 const loadControl = async () => {
   if (control) return control;
   try {
-    control = { ...DEFAULT_CONTROL, ...JSON.parse(await fs.readFile(controlPath, 'utf8')) };
+    const saved = JSON.parse(await fs.readFile(controlPath, 'utf8'));
+    control = { ...DEFAULT_CONTROL, ...saved, music: { ...DEFAULT_MUSIC, ...saved.music }, tts: { ...DEFAULT_TTS, ...saved.tts } };
   } catch {
     control = { ...DEFAULT_CONTROL };
   }
   return control;
+};
+
+// The stream page reports what it is playing on every poll so the control panel can show it.
+// Memory only: it is just a display hint, and anyone can load the stream page.
+let streamBeat = null;
+export const noteStreamBeat = (query = {}) => {
+  if (!query.np && !query.tts) return;
+  const clip = (value, max) => String(value || '').replace(/[\u0000-\u001f]/g, '').slice(0, max);
+  streamBeat = {
+    at: new Date().toISOString(),
+    playing: clip(query.np, 90),
+    mood: MUSIC_MOODS.includes(query.mood) ? query.mood : '',
+    tts: clip(query.tts, 40)
+  };
+};
+
+/* ---------------- background music files ---------------- */
+
+const MUSIC_EXT = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|webm)$/i;
+const musicDir = path.join(publicDir, 'music');
+let musicCache = { at: 0, tracks: [] };
+
+// "Artist - Title.mp3" shows as Title by Artist. Leading track numbers ("03 ") are dropped.
+export const trackTitle = (file) => {
+  const base = file.replace(MUSIC_EXT, '').replace(/^\d{1,3}[\s._-]+/, '').replace(/_/g, ' ').trim();
+  const [artist, ...rest] = base.split(/\s+-\s+/);
+  return rest.length ? { title: rest.join(' - '), artist } : { title: base, artist: '' };
+};
+
+export const musicTracks = async () => {
+  if (Date.now() - musicCache.at < 60 * 1000) return musicCache.tracks;
+  let files = [];
+  try {
+    files = (await fs.readdir(musicDir, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && MUSIC_EXT.test(entry.name))
+      .map((entry) => entry.name)
+      .sort();
+  } catch {}
+  const tracks = files.map((file) => ({ ...trackTitle(file), url: '/public/music/' + encodeURIComponent(file) }));
+  musicCache = { at: Date.now(), tracks };
+  return tracks;
 };
 
 const saveControl = async () => {
@@ -247,7 +302,8 @@ export const liveControl = async () => {
   return {
     ...current,
     banner: current.banner && Date.parse(current.banner.until) > now ? current.banner : null,
-    commands: current.commands.filter((command) => now - Date.parse(command.at) < 5 * 60 * 1000)
+    commands: current.commands.filter((command) => now - Date.parse(command.at) < 5 * 60 * 1000),
+    stream: streamBeat && now - Date.parse(streamBeat.at) < 60 * 1000 ? streamBeat : null
   };
 };
 
@@ -300,6 +356,28 @@ export const applyLiveCommand = async (body = {}) => {
     case 'reload':
       pushCommand({ type: 'reload' });
       break;
+    case 'music': {
+      const music = { ...current.music };
+      if ('on' in body) music.on = Boolean(body.on);
+      if ('volume' in body) music.volume = Math.round(Math.min(100, Math.max(0, Number(body.volume) || 0)));
+      if (MUSIC_SOURCES.includes(body.source)) music.source = body.source;
+      if (MUSIC_MOODS.includes(body.mood)) music.mood = body.mood;
+      if ('duck' in body) music.duck = Boolean(body.duck);
+      current.music = music;
+      break;
+    }
+    case 'music-next':
+      pushCommand({ type: 'music-next' });
+      break;
+    case 'tts': {
+      const tts = { ...current.tts };
+      if (TTS_ENGINES.includes(body.engine)) tts.engine = body.engine;
+      if (NEURAL_VOICES.includes(body.voice)) tts.voice = body.voice;
+      if (OPENAI_VOICES.includes(body.openaiVoice)) tts.openaiVoice = body.openaiVoice;
+      if ('speed' in body) tts.speed = Math.round(Math.min(1.4, Math.max(0.7, Number(body.speed) || 1)) * 100) / 100;
+      current.tts = tts;
+      break;
+    }
     default:
       throw Object.assign(new Error(`Unknown action "${action}"`), { status: 400 });
   }

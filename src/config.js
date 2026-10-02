@@ -136,6 +136,16 @@ export const config = {
     dataBase: process.env.WEATHERPOWER_API_BASE || 'https://weatherpower.app/wpcc-api',
     renderBase: process.env.WEATHERPOWER_RENDER_BASE || 'https://weatherpower.app/wpcc-render'
   },
+  // Optional WeBot voice through an OpenAI-compatible /audio/speech endpoint. OpenAI itself is paid;
+  // OPENAI_TTS_BASE_URL can point at a free self-hosted server (e.g. Kokoro-FastAPI) instead.
+  openaiTts: {
+    key: process.env.OPENAI_API_KEY || '',
+    baseUrl: process.env.OPENAI_TTS_BASE_URL || 'https://api.openai.com/v1',
+    model: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
+    voice: process.env.OPENAI_TTS_VOICE || 'onyx',
+    instructions: process.env.OPENAI_TTS_INSTRUCTIONS || 'You are WeBot, a friendly robot weather broadcaster on a live stream. Speak clearly and calmly, upbeat but serious about dangerous weather.',
+    dailyChars: Math.round(Math.max(0, number(process.env.OPENAI_TTS_DAILY_CHARS, 150000)))
+  },
   controllerToken: process.env.CONTROLLER_TOKEN || '',
   dryRunDefault: bool(process.env.DRY_RUN_DEFAULT, false)
 };

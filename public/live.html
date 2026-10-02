@@ -97,6 +97,8 @@
     .reportchip { position: absolute; left: 32px; bottom: 100px; z-index: 11; display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--edge); font-family: "WP Display"; font-size: 24px; font-weight: 700; color: #fff; }
     .reportchip svg { color: #ffc23d; }
     .reportchip small { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); font-weight: 600; }
+    .np { position: absolute; right: 300px; bottom: 104px; z-index: 11; display: none; font-family: "WP Mono"; font-size: 12px; font-weight: 700; letter-spacing: .14em; color: rgba(255,255,255,.75); padding: 5px 10px; background: rgba(9,16,30,.8); border: 1px solid rgba(255,255,255,.12); border-left: 3px solid #33d4ff; white-space: nowrap; }
+    .np.show { display: block; }
     .attrib { position: absolute; right: 300px; bottom: 86px; z-index: 11; font-family: "WP Mono"; font-size: 10px; color: rgba(255,255,255,.45); letter-spacing: .04em; }
     .sitemark { display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
     .sitemark i { width: 13px; height: 13px; border-radius: 50%; background: #3fb7ff; border: 2px solid #fff; }
@@ -206,6 +208,7 @@
     </section>
 
     <div class="reportchip" id="reportchip"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span id="rc-n">0</span><small>STORM REPORTS · 3 HRS</small></div>
+    <div class="np" id="np"></div>
     <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
 
     <div class="bot" id="bot" aria-hidden="true"></div>
@@ -238,6 +241,8 @@
       bot: P.get('bot') !== '0',
       hat: P.get('hat') !== '0',
       tips: P.get('tips') !== '0',
+      music: P.get('music') !== '0',
+      tts: ['neural', 'openai', 'browser'].includes(P.get('tts')) ? P.get('tts') : '',
       speed: Math.min(3, Math.max(0.4, Number(P.get('speed')) || 1)),
       tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone
     };
@@ -472,24 +477,93 @@
 
     const bot = $('bot');
     // WeBot never shows text bubbles; it only talks. With voice off it just animates.
-    const showBubble = () => {};
     const speech = { queue: [], busy: false, guard: null };
     const speechWorks = () => window.speechSynthesis && voices.length > 0;
-    const pumpSpeech = () => {
-      if (speech.busy || !speech.queue.length) return;
-      const item = speech.queue.shift();
-      speech.busy = true;
-      const done = () => {
-        clearTimeout(speech.guard);
-        if (!speech.busy) return;
-        speech.busy = false;
-        if (!speech.queue.length) bot.classList.remove('talk');
-        setTimeout(pumpSpeech, 180);
+
+    // WeBot's voice, best first: a free neural voice (Kokoro, running right here in the page), an
+    // OpenAI-compatible voice through the server, then the computer's own speech voices.
+    const ttsCfg = () => ({ engine: 'neural', voice: 'am_michael', openaiVoice: 'onyx', speed: 1, ...(S.control.tts || {}), ...(OPT.tts ? { engine: OPT.tts } : {}) });
+    const voiceBus = actx ? actx.createGain() : null;
+    voiceBus?.connect(actx.destination);
+    const KOKORO_JS = 'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js';
+    const neural = { worker: null, state: 'off', device: '', seq: 0, waits: new Map() };
+    const startNeural = () => {
+      if (neural.worker || neural.state === 'failed' || !actx || typeof Worker === 'undefined') return;
+      // The model (~90 MB) downloads once and is cached by the browser. It runs in a worker so
+      // the map never stutters while WeBot thinks of the words.
+      const src = `import { KokoroTTS } from '${KOKORO_JS}';
+        const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+        let tts = null;
+        const load = (async () => {
+          tts = await KokoroTTS.from_pretrained(MODEL, { dtype: 'q8', device: 'wasm' });
+          postMessage({ type: 'ready', device: 'wasm' });
+        })().catch((e) => postMessage({ type: 'failed', error: String((e && e.message) || e) }));
+        onmessage = async (event) => {
+          const { id, text, voice, speed } = event.data;
+          try {
+            await load;
+            const out = await tts.generate(text, { voice, speed });
+            postMessage({ type: 'audio', id, samples: out.audio, rate: out.sampling_rate }, [out.audio.buffer]);
+          } catch (e) {
+            postMessage({ type: 'audio', id, error: String((e && e.message) || e) });
+          }
+        };`;
+      try {
+        neural.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })), { type: 'module' });
+      } catch (error) {
+        neural.state = 'failed';
+        return;
+      }
+      neural.state = 'loading';
+      neural.worker.onmessage = ({ data }) => {
+        if (data.type === 'ready') { neural.state = 'ready'; neural.device = data.device; return; }
+        if (data.type === 'failed') {
+          console.warn('Neural voice unavailable:', data.error);
+          neural.state = 'failed';
+          neural.worker.terminate();
+          neural.waits.forEach((w) => w.reject(new Error(data.error)));
+          neural.waits.clear();
+          return;
+        }
+        const wait = neural.waits.get(data.id);
+        if (!wait) return;
+        neural.waits.delete(data.id);
+        if (data.error) { wait.reject(new Error(data.error)); return; }
+        const buffer = actx.createBuffer(1, data.samples.length, data.rate);
+        buffer.copyToChannel(data.samples, 0);
+        wait.resolve(buffer);
       };
-      // Spoken lines never get a caption.
+      neural.worker.onerror = (event) => { console.warn('Neural voice worker error:', event.message); neural.state = 'failed'; };
+    };
+    const neuralAudio = (text, voice, speed) => new Promise((resolve, reject) => {
+      const id = ++neural.seq;
+      neural.waits.set(id, { resolve, reject });
+      neural.worker.postMessage({ id, text, voice, speed });
+    });
+    // Starts making the audio as soon as a line is queued, so the next sentence is ready when this one ends.
+    const synth = (text) => {
+      const cfg = ttsCfg();
+      if (cfg.engine === 'neural' && neural.state === 'ready') return neuralAudio(text, cfg.voice, cfg.speed);
+      if (cfg.engine === 'openai' && S.openaiVoice) {
+        return fetch(BASE + '/api/v3/live/tts?' + new URLSearchParams({ text, voice: cfg.openaiVoice, speed: cfg.speed }))
+          .then((r) => { if (!r.ok) throw new Error('voice ' + r.status); return r.arrayBuffer(); })
+          .then((bytes) => actx.decodeAudioData(bytes));
+      }
+      return null;
+    };
+    const ttsLabel = () => {
+      const cfg = ttsCfg();
+      if (cfg.engine === 'neural') return 'neural ' + neural.state + ' · ' + cfg.voice;
+      if (cfg.engine === 'openai') return S.openaiVoice ? 'openai · ' + cfg.openaiVoice : 'openai not set up';
+      return 'computer voice';
+    };
+    const canNeural = () => (ttsCfg().engine === 'neural' && neural.state === 'ready') || (ttsCfg().engine === 'openai' && S.openaiVoice);
+
+    const browserSpeak = (item, done) => {
+      if (!speechWorks()) { done(); return; }
       const utter = new SpeechSynthesisUtterance(item.text);
       utter.voice = pickVoice();
-      utter.rate = 1.04;
+      utter.rate = 1.04 * (ttsCfg().speed || 1);
       utter.pitch = 1.02;
       utter.onstart = () => bot.classList.add('talk');
       utter.onend = done;
@@ -497,17 +571,52 @@
       speech.guard = setTimeout(() => { speechSynthesis.cancel(); done(); }, 4000 + item.text.length * 95);
       speechSynthesis.speak(utter);
     };
-    // Sentences go out one at a time: Chrome cuts off long single utterances.
-    const say = (text, { label } = {}) => {
+    const pumpSpeech = async () => {
+      if (speech.busy || !speech.queue.length) return;
+      const item = speech.queue.shift();
+      speech.busy = true;
+      let finished = false;
+      const done = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(speech.guard);
+        speech.busy = false;
+        if (!speech.queue.length) bot.classList.remove('talk');
+        setTimeout(pumpSpeech, 160);
+      };
+      // Spoken lines never get a caption.
+      if (item.audio) {
+        try {
+          const buffer = await Promise.race([item.audio, new Promise((resolve, reject) => setTimeout(() => reject(new Error('timed out')), 30000))]);
+          const source = actx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(voiceBus);
+          source.onended = done;
+          bot.classList.add('talk');
+          source.start();
+          speech.guard = setTimeout(done, buffer.duration * 1000 + 2000);
+          return;
+        } catch (error) {
+          console.warn('Voice fell back to the computer voice:', error.message);
+        }
+      }
+      browserSpeak(item, done);
+    };
+    // Sentences go out one at a time: Chrome cuts off long single utterances, and short lines
+    // let the neural voice start talking sooner.
+    const say = (text) => {
       if (!text) return;
-      if (!voiceOn() || !speechWorks() || (actx && actx.state !== 'running')) {
-        showBubble(text, Math.min(16000, 4000 + text.length * 55), label);
+      if (!voiceOn() || !(canNeural() || speechWorks()) || (actx && actx.state !== 'running')) {
         bot.classList.add('talk');
         setTimeout(() => bot.classList.remove('talk'), Math.min(6000, 1200 + text.length * 30));
         return;
       }
       const parts = speakable(text).match(/[^.!?]+[.!?]*/g) || [speakable(text)];
-      parts.map((p) => p.trim()).filter(Boolean).forEach((p, i) => speech.queue.push({ text: p, full: text, first: i === 0, label }));
+      parts.map((p) => p.trim()).filter(Boolean).forEach((p) => {
+        const audio = synth(p);
+        audio?.catch(() => {});
+        speech.queue.push({ text: p, audio });
+      });
       pumpSpeech();
     };
 
@@ -524,6 +633,374 @@
     });
     actx?.resume?.().catch(() => {});
     setTimeout(checkAudio, 1200);
+
+    /* ---------------- background music ---------------- */
+    // WeBot Radio is lo-fi music composed live in the page (electric piano, pads, bass, soft drums,
+    // vinyl crackle): free, endless, and nothing for YouTube Content ID to flag. Its mood follows
+    // the weather. Your own tracks in public/music can play instead.
+    const RADIO_NAMES = {
+      calm: ['Clear Skies', 'Dew Point', 'Warm Front', 'High Pressure', 'Fair Weather', 'Morning Fog', 'Light Breeze', 'Sunday Radar'],
+      chill: ['Night Shift', 'Overnight Radar', 'Low Clouds', 'Outflow', 'Mesoscale', 'Watch Box', 'Chaser Coffee', 'Data Feed'],
+      tense: ['Supercell Season', 'Hook Echo', 'Wall Cloud', 'Dryline', 'Rear Flank', 'Couplet', 'Inflow', 'Bounded Weak Echo']
+    };
+    const CHORDS = { maj7: [0, 4, 7, 11], maj9: [0, 4, 7, 11, 14], m7: [0, 3, 7, 10], m9: [0, 3, 7, 10, 14], m11: [0, 3, 7, 10, 14, 17], dom9: [0, 4, 7, 10, 14], sus: [0, 5, 7, 10, 14] };
+    const PROGS = {
+      calm: [[[0, 'maj9'], [9, 'm9'], [2, 'm9'], [7, 'sus']], [[5, 'maj9'], [4, 'm7'], [2, 'm9'], [0, 'maj9']], [[0, 'maj7'], [5, 'maj9'], [9, 'm9'], [5, 'maj9']]],
+      chill: [[[2, 'm9'], [7, 'dom9'], [0, 'maj9'], [9, 'm9']], [[9, 'm9'], [5, 'maj9'], [0, 'maj7'], [7, 'sus']], [[4, 'm7'], [9, 'm9'], [2, 'm9'], [7, 'dom9']]],
+      tense: [[[0, 'm9'], [8, 'maj7'], [5, 'm9'], [7, 'm7']], [[0, 'm11'], [0, 'm11'], [8, 'maj9'], [10, 'sus']], [[0, 'm9'], [3, 'maj7'], [8, 'maj7'], [7, 'sus']]]
+    };
+    const STYLES = {
+      calm: { bpm: [70, 78], keys: [60, 62, 65, 67], bars: 2, kick: '1000000000100000', snare: '0000100000001000', hat: '1010101010101010', stab: [0], mel: 0.16, scale: [0, 2, 4, 7, 9], pad: 0.7, tone: 6200 },
+      chill: { bpm: [80, 88], keys: [57, 60, 62, 64], bars: 1, kick: '1000000010100000', snare: '0000100000001000', hat: '1111111111111111', stab: [0, 6, 11], mel: 0.2, scale: [0, 2, 4, 7, 9], pad: 0.5, tone: 7000 },
+      tense: { bpm: [64, 70], keys: [57, 55, 52, 50], bars: 2, kick: '1000000010000000', snare: '0000000000001000', hat: '0010001000100010', stab: [], arp: true, mel: 0.07, scale: [0, 3, 5, 7, 10], pad: 1, tone: 3800 }
+    };
+    const makeRadio = (ctx, out, opts = {}) => {
+      const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      const pick = (list) => list[Math.floor(Math.random() * list.length)];
+      const rate = ctx.sampleRate;
+      const noise = ctx.createBuffer(1, rate, rate);
+      { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+      const ir = ctx.createBuffer(2, Math.floor(rate * 2.6), rate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2); }
+
+      const master = ctx.createGain();
+      master.gain.value = opts.gain ?? 0.8;
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass'; tone.frequency.value = 6200; tone.Q.value = 0.3;
+      const glue = ctx.createDynamicsCompressor();
+      glue.threshold.value = -20; glue.ratio.value = 3; glue.attack.value = 0.01; glue.release.value = 0.25;
+      master.connect(tone).connect(glue).connect(out);
+      const verbIn = ctx.createGain();
+      verbIn.gain.value = 0.3;
+      const verb = ctx.createConvolver();
+      verb.buffer = ir;
+      verbIn.connect(verb).connect(master);
+      const echo = ctx.createDelay(2);
+      const echoTone = ctx.createBiquadFilter();
+      echoTone.type = 'lowpass'; echoTone.frequency.value = 2400;
+      const echoFb = ctx.createGain();
+      echoFb.gain.value = 0.33;
+      echo.connect(echoTone).connect(echoFb).connect(echo);
+      echoTone.connect(master);
+      const drums = ctx.createBiquadFilter();
+      drums.type = 'lowpass'; drums.frequency.value = 5200;
+      drums.connect(master);
+      // Slow tape wobble on the keys.
+      const wob = ctx.createOscillator();
+      wob.frequency.value = 0.31;
+      const wobAmt = ctx.createGain();
+      wobAmt.gain.value = 6;
+      wob.connect(wobAmt);
+      wob.start();
+      const crackleBuf = ctx.createBuffer(1, rate * 3, rate);
+      { const d = crackleBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.02 + (Math.random() < 0.0004 ? (Math.random() * 2 - 1) * 0.7 : 0); }
+      const crackle = ctx.createBufferSource();
+      crackle.buffer = crackleBuf; crackle.loop = true;
+      const crackleTone = ctx.createBiquadFilter();
+      crackleTone.type = 'bandpass'; crackleTone.frequency.value = 3000; crackleTone.Q.value = 0.5;
+      const crackleGain = ctx.createGain();
+      crackleGain.gain.value = 0.06;
+      crackle.connect(crackleTone).connect(crackleGain).connect(master);
+      crackle.start();
+
+      const env = (param, t, peak, attack, decay, floor = 0.0001) => {
+        param.setValueAtTime(0.0001, t);
+        param.exponentialRampToValueAtTime(peak, t + attack);
+        param.exponentialRampToValueAtTime(Math.max(0.0001, floor), t + attack + decay);
+      };
+      const wobble = (osc) => {
+        wobAmt.connect(osc.detune);
+        osc.onended = () => { try { wobAmt.disconnect(osc.detune); } catch {} };
+      };
+      // Electric piano: a two-operator FM voice with a soft bell attack.
+      const ep = (m, t, dur, vel) => {
+        const f = mtof(m);
+        const car = ctx.createOscillator();
+        const mod = ctx.createOscillator();
+        car.frequency.value = f; mod.frequency.value = f;
+        const modDepth = ctx.createGain();
+        env(modDepth.gain, t, f * 1.3 * vel, 0.005, 0.6, f * 0.06);
+        mod.connect(modDepth).connect(car.frequency);
+        const g = ctx.createGain();
+        env(g.gain, t, 0.06 * vel, 0.006, dur);
+        car.connect(g);
+        g.connect(master); g.connect(verbIn);
+        wobble(car);
+        car.start(t); mod.start(t);
+        car.stop(t + dur + 0.1); mod.stop(t + dur + 0.1);
+      };
+      const bell = (m, t, vel) => {
+        const f = mtof(m);
+        const car = ctx.createOscillator();
+        const mod = ctx.createOscillator();
+        car.frequency.value = f; mod.frequency.value = f * 3.5;
+        const modDepth = ctx.createGain();
+        env(modDepth.gain, t, f * 0.9 * vel, 0.004, 0.35);
+        mod.connect(modDepth).connect(car.frequency);
+        const g = ctx.createGain();
+        env(g.gain, t, 0.045 * vel, 0.005, 1.3);
+        car.connect(g);
+        g.connect(master); g.connect(verbIn); g.connect(echo);
+        car.start(t); mod.start(t);
+        car.stop(t + 1.5); mod.stop(t + 1.5);
+      };
+      const pad = (notes, t, dur, level) => {
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(450, t);
+        filter.frequency.linearRampToValueAtTime(1000, t + dur * 0.5);
+        filter.frequency.linearRampToValueAtTime(550, t + dur + 0.8);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.014 * level, t + Math.min(1.4, dur * 0.4));
+        g.gain.setValueAtTime(0.014 * level, t + dur - 0.2);
+        g.gain.linearRampToValueAtTime(0, t + dur + 0.8);
+        filter.connect(g);
+        g.connect(master); g.connect(verbIn);
+        notes.slice(0, 4).forEach((m) => [-8, 8].forEach((cents) => {
+          const o = ctx.createOscillator();
+          o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = cents;
+          o.connect(filter);
+          o.start(t); o.stop(t + dur + 0.9);
+        }));
+      };
+      const bass = (m, t, dur, vel) => {
+        const tri = ctx.createOscillator();
+        const sub = ctx.createOscillator();
+        tri.type = 'triangle';
+        tri.frequency.value = mtof(m); sub.frequency.value = mtof(m);
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass'; filter.frequency.value = 380;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.2 * vel, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.11 * vel, t + 0.25);
+        g.gain.setValueAtTime(0.11 * vel, Math.max(t + 0.26, t + dur - 0.06));
+        g.gain.exponentialRampToValueAtTime(0.0001, Math.max(t + 0.32, t + dur));
+        tri.connect(filter); sub.connect(filter);
+        filter.connect(g).connect(master);
+        tri.start(t); sub.start(t);
+        tri.stop(t + dur + 0.4); sub.stop(t + dur + 0.4);
+      };
+      const hit = (t, freq, type, q, peak, decay, dest = drums) => {
+        const src = ctx.createBufferSource();
+        src.buffer = noise;
+        const filter = ctx.createBiquadFilter();
+        filter.type = type; filter.frequency.value = freq; filter.Q.value = q;
+        const g = ctx.createGain();
+        env(g.gain, t, peak, 0.002, decay);
+        src.connect(filter).connect(g).connect(dest);
+        src.start(t, Math.random() * 0.5, decay + 0.05);
+        return g;
+      };
+      const kick = (t, vel) => {
+        const o = ctx.createOscillator();
+        o.frequency.setValueAtTime(130, t);
+        o.frequency.exponentialRampToValueAtTime(46, t + 0.11);
+        const g = ctx.createGain();
+        env(g.gain, t, 0.7 * vel, 0.003, 0.4);
+        o.connect(g).connect(drums);
+        o.start(t); o.stop(t + 0.5);
+      };
+      const snare = (t, vel) => {
+        hit(t, 1700, 'bandpass', 0.7, 0.2 * vel, 0.2).connect(verbIn);
+        const o = ctx.createOscillator();
+        o.type = 'triangle'; o.frequency.value = 185;
+        const g = ctx.createGain();
+        env(g.gain, t, 0.09 * vel, 0.002, 0.09);
+        o.connect(g).connect(drums);
+        o.start(t); o.stop(t + 0.15);
+      };
+      const hat = (t, vel, open) => hit(t, 7200, 'highpass', 0.5, 0.05 * vel, open ? 0.22 : 0.04);
+
+      let track = null;
+      let step = 0;
+      let nextAt = ctx.currentTime + 0.1;
+      let wantMood = opts.mood || 'calm';
+      let melIdx = 2;
+      const voicing = (root, quality) => {
+        let base = root;
+        while (base > 55) base -= 12;
+        while (base < 48) base += 12;
+        return CHORDS[quality].map((iv) => base + iv);
+      };
+      const newTrack = (mood) => {
+        const style = STYLES[mood];
+        let name = pick(RADIO_NAMES[mood]);
+        if (track && name === track.name) name = pick(RADIO_NAMES[mood]);
+        track = { mood, style, name, key: pick(style.keys), bpm: Math.round(rnd(style.bpm[0], style.bpm[1])), prog: pick(PROGS[mood]), bars: 48 };
+        step = opts.skipIntro && !api.started ? 4 * 16 : 0;
+        api.started = true;
+        tone.frequency.setTargetAtTime(style.tone, Math.max(ctx.currentTime, nextAt), 1.5);
+        api.onTrack?.(track);
+      };
+      const playStep = (t) => {
+        const st = track.style;
+        const s16 = step % 16;
+        const bar = Math.floor(step / 16);
+        const sec16 = 60 / track.bpm / 4;
+        const [deg, quality] = track.prog[Math.floor(bar / st.bars) % track.prog.length];
+        const root = track.key + deg;
+        const notes = voicing(root, quality);
+        let low = root;
+        while (low > 45) low -= 12;
+        while (low < 33) low += 12;
+        const intro = bar < 4;
+        const outro = bar >= track.bars - 4;
+        const breakdown = bar >= 24 && bar < 28;
+        const drumsOn = !intro && !outro && !breakdown;
+        const fade = outro ? 1 - (bar - (track.bars - 4) + s16 / 16) / 5 : 1;
+        if (bar % st.bars === 0 && s16 === 0) pad(notes, t, sec16 * 16 * st.bars, st.pad * fade);
+        if (st.stab.includes(s16)) {
+          const first = s16 === 0;
+          const dur = first ? sec16 * 14 : sec16 * 5;
+          notes.forEach((m, i) => ep(m, t + i * 0.012, dur, (first ? 1 : 0.6) * rnd(0.8, 1) * fade));
+        }
+        if (st.arp && s16 % 2 === 0) ep(notes[(s16 / 2) % notes.length] + 12, t, sec16 * 3, 0.5 * rnd(0.8, 1) * fade);
+        if (s16 === 0) bass(low, t, sec16 * (st.arp ? 7 : st.bars === 2 ? 12 : 9), fade);
+        else if (st.arp && s16 % 4 === 0 && !intro) bass(low, t, sec16 * 1.8, 0.6 * fade);
+        else if (s16 === 10 && !st.arp && !intro) bass(low + (Math.random() < 0.5 ? 7 : 12), t, sec16 * 5, 0.7 * fade);
+        if (drumsOn) {
+          if (st.kick[s16] === '1') kick(t, rnd(0.85, 1));
+          else if ((s16 === 7 || s16 === 15) && Math.random() < 0.1) kick(t, 0.45);
+          if (st.snare[s16] === '1') snare(t, rnd(0.8, 1));
+          if (st.hat[s16] === '1') hat(t, (s16 % 4 === 0 ? 0.9 : s16 % 2 === 0 ? 0.65 : 0.4) * rnd(0.8, 1), s16 === 14 && Math.random() < 0.2);
+        }
+        if (!intro && s16 % 2 === 0 && Math.random() < st.mel * fade) {
+          melIdx = Math.max(0, Math.min(9, melIdx + pick([-2, -1, -1, 1, 1, 2])));
+          const scaleNote = st.scale[melIdx % 5] + 12 * Math.floor(melIdx / 5);
+          bell(track.key + 12 + scaleNote, t, rnd(0.5, 1));
+        }
+      };
+      const api = {
+        started: false,
+        onTrack: null,
+        get track() { return track; },
+        setMood(mood) { if (STYLES[mood]) wantMood = mood; },
+        next() { nextAt = Math.max(nextAt, ctx.currentTime + 0.05); newTrack(wantMood); },
+        // Schedule every note up to time `until` (seconds on the audio clock).
+        schedule(until) {
+          if (!track) newTrack(wantMood);
+          if (nextAt < ctx.currentTime - 0.2) nextAt = ctx.currentTime + 0.05;
+          while (nextAt < until) {
+            // Storms take over right away (at the next bar); calmer moods wait for the song to end.
+            if (step % 16 === 0 && track.mood !== wantMood && (wantMood === 'tense' || track.mood === 'tense')) newTrack(wantMood);
+            const sec16 = 60 / track.bpm / 4;
+            playStep(nextAt + (step % 2 ? sec16 * 0.22 : 0));
+            nextAt += sec16;
+            step += 1;
+            if (step >= track.bars * 16) newTrack(wantMood);
+          }
+        },
+        stop() {
+          try { crackle.stop(); wob.stop(); } catch {}
+          master.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+          setTimeout(() => { try { master.disconnect(); } catch {} }, 2000);
+        }
+      };
+      return api;
+    };
+    window.WeBotRadio = { makeRadio };
+
+    const musicCfg = () => ({ on: true, volume: 35, source: 'auto', mood: 'auto', duck: true, ...(S.control.music || {}) });
+    const M = { bus: null, duck: null, radio: null, timer: null, el: null, files: [], filesAt: 0, order: [], idx: -1, playing: '', mode: '', mood: '', fading: false, fails: 0 };
+    const autoMood = () => {
+      const t = S.live?.tallies || {};
+      const label = S.live?.index?.label || '';
+      if (S.inBreaking || t.tor || /SEVERE|EXTREME/.test(label)) return 'tense';
+      if (/BUSY/.test(label) || (t.svr || 0) + (t.ffw || 0) >= 8) return 'chill';
+      return 'calm';
+    };
+    const loadMusicFiles = async () => {
+      if (Date.now() - M.filesAt < 5 * 60 * 1000) return;
+      M.filesAt = Date.now();
+      try { M.files = (await getJson('/api/v3/live/music')).tracks || []; } catch {}
+    };
+    const renderNp = () => {
+      const np = $('np');
+      np.classList.toggle('show', Boolean(M.mode && M.playing));
+      np.textContent = M.playing ? '♪ ' + M.playing.toUpperCase() : '';
+    };
+    const nextFile = () => {
+      if (!M.files.length) return;
+      if (!M.el) {
+        M.el = new Audio();
+        M.el.preload = 'auto';
+        actx.createMediaElementSource(M.el).connect(M.bus);
+        M.el.onended = nextFile;
+        M.el.onplaying = () => { M.fails = 0; };
+        M.el.onerror = () => { if (++M.fails < 5) setTimeout(nextFile, 500); };
+      }
+      if (M.idx >= M.order.length - 1) {
+        const last = M.order[M.idx];
+        M.order = M.files.map((_, i) => i).sort(() => Math.random() - 0.5);
+        if (M.order.length > 1 && M.order[0] === last) M.order.push(M.order.shift());
+        M.idx = -1;
+      }
+      const t = M.files[M.order[++M.idx]];
+      M.el.src = BASE + t.url;
+      M.el.play().catch(() => {});
+      M.playing = t.title + (t.artist ? ' — ' + t.artist : '');
+      renderNp();
+    };
+    const startRadio = () => {
+      if (M.radio) return;
+      M.radio = makeRadio(actx, M.bus, { mood: M.mood });
+      M.radio.onTrack = (track) => { M.playing = track.name + ' · WeBot Radio'; renderNp(); };
+      M.radio.schedule(actx.currentTime + 0.4);
+      M.timer = setInterval(() => M.radio?.schedule(actx.currentTime + 0.4), 100);
+    };
+    const stopMusic = () => {
+      clearInterval(M.timer);
+      M.timer = null;
+      M.radio?.stop();
+      M.radio = null;
+      M.el?.pause();
+      M.mode = '';
+      M.playing = '';
+      renderNp();
+    };
+    const musicNext = () => {
+      if (M.mode === 'radio') M.radio?.next();
+      else if (M.mode === 'files') nextFile();
+    };
+    const musicTick = () => {
+      if (!actx) return;
+      if (!M.bus) {
+        M.bus = actx.createGain();
+        M.bus.gain.value = 0;
+        M.duck = actx.createGain();
+        M.bus.connect(M.duck).connect(actx.destination);
+      }
+      const cfg = musicCfg();
+      const on = OPT.music && cfg.on && actx.state === 'running';
+      const mode = !on ? '' : (cfg.source === 'files' || cfg.source === 'auto') && M.files.length ? 'files' : 'radio';
+      M.mood = cfg.mood === 'auto' ? autoMood() : cfg.mood;
+      M.radio?.setMood(M.mood);
+      const now = actx.currentTime;
+      if (mode !== M.mode) {
+        if (M.fading) return;
+        if (M.mode) {
+          // Fade out what is playing, then switch.
+          M.fading = true;
+          M.bus.gain.setTargetAtTime(0, now, 0.25);
+          setTimeout(() => { stopMusic(); M.fading = false; }, 1300);
+          return;
+        }
+        M.mode = mode;
+        if (mode === 'radio') startRadio();
+        if (mode === 'files') nextFile();
+      }
+      if (M.fading) return;
+      // Volume 35 puts WeBot Radio around -28 dBFS: clearly there, well under the voice.
+      M.bus.gain.setTargetAtTime(M.mode ? Math.pow(cfg.volume / 100, 1.2) : 0, now, 0.4);
+      // Duck under WeBot's voice, and nearly mute for a breaking alert.
+      const talking = speech.busy || bot.classList.contains('talk');
+      const duck = S.inBreaking ? 0.12 : cfg.duck && talking ? 0.3 : 1;
+      M.duck.gain.setTargetAtTime(duck, now, duck < 1 ? 0.08 : 0.7);
+    };
+    setInterval(musicTick, 400);
 
     /* ---------------- bot ---------------- */
     const hatSvg = () => {
@@ -1230,7 +1707,8 @@
       buildHeadlines();
     };
     const loadLive = async () => {
-      const body = await getJson('/api/v3/live');
+      // The query is a heartbeat for the control panel: what is playing and which voice is on.
+      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: voiceOn() ? ttsLabel() : 'voice off' }));
       const prevRev = S.control.rev;
       const prevCtl = S.control;
       S.live = body;
@@ -1248,12 +1726,15 @@
           if (cmd.type === 'say') say(cmd.text);
           else if (cmd.type === 'next') nextShot();
           else if (cmd.type === 'reload') location.reload();
+          else if (cmd.type === 'music-next') musicNext();
           else if (cmd.type === 'test-breaking') {
             const a = (cmd.key && byKey(cmd.key)) || candidates()[0];
             if (a) { S.breaking.unshift({ key: a.key, alert: a, test: true }); if (!S.inBreaking) nextShot(); }
           }
         }
       }
+      if (ttsCfg().engine === 'neural' && OPT.voice) startNeural();
+      loadMusicFiles();
       if (prevRev >= 0 && prevRev !== S.control.rev && (prevCtl.pin !== S.control.pin || prevCtl.mode !== S.control.mode || prevCtl.state !== S.control.state)) {
         S.recent = [];
         buildHeadlines();
@@ -1303,6 +1784,7 @@
       S.sites = sites.sites || [];
       S.home = config.home || null;
       S.soundings = Boolean(config.soundings);
+      S.openaiVoice = Boolean((await getJson('/api/v3/live/voice').catch(() => null))?.openai?.available);
       await Promise.all([loadAlerts(), loadLive()]).catch((e) => console.warn(e.message));
       S.map = new maplibregl.Map({
         container: 'map', style: config.darkStyleUrl, center: [-96, 38.6], zoom: 4.1,
@@ -1317,7 +1799,13 @@
       poll(loadAlerts, 20000);
       poll(loadLive, 6000);
       poll(loadRadar, 120000);
-      setTimeout(() => say('WeBot here, and WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.'), 2500);
+      // Give the neural voice a moment to load so the first line is in WeBot's real voice.
+      const hello = Date.now();
+      const intro = () => {
+        if (neural.state === 'loading' && Date.now() - hello < 25000) { setTimeout(intro, 1000); return; }
+        say('WeBot here, and WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.');
+      };
+      setTimeout(intro, 2500);
     };
     boot().catch((error) => { $('boot').textContent = 'WEATHERPOWER LIVE · RECONNECTING…'; console.error(error); setTimeout(() => location.reload(), 15000); });
     // Long-running stream: a reload every 6 hours keeps browser memory in check.

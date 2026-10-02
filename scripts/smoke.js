@@ -10,7 +10,7 @@ import { displayTimes, normalizeWarning } from '../src/warning.js';
 import { fetchDailyForecastCards } from '../src/dailyForecasts.js';
 import { forecastSearchQuery } from '../src/forecastSearch.js';
 import { areaLineFor, headlineFor, statusTagFor, summaryFor } from '../src/broadcast.js';
-import { indexLabelFor, indexValueFor, spcDay1Risk, talliesFor } from '../src/live.js';
+import { indexLabelFor, indexValueFor, spcDay1Risk, talliesFor, trackTitle } from '../src/live.js';
 import { modelTake } from '../src/models.js';
 import { warningShortHtml } from '../src/shortHtml.js';
 import { toV3Alert } from '../src/apiV3.js';
@@ -395,5 +395,9 @@ const split = modelTake('cape', 'CAPE', 'J/kg', [{ model: 'hrrr', name: 'HRRR', 
 assert.match(split, /very unstable air/);
 assert.match(split, /models disagree/);
 assert.match(modelTake('refc', 'Simulated radar', 'dBZ', [{ model: 'hrrr', name: 'HRRR', value: null }], 'hrrr', 'Idabel', 18), /doesn't have/);
+
+// Music file names become "Title — Artist" on stream.
+assert.deepEqual(trackTitle('03 - Lofi Guy - Rainy Night.mp3'), { title: 'Rainy Night', artist: 'Lofi Guy' });
+assert.deepEqual(trackTitle('storm_chaser_beat.ogg'), { title: 'storm chaser beat', artist: '' });
 
 console.log('Smoke checks passed.');

@@ -284,7 +284,7 @@ Stream state is stored in `data/live-control.json` and `data/live-index.json`.
 ### WeBot thinks and checks the models
 
 The stream doesn't only track warnings. In its rotation WeBot zooms out, thinks (eyes glancing
-around, thought dots) while the next model check loads, then plays a **Model Studio** loop
+around) while the next model check loads, then plays a **Model Studio** loop
 (WeatherPower Radar 3.1's model service, `https://weatherpower.app/wpcc-render/api/models`):
 
 - HRRR, NAM 3km, GFS and ECMWF fields: simulated radar, precip type, CAPE, updraft helicity,
@@ -303,5 +303,37 @@ around, thought dots) while the next model check loads, then plays a **Model Stu
 API: `GET /api/v3/models/catalog`, `GET /api/v3/models/segment?model=hrrr&field=refc&lat=&lon=&place=`.
 Control panel: **Models** mode makes WeBot loop think → model check.
 
-While WeBot is speaking there is no caption bubble; the bubble only appears when voice is off or the
-browser has no speech voice.
+WeBot never shows caption bubbles; safety tips ride in the top ticker.
+
+### Background music
+
+**WeBot Radio** is lo-fi music composed live in the stream page with Web Audio (electric piano, pads,
+bass, soft drums, vinyl crackle). It is free, never repeats exactly, and has nothing for YouTube
+Content ID to match. Each "song" runs about 2–3 minutes with a name on screen (`♪ NIGHT SHIFT ·
+WEBOT RADIO`). On **Auto** mood it follows the weather: calm when quiet, chill when busy, and a darker
+storm mood (switching at the next bar) when tornado warnings are out or the index is SEVERE.
+The music ducks under WeBot's voice and nearly mutes for breaking alerts.
+
+Your own songs: drop audio files in `public/music/` (`Artist - Title.mp3`). **Auto** source plays them
+shuffled when any exist, **WeBot Radio** forces the generated music. Only use music you have the
+rights to stream.
+
+Control panel → **Music**: on/off, next song, volume, Auto / WeBot Radio / My tracks, mood (Auto,
+Calm, Chill, Storm), and "lower for voice". **Stream status** shows what the stream is playing.
+URL: `?music=0` turns music off for that browser source.
+API: `GET /api/v3/live/music`; control actions `music` (`on`, `volume`, `source`, `mood`, `duck`) and
+`music-next`.
+
+### WeBot's voice
+
+| Engine | Cost | How |
+| --- | --- | --- |
+| Free neural voice (default) | Free | [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0) runs inside the stream page via `kokoro-js` in a Web Worker. First start downloads ~90 MB from jsDelivr/Hugging Face, then it is cached. Works in an OBS browser source. Voices include Michael, Fenrir, Puck, Heart (best quality), Bella, George… |
+| OpenAI voice | Paid by OpenAI (gpt-4o-mini-tts is roughly $0.015/min) | Set `OPENAI_API_KEY`. Optional `OPENAI_TTS_MODEL` (default `gpt-4o-mini-tts`), `OPENAI_TTS_VOICE` (`onyx`), `OPENAI_TTS_INSTRUCTIONS`, `OPENAI_TTS_DAILY_CHARS` (default 150000/day budget). |
+| Self-hosted, OpenAI-compatible | Free | Point `OPENAI_TTS_BASE_URL` at any server with OpenAI's `/v1/audio/speech` API (for example Kokoro-FastAPI on your PC), no key needed. |
+| Computer voice | Free | The browser's speech voices. Used as the fallback while the neural voice loads or if it fails. |
+
+There is no free way to use OpenAI's own voices; Kokoro is the free model that sounds closest.
+Control panel → **WeBot**: engine, voice, speed and a Test button. URL: `?tts=browser|neural|openai`.
+API: `GET /api/v3/live/voice`, `GET /api/v3/live/tts?text=&voice=` (OpenAI-compatible engine only,
+rate-limited to 40 lines a minute plus the daily character budget).

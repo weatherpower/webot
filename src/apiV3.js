@@ -10,8 +10,10 @@ import {
   SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 import {
-  applyLiveCommand, indexSummary, liveControl, nexradSites, recentReports, requireLiveToken, siteRadar, talliesFor
+  applyLiveCommand, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES,
+  recentReports, requireLiveToken, siteRadar, talliesFor
 } from './live.js';
+import { openaiSpeech, openaiTtsStatus } from './voice.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -287,6 +289,7 @@ export const apiV3Router = () => {
   /* ---------- live stream ---------- */
   router.get('/live', async (req, res, next) => {
     try {
+      noteStreamBeat(req.query);
       const { alerts } = await currentAlerts();
       const [index, control, reports] = await Promise.all([indexSummary(alerts), liveControl(), recentReports()]);
       res.set('Cache-Control', 'no-store');
@@ -300,6 +303,30 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=60');
       res.json(await siteRadar(req.query.site));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/live/music', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json({ tracks: await musicTracks() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/live/voice', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ neural: NEURAL_VOICES, openai: { ...openaiTtsStatus(), voices: OPENAI_VOICES } });
+  });
+
+  router.get('/live/tts', async (req, res, next) => {
+    try {
+      const audio = await openaiSpeech({ text: req.query.text, voice: req.query.voice, speed: req.query.speed });
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.type('audio/mpeg').send(audio);
     } catch (error) {
       next(error);
     }

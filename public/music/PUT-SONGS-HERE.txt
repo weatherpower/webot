@@ -1,0 +1,4 @@
+Put your own background music here (MP3, M4A, OGG, WAV...).
+Name files "Artist - Title.mp3" and they show on stream as Title - Artist.
+In Live Control > Music, "Auto" or "My tracks" plays them shuffled; "WeBot Radio" uses the free generated music.
+Only add music you have the rights to stream.

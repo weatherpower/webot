@@ -35,7 +35,7 @@
     .btn.on { background: var(--ok); color: #06210f; border-color: transparent; }
     .btn.warn { background: var(--warn); color: #1d1600; border-color: transparent; }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
-    .seg { display: inline-flex; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; overflow: hidden; }
+    .seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; overflow: hidden; }
     .seg button { border: 0; background: transparent; padding: 8px 12px; cursor: pointer; font-weight: 600; }
     .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
     .status { font-family: "WP Mono"; font-size: 12px; letter-spacing: .08em; color: var(--muted); }
@@ -59,6 +59,9 @@
     .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #fff; color: #111; padding: 10px 16px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; }
     .toast.show { opacity: 1; }
     .locked .needs-token { opacity: .4; pointer-events: none; }
+    input[type="range"] { padding: 0; accent-color: var(--brand); background: transparent; border: 0; height: 28px; }
+    .row > .status:first-child { min-width: 58px; }
+    .live-line b { color: var(--ok); }
   </style>
 </head>
 <body class="locked">
@@ -105,6 +108,45 @@
           <button class="btn" id="voice">Voice</button>
           <button class="btn" id="sound">Sounds</button>
         </div>
+        <div class="row">
+          <label for="tts-engine" class="status">VOICE</label>
+          <select id="tts-engine" class="grow">
+            <option value="neural">Free neural voice (Kokoro)</option>
+            <option value="openai">OpenAI voice (needs server key)</option>
+            <option value="browser">Computer voice</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="tts-voice" class="status">WHO</label>
+          <select id="tts-voice" class="grow"></select>
+          <button class="btn" id="tts-test">Test</button>
+        </div>
+        <div class="row">
+          <label for="tts-speed" class="status">SPEED</label>
+          <input id="tts-speed" type="range" min="0.8" max="1.25" step="0.05" class="grow">
+          <span class="status" id="tts-speed-n">1.00×</span>
+        </div>
+      </section>
+
+      <section class="box">
+        <h2>Music</h2>
+        <div class="row">
+          <button class="btn" id="music-on">Music</button>
+          <button class="btn" id="music-next">Next song ⏭</button>
+          <button class="btn" id="music-duck">Lower for voice</button>
+        </div>
+        <div class="row">
+          <label for="music-vol" class="status">VOLUME</label>
+          <input id="music-vol" type="range" min="0" max="100" step="1" class="grow">
+          <span class="status" id="music-vol-n">35</span>
+        </div>
+        <div class="row"><span class="status">PLAY</span><div class="seg" id="music-src">
+          <button data-v="auto">Auto</button><button data-v="radio">WeBot Radio</button><button data-v="files">My tracks</button>
+        </div></div>
+        <div class="row"><span class="status">MOOD</span><div class="seg" id="music-mood">
+          <button data-v="auto">Auto</button><button data-v="calm">Calm</button><button data-v="chill">Chill</button><button data-v="tense">Storm</button>
+        </div></div>
+        <p class="note">WeBot Radio is lo-fi made live by the stream page, so it's free and safe from copyright claims. On <b>Auto</b> the mood follows the weather: calm when it's quiet, darker when tornado warnings are out. To use your own songs, put MP3s in <code>public/music</code> (name them <code>Artist - Title.mp3</code>) and pick <b>My tracks</b> (Auto also prefers them). Only use songs you have the rights to stream.</p>
       </section>
 
       <section class="box">
@@ -127,6 +169,11 @@
     </div>
 
     <section class="box needs-token">
+      <h2>Stream status</h2>
+      <p class="status live-line" id="live-line" style="margin:0">Waiting for the stream…</p>
+    </section>
+
+    <section class="box needs-token">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">Active alerts</h2><input id="filter" placeholder="Filter (event, county, state)" style="min-width:220px"></div>
       <div class="list" id="alerts" style="margin-top:10px"></div>
     </section>
@@ -135,9 +182,9 @@
       <h2>Put it on YouTube / Twitch with OBS</h2>
       <ol>
         <li>In OBS add a <b>Browser</b> source. URL: <code id="obs-url"></code>, width <b>1920</b>, height <b>1080</b>.</li>
-        <li>Tick <b>Control audio via OBS</b> so the alert chimes go to the stream.</li>
-        <li>WeBot's voice uses Windows speech. If it isn't heard on stream, open the stream URL in Chrome instead, add it with <b>Window Capture</b>, and capture desktop audio.</li>
-        <li>URL options: <code>?state=OK</code> focus one state · <code>?voice=0</code> · <code>?sound=0</code> · <code>?bot=0</code> · <code>?tips=0</code> · <code>?speed=1.5</code> slower shots · <code>?tz=America/Chicago</code> clock zone.</li>
+        <li>Tick <b>Control audio via OBS</b> so the music, chimes and WeBot's voice all go to the stream.</li>
+        <li>The free neural voice runs inside the stream page, so it works right in OBS. The first start downloads it (about 90 MB), then it's cached. Until it's ready WeBot uses the computer voice.</li>
+        <li>URL options: <code>?state=OK</code> focus one state · <code>?voice=0</code> · <code>?sound=0</code> · <code>?music=0</code> · <code>?tts=browser</code> computer voice · <code>?bot=0</code> · <code>?tips=0</code> · <code>?speed=1.5</code> slower shots · <code>?tz=America/Chicago</code> clock zone.</li>
       </ol>
     </section>
   </div>
@@ -154,6 +201,10 @@
     try { token = localStorage.getItem('wp-live-token') || ''; } catch {}
     let control = null;
     let alerts = [];
+    let voices = { neural: [], openai: { available: false, voices: [] } };
+    const VOICE_KINDS = { af: 'US female', am: 'US male', bf: 'British female', bm: 'British male' };
+    const VOICE_NOTES = { af_heart: ' ★ best', af_bella: ' ★', am_michael: ' (default)', am_fenrir: ' (deep)', am_puck: ' (bright)' };
+    const voiceLabel = (id) => { const [p, n] = id.split('_'); return n.charAt(0).toUpperCase() + n.slice(1) + ' — ' + (VOICE_KINDS[p] || p) + (VOICE_NOTES[id] || ''); };
 
     const streamUrl = location.origin + BASE + '/live';
     $('open-stream').href = streamUrl;
@@ -197,6 +248,22 @@
       const pinned = control.pin && alerts.find((a) => a.key === control.pin);
       $('state-line').innerHTML = 'PINNED: <b>' + esc(pinned ? pinned.eventLabel + ' · ' + pinned.area : control.pin ? 'expired alert' : 'nothing') + '</b>';
       $('unpin').disabled = !control.pin;
+      const tts = control.tts || {};
+      $('tts-engine').value = tts.engine || 'neural';
+      fillVoices();
+      if (document.activeElement !== $('tts-speed')) { $('tts-speed').value = tts.speed || 1; $('tts-speed-n').textContent = Number(tts.speed || 1).toFixed(2) + '×'; }
+      const music = control.music || {};
+      $('music-on').classList.toggle('on', music.on !== false);
+      $('music-on').textContent = music.on !== false ? 'Music: on' : 'Music: off';
+      $('music-duck').classList.toggle('on', music.duck !== false);
+      $('music-duck').textContent = music.duck !== false ? 'Lower for voice: on' : 'Lower for voice: off';
+      if (document.activeElement !== $('music-vol')) { $('music-vol').value = music.volume ?? 35; $('music-vol-n').textContent = music.volume ?? 35; }
+      document.querySelectorAll('#music-src button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.source || 'auto'))));
+      document.querySelectorAll('#music-mood button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.mood || 'auto'))));
+      const st = control.stream;
+      $('live-line').innerHTML = st
+        ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
+        : 'The stream page hasn’t checked in for a minute. Open it in OBS or click "Open stream".';
       $('banner-line').innerHTML = control.banner ? 'SHOWING UNTIL <b>' + esc(new Date(control.banner.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '</b>: ' + esc(control.banner.text) : 'No banner message.';
       renderAlerts();
     };
@@ -209,6 +276,27 @@
       $('alerts').innerHTML = list.length ? list.map((a) => '<div class="item' + (control?.pin === a.key ? ' pinned' : '') + '" style="--c:' + esc(a.color) + '"><i></i><div><b>' + esc(a.eventLabel) + '</b><span>' + esc(a.area || a.areaDesc) + ' · until ' + esc(a.times?.expires || '') + '</span></div>'
         + '<button class="btn" data-pin="' + esc(a.key) + '">' + (control?.pin === a.key ? 'Pinned' : 'Pin') + '</button><button class="btn" data-test="' + esc(a.key) + '" title="Breaking test with this alert">Test</button></div>').join('')
         : '<p class="note">No alerts match.</p>';
+    };
+
+    const fillVoices = () => {
+      const engine = $('tts-engine').value;
+      const list = engine === 'openai' ? voices.openai.voices : engine === 'neural' ? voices.neural : [];
+      const want = engine === 'openai' ? control?.tts?.openaiVoice : control?.tts?.voice;
+      const key = engine + '|' + list.join();
+      if ($('tts-voice').dataset.key !== key) {
+        $('tts-voice').dataset.key = key;
+        $('tts-voice').innerHTML = list.length
+          ? list.map((id) => '<option value="' + esc(id) + '">' + esc(engine === 'neural' ? voiceLabel(id) : id.charAt(0).toUpperCase() + id.slice(1)) + '</option>').join('')
+          : '<option value="">Best voice on the computer</option>';
+      }
+      if (want && list.includes(want)) $('tts-voice').value = want;
+      $('tts-voice').disabled = !list.length;
+      $('tts-engine').querySelector('[value="openai"]').textContent = voices.openai.available
+        ? 'OpenAI voice (' + (voices.openai.hosted === 'openai' ? voices.openai.model : 'your voice server') + ')'
+        : 'OpenAI voice (not set up on the server)';
+    };
+    const loadVoices = async () => {
+      try { voices = await fetch(BASE + '/api/v3/live/voice', { cache: 'no-store' }).then((r) => r.json()); fillVoices(); } catch {}
     };
 
     const loadAlerts = async () => {
@@ -237,6 +325,25 @@
     $('banner-set').addEventListener('click', () => act({ action: 'banner', text: $('banner').value, minutes: Number($('minutes').value) }, 'Banner set'));
     $('banner-clear').addEventListener('click', () => act({ action: 'banner', text: '' }, 'Banner cleared'));
     $('test').addEventListener('click', () => act({ action: 'test-breaking' }, 'Breaking test sent'));
+    $('tts-engine').addEventListener('change', () => {
+      const engine = $('tts-engine').value;
+      if (engine === 'openai' && !voices.openai.available) toast('Add OPENAI_API_KEY to the server .env first');
+      act({ action: 'tts', engine }, 'Voice: ' + $('tts-engine').selectedOptions[0].textContent);
+    });
+    $('tts-voice').addEventListener('change', () => {
+      const v = $('tts-voice').value;
+      act($('tts-engine').value === 'openai' ? { action: 'tts', openaiVoice: v } : { action: 'tts', voice: v }, 'WeBot voice changed');
+    });
+    $('tts-speed').addEventListener('input', () => { $('tts-speed-n').textContent = Number($('tts-speed').value).toFixed(2) + '×'; });
+    $('tts-speed').addEventListener('change', () => act({ action: 'tts', speed: Number($('tts-speed').value) }));
+    $('tts-test').addEventListener('click', () => act({ action: 'say', text: 'Hey everyone, WeBot here. This is my voice. I will read out the warnings as they come in.' }, 'WeBot is talking'));
+    $('music-on').addEventListener('click', () => act({ action: 'music', on: control?.music?.on === false }));
+    $('music-duck').addEventListener('click', () => act({ action: 'music', duck: control?.music?.duck === false }));
+    $('music-next').addEventListener('click', () => act({ action: 'music-next' }, 'Next song'));
+    $('music-vol').addEventListener('input', () => { $('music-vol-n').textContent = $('music-vol').value; });
+    $('music-vol').addEventListener('change', () => act({ action: 'music', volume: Number($('music-vol').value) }));
+    $('music-src').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act({ action: 'music', source: b.dataset.v }, 'Music: ' + b.textContent); });
+    $('music-mood').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act({ action: 'music', mood: b.dataset.v }, 'Mood: ' + b.textContent); });
     $('filter').addEventListener('input', renderAlerts);
     $('alerts').addEventListener('click', (e) => {
       const pin = e.target.closest('[data-pin]')?.dataset.pin;
@@ -247,7 +354,10 @@
 
     loadAlerts();
     setInterval(loadAlerts, 30000);
+    loadVoices();
     if (token) send({ action: 'ping' }).catch(() => {});
+    // Keeps "Stream status" fresh while the panel is open.
+    setInterval(() => { if (control && !document.hidden) send({ action: 'ping' }).catch(() => {}); }, 8000);
   })();
   </script>
 </body>
