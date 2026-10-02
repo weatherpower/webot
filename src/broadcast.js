@@ -66,6 +66,17 @@ export const headlineFor = (warning = {}) => {
   if (isForecast) {
     return { event: 'DAILY FORECAST', place: String(warning.forecast?.location || warning.areaDesc || '').toUpperCase(), full: String(warning.title || 'DAILY FORECAST').toUpperCase() };
   }
+  if (warning.classification?.isOutlook || warning.outlookDetails) {
+    const day = warning.outlookDetails?.day || String(warning.title || '').match(/DAY\s*(\d)/i)?.[1] || '';
+    const risk = String(warning.outlookDetails?.labelText || warning.hazards?.value || '').replace(/^day \d+ \w+ outlook\s*·?\s*/i, '').toUpperCase();
+    const label = `SPC DAY ${day} OUTLOOK`.replace('  ', ' ');
+    return { event: label, place: risk, full: risk ? `${label}: ${risk}` : label };
+  }
+  if (warning.classification?.isDiscussion || /mesoscale discussion/i.test(warning.event || '')) {
+    const number = warning.mdDetails?.number || String(warning.key || '').match(/spc-md-(\d+)/)?.[1] || '';
+    const label = `MESOSCALE DISCUSSION${number ? ` #${number}` : ''}`;
+    return { event: label, place, full: `${label} · ${place}` };
+  }
   return { event, place, full: `${event} IN ${place}` };
 };
 

@@ -7,7 +7,7 @@ import { compactPublicGeometry } from './publicFeed.js';
 import { compositeValidTime } from './shortVideo.js';
 import { getShort, listShorts, queueShort, requestShort, shortsByKey, shortsStatus } from './shorts.js';
 import {
-  areaLineFor, eventLabelFor, hazardChipsFor, iconKeyFor, placeFor, statusTagFor, threatTagFor, timeLabelsFor
+  areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -47,9 +47,9 @@ export const toV3Alert = (item = {}, short = null, { detail = false } = {}) => {
   const alert = {
     key: item.key,
     event: item.event,
-    eventLabel: eventLabelFor(item),
-    headline: `${eventLabelFor(item)} IN ${placeFor(item)}`,
-    place: placeFor(item),
+    eventLabel: headlineFor(item).event,
+    headline: headlineFor(item).full,
+    place: headlineFor(item).place,
     area: areaLineFor(item),
     areaDesc: item.areaDesc,
     states: item.stateCodes || [],

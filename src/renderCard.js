@@ -8,7 +8,7 @@ import GIFEncoder from 'gif-encoder-2';
 import { PNG } from 'pngjs';
 import { config } from './config.js';
 import { cardsDir, chromiumTmpDir, ensureRuntimeDirs, publicDir } from './paths.js';
-import { warningCardHtml } from './cardHtml.js';
+import { CARD_SIZE, warningCardHtml } from './cardHtml.js';
 import { normalizeWarning } from './warning.js';
 import { enrichWarningRadar } from './radar.js';
 import { enrichWarningTropical } from './nhc.js';
@@ -241,7 +241,7 @@ const getMapStyle = async () => {
   return mapStylePromise;
 };
 
-const encodeGif = async ({ framePaths, outputPath, width = 1280, height = 960 }) => {
+const encodeGif = async ({ framePaths, outputPath, width = CARD_SIZE.width, height = CARD_SIZE.height }) => {
   const encoder = new GIFEncoder(width, height);
   encoder.setDelay(520);
   encoder.setRepeat(0);
@@ -266,7 +266,7 @@ const screenshotCard = async ({ browser, warning, logoDataUrl, fontDataUrls, map
     staticMapDataUrl
   });
   const page = await browser.newPage({
-    viewport: { width: 1280, height: 960 },
+    viewport: CARD_SIZE,
     deviceScaleFactor: 1
   });
 
@@ -301,7 +301,7 @@ const forecastStaticMapDataUrl = async (warning, browser, mapStyle) => {
   const [lon, lat] = (warning.center || []).map(Number);
   if (!config.maps.styleUrl || !Number.isFinite(lon) || !Number.isFinite(lat)) return '';
   const page = await browser.newPage({
-    viewport: { width: 880, height: 840 },
+    viewport: CARD_SIZE,
     deviceScaleFactor: 1
   });
   const payload = JSON.stringify({
