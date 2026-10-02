@@ -576,6 +576,10 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
         if (forecastPriority) return forecastPriority;
         return Date.parse(b.issuedAt || '') - Date.parse(a.issuedAt || '');
       });
+      // Queue warning videos first so they are not stuck behind a long card backlog.
+      queueAutoShorts(activeWarnings).catch((error) => {
+        console.warn(`Auto shorts failed: ${error.message}`);
+      });
       const pendingItems = pruneExpiredItems(await mapLimit(activeWarnings, config.autoRender.concurrency, async (warning) => {
         const key = warning.key || warning.nwsId;
         return toPendingItem({
@@ -704,9 +708,6 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
         items
       };
       await saveRenderedState();
-      queueAutoShorts(activeWarnings).catch((error) => {
-        console.warn(`Auto shorts failed: ${error.message}`);
-      });
       cleanupUnusedCards(items).catch((error) => {
         console.warn(`Card cleanup failed: ${error.message}`);
       });

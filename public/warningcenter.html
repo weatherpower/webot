@@ -2,1806 +2,741 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#05080d">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070a10">
   <title>WeatherPower Warning Center</title>
+  <meta name="description" content="Live U.S. weather warnings with real-time radar, warning cards, and warning video shorts from WeatherPower.">
   <link rel="icon" type="image/png" href="/warningcenter/favicon.ico">
   <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
   <style>
-    @font-face { font-family: Inter; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-style: normal; font-weight: 400 900; font-display: swap; }
-    @font-face { font-family: Oswald; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-style: normal; font-weight: 500 700; font-display: swap; }
-    @font-face { font-family: "Barlow Condensed"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-style: normal; font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "WP Display"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "WP Sans"; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+    @font-face { font-family: "WP Mono"; src: url("/warningcenter/public/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
     :root {
-      color-scheme: dark;
-      --void: #05080d;
-      --surface: #081019;
-      --surface-2: #0b1520;
-      --surface-3: #0e1b28;
-      --line: #243542;
-      --line-soft: rgba(148, 184, 204, .18);
-      --text: #f4f8fa;
-      --muted: #a3b3bd;
-      --faint: #6d7d87;
-      --cyan: #30c9ef;
-      --green: #2ed17b;
-      --gold: #f7bf2b;
-      --red: #f54848;
-      --pink: #ed5ab7;
-      --blue: #61a8ff;
-      --shadow: 0 20px 52px rgba(0, 0, 0, .3);
+      --bg: #070a10; --panel: #0d121b; --panel-2: #121926; --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.14);
+      --text: #eef2f8; --muted: #8e99ab; --dim: #5d6879; --live: #34e07a;
+      --rail: 460px; --top: 60px;
     }
-
     * { box-sizing: border-box; }
-
-    html, body {
-      min-height: 100%;
-      margin: 0;
-      background:
-        radial-gradient(circle at 82% -20%, rgba(30, 155, 187, .12), transparent 30%),
-        linear-gradient(180deg, #060a0f 0%, var(--void) 100%);
-      color: var(--text);
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    body { overflow-x: hidden; }
-    button, input, select { font: inherit; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; color: inherit; }
     button { cursor: pointer; }
-    a { color: inherit; text-decoration: none; }
-
-    .app {
-      width: min(1780px, calc(100vw - 24px));
-      margin: 0 auto;
-      padding: 12px 0 24px;
-    }
-
-    .topbar {
-      min-height: 66px;
-      display: grid;
-      grid-template-columns: minmax(280px, 1fr) auto minmax(280px, 1fr);
-      align-items: center;
-      gap: 18px;
-      border: 1px solid var(--line);
-      border-radius: 8px 8px 0 0;
-      background: rgba(6, 12, 18, .94);
-      box-shadow: var(--shadow);
-      padding: 10px 16px;
-    }
-
-    .beta-banner {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-height: 42px;
-      padding: 8px 16px;
-      border: 1px solid var(--line);
-      border-top: 0;
-      background: rgba(152, 103, 10, .14);
-      color: #f4dca2;
-      font-size: 12px;
-      font-weight: 650;
-      line-height: 1.4;
-    }
-
-    .beta-banner strong {
-      flex: 0 0 auto;
-      color: #ffd25d;
-      font-family: Oswald, sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: .075em;
-      text-transform: uppercase;
-    }
-
-    .brand {
-      min-width: 0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .brand img {
-      width: 40px;
-      height: 40px;
-      flex: 0 0 auto;
-      border-radius: 9px;
-      box-shadow: 0 0 0 1px rgba(90, 189, 255, .35), 0 8px 22px rgba(0, 0, 0, .42);
-    }
-
-    .brand-name {
-      font-family: Oswald, sans-serif;
-      font-size: 26px;
-      font-weight: 700;
-      letter-spacing: .025em;
-      line-height: 1;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    .brand-name::after {
-      content: "";
-      display: inline-block;
-      width: 1px;
-      height: 27px;
-      margin: 0 14px -7px 15px;
-      background: var(--line);
-    }
-
-    .brand-section {
-      color: var(--text);
-      font-size: 15px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .live-meta {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 18px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .live-meta strong { color: var(--cyan); }
-    .live-meta .live-source { color: var(--text); }
-
-    .live-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      margin-right: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 0 4px rgba(46, 209, 123, .12), 0 0 12px rgba(46, 209, 123, .84);
-      vertical-align: 1px;
-    }
-
-    .top-actions {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 9px;
-    }
-
-    .status-copy {
-      min-width: 0;
-      text-align: right;
-      color: var(--faint);
-      font-size: 11px;
-      line-height: 1.35;
-    }
-
-    .status-copy b {
-      display: block;
-      color: var(--text);
-      font-size: 12px;
-    }
-
-    .icon-button,
-    .control-button {
-      border: 1px solid var(--line);
-      color: var(--text);
-      background: #0c1722;
-      transition: border-color .15s ease, background .15s ease, transform .15s ease;
-    }
-
-    .icon-button {
-      width: 38px;
-      height: 38px;
-      display: inline-grid;
-      place-items: center;
-      border-radius: 6px;
-    }
-
-    .icon-button svg,
-    .utility-link svg,
-    .severity-icon svg { width: 18px; height: 18px; }
-
-    .icon-button:hover,
-    .control-button:hover,
-    .utility-link:hover {
-      border-color: rgba(48, 201, 239, .76);
-      background: #102334;
-      transform: translateY(-1px);
-    }
-
-    .command-grid {
-      display: grid;
-      grid-template-columns: 236px minmax(0, 1fr) 320px;
-      grid-template-rows: minmax(500px, 64vh) auto auto;
-      border: 1px solid var(--line);
-      border-top: 0;
-      background: rgba(5, 10, 15, .86);
-      box-shadow: var(--shadow);
-    }
-
-    .filter-rail,
-    .incident-queue {
-      min-width: 0;
-      background: linear-gradient(180deg, rgba(10, 18, 26, .96), rgba(6, 13, 20, .96));
-    }
-
-    .filter-rail {
-      grid-column: 1;
-      grid-row: 1 / 4;
-      border-right: 1px solid var(--line);
-      padding: 14px 12px;
-    }
-
-    .rail-title,
-    .queue-title,
-    .deck-title,
-    .intel-title {
-      margin: 0;
-      font-family: Oswald, sans-serif;
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: .035em;
-      text-transform: uppercase;
-    }
-
-    .rail-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 3px 12px;
-      border-bottom: 1px solid var(--line-soft);
-    }
-
-    .rail-title .warning-mark {
-      display: inline-grid;
-      width: 17px;
-      height: 17px;
-      place-items: center;
-      color: var(--red);
-    }
-
-    .summary-list {
-      display: grid;
-      gap: 2px;
-      padding: 8px 0 10px;
-      border-bottom: 1px solid var(--line-soft);
-    }
-
-    .summary-row {
-      width: 100%;
-      display: grid;
-      grid-template-columns: 5px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px;
-      border: 0;
-      padding: 6px 3px;
-      background: transparent;
-      color: var(--muted);
-      text-align: left;
-    }
-
-    .summary-row:hover { color: var(--text); }
-    .summary-row.active { color: var(--text); background: rgba(255,255,255,.035); }
-    .summary-stripe { width: 3px; height: 19px; border-radius: 1px; background: var(--accent, var(--cyan)); }
-    .summary-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 800; }
-    .summary-count { color: var(--accent, var(--cyan)); font-size: 12px; font-weight: 900; }
-
-    .filter-block { margin-top: 13px; }
-    .filter-label {
-      display: block;
-      margin: 0 3px 7px;
-      color: var(--faint);
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: .13em;
-      text-transform: uppercase;
-    }
-
-    .filter-select,
-    .search-input {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 5px;
-      outline: 0;
-      background: #09131d;
-      color: var(--text);
-      padding: 9px 10px;
-      font-size: 12px;
-    }
-
-    .search-input:focus,
-    .filter-select:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(48, 201, 239, .12); }
-
-    .forecast-search-row { display: flex; gap: 6px; }
-    .forecast-search-row .search-input { min-width: 0; }
-    .forecast-generate {
-      flex: 0 0 auto;
-      border: 1px solid rgba(48, 201, 239, .72);
-      border-radius: 5px;
-      background: rgba(27, 106, 133, .34);
-      color: #e5fbff;
-      padding: 0 10px;
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-    }
-    .forecast-generate:hover:not(:disabled) { background: rgba(32, 145, 182, .52); }
-    .forecast-generate:disabled { cursor: wait; opacity: .68; }
-    .forecast-search-note { margin: 6px 3px 0; color: var(--faint); font-size: 9px; font-weight: 700; line-height: 1.35; }
-
-    .layer-set { display: grid; gap: 5px; }
-    .layer-toggle {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      background: transparent;
-      color: var(--muted);
-      padding: 6px 5px;
-      text-align: left;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .layer-toggle:hover { border-color: var(--line); color: var(--text); }
-    .toggle-square {
-      width: 14px;
-      height: 14px;
-      flex: 0 0 auto;
-      border: 1px solid var(--faint);
-      border-radius: 2px;
-      background: #050a0f;
-    }
-    .layer-toggle.active .toggle-square {
-      border-color: var(--cyan);
-      background: var(--cyan);
-      box-shadow: inset 0 0 0 3px #0a1721;
-    }
-
-    .utility-links {
-      display: grid;
-      gap: 5px;
-      margin-top: 15px;
-      padding-top: 13px;
-      border-top: 1px solid var(--line-soft);
-    }
-
-    .utility-link {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      border: 1px solid var(--line);
-      border-radius: 5px;
-      background: rgba(255,255,255,.02);
-      color: var(--muted);
-      padding: 8px 9px;
-      font-size: 11px;
-      font-weight: 800;
-    }
-
-    .map-stage {
-      grid-column: 2;
-      grid-row: 1;
-      position: relative;
-      min-width: 0;
-      overflow: hidden;
-      background: #10161c;
-    }
-
-    #map {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    .maplibregl-ctrl-top-left { top: 58px !important; left: auto !important; right: 10px !important; }
-    .maplibregl-ctrl-group { border-radius: 5px !important; background: rgba(5, 10, 15, .92) !important; border: 1px solid var(--line) !important; box-shadow: none !important; }
-    .maplibregl-ctrl-group button { filter: invert(1) brightness(1.7); }
-    .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { display: none; }
-
-    .map-topbar {
-      position: absolute;
-      z-index: 4;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      pointer-events: none;
-    }
-
-    .map-controls,
-    .map-updated,
-    .legend {
-      border: 1px solid rgba(148, 184, 204, .28);
-      background: rgba(4, 9, 14, .87);
-      box-shadow: 0 12px 28px rgba(0,0,0,.26);
-      backdrop-filter: blur(10px);
-    }
-
-    .map-controls {
-      display: inline-flex;
-      padding: 4px;
-      pointer-events: auto;
-    }
-
-    .map-mode {
-      border: 0;
-      border-radius: 3px;
-      padding: 8px 12px;
-      background: transparent;
-      color: var(--muted);
-      font-family: Barlow Condensed, Inter, sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    .map-mode.active { background: #184b74; color: #fff; }
-    .map-mode:disabled { cursor: not-allowed; opacity: .45; }
-
-    .map-updated {
-      align-self: flex-start;
-      color: var(--muted);
-      padding: 9px 11px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .map-updated b { color: var(--text); }
-
-    .map-readout {
-      position: absolute;
-      z-index: 4;
-      top: 64px;
-      left: 12px;
-      max-width: min(440px, calc(100% - 160px));
-      border-left: 3px solid var(--cyan);
-      background: rgba(3, 8, 12, .78);
-      padding: 8px 10px 9px;
-      pointer-events: none;
-    }
-
-    .map-readout strong {
-      display: block;
-      font-family: Oswald, sans-serif;
-      font-size: 15px;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-    }
-
-    .map-readout span { color: var(--muted); font-size: 11px; font-weight: 700; }
-
-    .map-picker {
-      position: absolute;
-      z-index: 5;
-      right: 12px;
-      bottom: 12px;
-      width: min(300px, calc(100% - 24px));
-      border: 1px solid var(--accent, var(--cyan));
-      border-left-width: 4px;
-      background: rgba(5, 12, 18, .94);
-      box-shadow: 0 18px 42px rgba(0,0,0,.42);
-      backdrop-filter: blur(12px);
-      padding: 12px;
-    }
-
-    .map-picker[hidden] { display: none; }
-    .map-picker.choice-mode {
-      right: auto;
-      bottom: auto;
-      width: min(310px, calc(100% - 24px));
-      border-color: #4d89e8;
-      background: rgba(13, 32, 70, .96);
-    }
-    .map-picker.choice-mode::after {
-      content: "";
-      position: absolute;
-      left: 33px;
-      bottom: -9px;
-      width: 16px;
-      height: 16px;
-      border-right: 1px solid #4d89e8;
-      border-bottom: 1px solid #4d89e8;
-      background: rgba(13, 32, 70, .96);
-      transform: rotate(45deg);
-    }
-
-    .picker-head,
-    .picker-actions,
-    .picker-meta {
-      display: flex;
-      align-items: center;
-    }
-
-    .picker-head {
-      justify-content: space-between;
-      gap: 8px;
-      color: var(--faint);
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-    }
-
-    .picker-close {
-      width: 25px;
-      height: 25px;
-      display: grid;
-      place-items: center;
-      border: 0;
-      border-radius: 3px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 18px;
-      line-height: 1;
-    }
-
-    .picker-close:hover { background: rgba(255,255,255,.08); color: var(--text); }
-    .choice-list { display: grid; margin-top: 7px; }
-    .choice-option {
-      width: 100%;
-      display: grid;
-      grid-template-columns: 8px minmax(0, 1fr) 18px;
-      align-items: center;
-      gap: 7px;
-      border: 0;
-      border-top: 1px solid var(--line-soft);
-      background: transparent;
-      color: var(--text);
-      padding: 9px 0;
-      text-align: left;
-      font: inherit;
-    }
-    .choice-option:first-child { border-top: 0; }
-    .choice-option:hover .choice-name { color: var(--accent, var(--cyan)); }
-    .choice-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--choice-accent, var(--accent)); box-shadow: 0 0 11px var(--choice-accent, var(--accent)); }
-    .choice-copy { min-width: 0; }
-    .choice-name { display: block; overflow: hidden; font-size: 12px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
-    .choice-stats { display: block; overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-    .choice-arrow { color: var(--text); font-size: 24px; font-weight: 400; line-height: 1; }
-    .picker-event { margin: 7px 0 3px; color: var(--text); font-family: Barlow Condensed, Inter, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
-    .picker-area { display: block; overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-    .picker-meta { gap: 6px; margin-top: 10px; color: var(--faint); font-size: 10px; font-weight: 800; }
-    .picker-meta b { color: var(--accent, var(--cyan)); }
-    .picker-actions { gap: 7px; margin-top: 12px; }
-
-    .picker-button,
-    .picker-detail {
-      min-height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 0 10px;
-      color: var(--text);
-      background: #0b1722;
-      font-size: 11px;
-      font-weight: 800;
-    }
-
-    .picker-button { flex: 1; cursor: pointer; }
-    .picker-detail { border-color: var(--accent, var(--cyan)); background: rgba(var(--accent-rgb, 48, 201, 239), .14); }
-    .picker-button:hover, .picker-detail:hover { border-color: var(--accent, var(--cyan)); background: rgba(var(--accent-rgb, 48, 201, 239), .22); }
-
-    .legend {
-      position: absolute;
-      z-index: 4;
-      left: 12px;
-      bottom: 12px;
-      width: 245px;
-      padding: 9px 10px;
-      pointer-events: none;
-    }
-
-    .legend-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      color: var(--text);
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-    }
-
-    .legend-bar {
-      height: 10px;
-      margin: 8px 0 5px;
-      border: 1px solid rgba(255,255,255,.16);
-      background: linear-gradient(90deg, #164a1d, #28b54f 19%, #d8e831 38%, #ff9b21 58%, #e62f25 76%, #ef3fdb 92%, #d8b8ff);
-    }
-
-    .legend-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; font-weight: 700; }
-
-    .incident-queue {
-      grid-column: 3;
-      grid-row: 1;
-      border-left: 1px solid var(--line);
-      overflow: auto;
-    }
-
-    .queue-head,
-    .deck-head,
-    .intel-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .queue-head {
-      min-height: 52px;
-      padding: 0 12px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .queue-head span { color: var(--faint); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-
-    .incident-list { display: grid; align-content: start; }
-
-    .incident-row {
-      --accent: var(--blue);
-      width: 100%;
-      display: grid;
-      grid-template-columns: 31px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 9px;
-      border: 0;
-      border-bottom: 1px solid var(--line-soft);
-      border-left: 4px solid var(--accent);
-      background:
-        linear-gradient(90deg, rgba(var(--rgb, 97, 168, 255), .14), rgba(0,0,0,0) 72%),
-        rgba(7, 14, 21, .74);
-      color: var(--text);
-      cursor: pointer;
-      font: inherit;
-      padding: 8px 10px 8px 8px;
-      text-align: left;
-      transition: background .14s ease;
-    }
-
-    .incident-row:hover { background: rgba(21, 40, 55, .9); }
-    .severity-icon { display: grid; place-items: center; color: var(--accent); }
-    .incident-copy { min-width: 0; }
-    .incident-event { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Barlow Condensed, Inter, sans-serif; font-size: 14px; font-weight: 700; }
-    .incident-area { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 700; }
-    .incident-time { color: var(--muted); font-size: 10px; font-weight: 800; white-space: nowrap; }
-    .queue-empty { padding: 28px 15px; color: var(--faint); text-align: center; font-size: 12px; font-weight: 700; }
-
-    .rendered-deck {
-      grid-column: 2 / 4;
-      grid-row: 2;
-      min-width: 0;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      background: rgba(7, 13, 19, .96);
-      padding: 9px 12px 10px;
-    }
-
-    .generated-forecast-results {
-      margin-top: 9px;
-      padding-top: 9px;
-      border-top: 1px solid var(--line-soft);
-    }
-    .generated-forecast-results .deck-head { display: flex; align-items: center; gap: 9px; }
-    .generated-forecast-results .deck-title { color: #c7f5ff; }
-
-    .deck-head { min-height: 25px; }
-    .deck-title { flex: 0 0 auto; font-size: 14px; white-space: nowrap; }
-    .deck-status { color: var(--faint); font-size: 10px; font-weight: 800; }
-    .deck-tabs { display: flex; min-width: 0; gap: 4px; align-items: center; overflow: auto; padding-left: 12px; }
-
-    .deck-tab {
-      border: 0;
-      border-bottom: 2px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      padding: 4px 6px 6px;
-      font-size: 10px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-    .deck-tab.active { border-bottom-color: var(--cyan); color: #fff; }
-
-    .card-strip {
-      display: flex;
-      gap: 9px;
-      overflow-x: auto;
-      padding: 8px 0 2px;
-      scroll-snap-type: x proximity;
-      scrollbar-color: var(--line) transparent;
-    }
-
-    .media-card {
-      --accent: var(--blue);
-      position: relative;
-      width: 185px;
-      flex: 0 0 185px;
-      overflow: hidden;
-      border: 1px solid var(--accent);
-      border-radius: 4px;
-      background: #0b1118;
-      box-shadow: 0 7px 18px rgba(0,0,0,.28);
-      scroll-snap-align: start;
-    }
-
-    .media-card:hover { transform: translateY(-1px); box-shadow: 0 11px 24px rgba(0,0,0,.36); }
-    .media-thumb { display: block; width: 100%; height: 82px; background: #101a25; overflow: hidden; }
-    .media-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .18s ease; }
-    .media-card:hover img { transform: scale(1.025); }
-    .media-card figcaption { padding: 6px 7px 7px; }
-    .media-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Barlow Condensed, Inter, sans-serif; font-size: 13px; letter-spacing: .025em; text-transform: uppercase; }
-    .media-card span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; color: var(--muted); font-size: 9px; font-weight: 700; }
-
-    .rendering-thumb {
-      width: 100%;
-      height: 82px;
-      display: grid;
-      place-items: center;
-      align-content: center;
-      gap: 6px;
-      color: #d5f5fc;
-      background: repeating-linear-gradient(120deg, rgba(255,255,255,.05) 0 1px, transparent 1px 7px), #0b1822;
-      font-size: 9px;
-      font-weight: 900;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-    }
-
-    .spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255,255,255,.2);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin .75s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .intelligence {
-      grid-column: 2 / 4;
-      grid-row: 3;
-      display: grid;
-      grid-template-columns: 1fr 1.15fr .9fr;
-      min-width: 0;
-      background: #071019;
-    }
-
-    .intel-panel {
-      min-width: 0;
-      padding: 12px;
-      border-right: 1px solid var(--line);
-    }
-
-    .intel-panel:last-child { border-right: 0; }
-    .intel-title { font-size: 14px; }
-    .intel-link { color: var(--cyan); font-size: 10px; font-weight: 800; }
-
-    .intel-list { display: grid; gap: 0; margin-top: 8px; }
-    .intel-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--line-soft);
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .intel-row:last-child { border-bottom: 0; }
-    .intel-row strong { overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-    .intel-row time { color: var(--faint); font-size: 10px; font-weight: 700; }
-    .outlook-swatch { display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--accent, var(--cyan)); }
-
-    .report-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 7px;
-      margin-top: 10px;
-    }
-
-    .report-stat {
-      border: 1px solid var(--line);
-      border-top: 2px solid var(--accent, var(--cyan));
-      padding: 7px;
-      background: rgba(255,255,255,.018);
-    }
-    .report-stat span { display: block; color: var(--faint); font-size: 9px; font-weight: 800; text-transform: uppercase; }
-    .report-stat strong { display: block; margin-top: 3px; font-family: Oswald, sans-serif; font-size: 20px; line-height: 1; }
-    .report-note { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
-
-    .empty-state {
-      min-height: 85px;
-      display: grid;
-      place-items: center;
-      border: 1px dashed var(--line);
-      color: var(--faint);
-      text-align: center;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .is-hidden { display: none !important; }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
-    }
-
-    @media (max-width: 1320px) {
-      .command-grid { grid-template-columns: 220px minmax(0, 1fr) 285px; }
-      .live-meta { gap: 10px; }
-      .live-meta .source-label { display: none; }
-    }
-
-    @media (max-width: 1100px) {
-      .topbar { grid-template-columns: 1fr auto; }
-      .live-meta { display: none; }
-      .command-grid { grid-template-columns: 205px minmax(0, 1fr); grid-template-rows: minmax(500px, 62vh) auto auto auto; }
-      .filter-rail { grid-row: 1 / 5; }
-      .incident-queue { grid-column: 2; grid-row: 2; border-top: 1px solid var(--line); border-left: 0; max-height: 360px; }
-      .rendered-deck { grid-column: 2; grid-row: 3; }
-      .intelligence { grid-column: 2; grid-row: 4; }
-      .incident-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @media (max-width: 740px) {
-      .app { width: 100%; padding: 0; }
-      .topbar { position: sticky; top: 0; z-index: 12; min-height: 58px; border-radius: 0; padding: 9px 10px; }
-      .beta-banner { padding: 8px 10px; font-size: 11px; align-items: flex-start; }
-      .brand img { width: 34px; height: 34px; }
-      .brand-name { font-size: 21px; }
-      .brand-name::after { width: 0; margin: 0; }
-      .brand-section { display: none; }
-      .status-copy { display: none; }
-      .command-grid { display: block; border-left: 0; border-right: 0; }
-      .filter-rail { border-right: 0; border-bottom: 1px solid var(--line); padding: 9px 10px; }
-      .rail-title, .summary-list, .utility-links { display: none; }
-      .filter-block { display: inline-block; width: calc(50% - 5px); margin: 0 6px 0 0; vertical-align: top; }
-      .filter-block.filter-layers { display: none; }
-      .filter-block.location-forecast-search { display: block; width: 100%; margin: 8px 0 0; }
-      .filter-block .layer-set { display: none; }
-      .map-stage { height: 58vh; min-height: 420px; }
-      .map-topbar { align-items: flex-start; }
-      .map-updated { display: none; }
-      .map-readout { top: 60px; max-width: calc(100% - 24px); }
-      .legend { width: 210px; }
-      .map-picker { right: 10px; bottom: 10px; width: calc(100% - 20px); }
-      .map-stage.has-selection .legend { bottom: 166px; }
-      .deck-head { align-items: flex-start; }
-      .deck-tabs { padding-left: 6px; }
-      .incident-list { grid-template-columns: 1fr; }
-      .rendered-deck { padding: 9px 10px; }
-      .deck-tabs { padding-left: 4px; }
-      .media-card { width: 72vw; flex-basis: 72vw; }
-      .media-thumb, .rendering-thumb { height: 126px; }
-      .intelligence { grid-template-columns: 1fr; }
-      .intel-panel { border-right: 0; border-bottom: 1px solid var(--line); }
-      .intel-panel:last-child { border-bottom: 0; }
-    }
+    .mono { font-family: "WP Mono", ui-monospace, monospace; }
+
+    /* ---------- top bar ---------- */
+    .top { position: fixed; inset: 0 0 auto 0; height: var(--top); display: flex; align-items: center; gap: 16px; padding: 0 16px; background: rgba(7,10,16,.96); border-bottom: 1px solid var(--line); z-index: 30; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; flex: none; }
+    .brand img { width: 36px; height: 36px; border-radius: 9px; }
+    .brand b { font-family: "WP Display"; font-size: 21px; letter-spacing: .04em; font-weight: 700; line-height: 1; }
+    .brand small { display: block; font-family: "WP Mono"; font-size: 10px; letter-spacing: .18em; color: var(--muted); margin-top: 3px; }
+    .live { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-family: "WP Mono"; font-size: 11px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
+    .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 0 rgba(52,224,122,.6); animation: pulse 2s infinite; }
+    .live.stale i { background: #f2b33d; animation: none; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(52,224,122,0); } 100% { box-shadow: 0 0 0 0 rgba(52,224,122,0); } }
+    .search { flex: 1; max-width: 520px; margin-left: auto; position: relative; }
+    .search input { width: 100%; height: 38px; padding: 0 14px 0 38px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px; outline: none; }
+    .search input:focus { border-color: rgba(255,255,255,.35); }
+    .search svg { position: absolute; left: 12px; top: 11px; color: var(--muted); }
+    .tally { display: flex; gap: 6px; flex: none; }
+    .tally span { display: flex; flex-direction: column; align-items: center; min-width: 58px; padding: 4px 8px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
+    .tally b { font-family: "WP Display"; font-size: 18px; line-height: 1.1; }
+    .tally small { font-family: "WP Mono"; font-size: 9px; letter-spacing: .12em; color: var(--muted); }
+
+    /* ---------- breaking banner ---------- */
+    .breaking { position: fixed; top: calc(var(--top) + 10px); left: 50%; transform: translate(-50%, -160%); z-index: 40; display: flex; align-items: stretch; max-width: min(820px, calc(100vw - 24px)); border-radius: 12px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.55); transition: transform .45s cubic-bezier(.2,.9,.3,1.2); border: 0; padding: 0; text-align: left; background: none; }
+    .breaking:not(.show) { visibility: hidden; transition: transform .45s, visibility 0s .45s; }
+    .breaking.show { transform: translate(-50%, 0); }
+    .breaking .tag { padding: 12px 14px; background: #fff; color: #000; font-family: "WP Display"; font-weight: 700; letter-spacing: .08em; display: flex; align-items: center; }
+    .breaking .msg { padding: 10px 16px; background: var(--b, #e40000); color: #fff; }
+    .breaking .msg b { display: block; font-family: "WP Display"; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; }
+    .breaking .msg span { font-size: 13px; opacity: .9; }
+
+    /* ---------- layout ---------- */
+    .stage { position: fixed; top: var(--top); left: 0; right: var(--rail); bottom: 0; }
+    #map { position: absolute; inset: 0; background: #0b1018; }
+    .rail { position: fixed; top: var(--top); right: 0; bottom: 0; width: var(--rail); display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); z-index: 10; }
+
+    /* map overlays */
+    .tools { position: absolute; top: 12px; left: 12px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 70px); z-index: 5; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: rgba(10,14,22,.88); backdrop-filter: blur(8px); font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--muted); }
+    .chip[aria-pressed="true"] { color: #fff; border-color: rgba(255,255,255,.4); background: rgba(30,38,54,.95); }
+    .chip .dot { width: 8px; height: 8px; border-radius: 2px; background: currentColor; }
+    .timeline { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 8px; border-radius: 12px; background: rgba(10,14,22,.9); border: 1px solid var(--line-2); backdrop-filter: blur(8px); z-index: 5; }
+    .timeline button { width: 34px; height: 34px; border-radius: 8px; border: 0; background: #fff; color: #000; display: grid; place-items: center; }
+    .timeline .tl-time { font-family: "WP Mono"; font-size: 13px; min-width: 112px; }
+    .timeline .tl-track { display: flex; gap: 3px; }
+    .timeline .tl-track i { width: 10px; height: 18px; border-radius: 3px; background: rgba(255,255,255,.14); }
+    .timeline .tl-track i.on { background: #fff; }
+    .legend { position: absolute; right: 12px; bottom: 30px; width: 260px; padding: 10px 12px; border-radius: 12px; background: rgba(10,14,22,.9); border: 1px solid var(--line-2); z-index: 5; }
+    .legend .lt { display: flex; justify-content: space-between; font-family: "WP Mono"; font-size: 10px; letter-spacing: .1em; color: var(--muted); margin-bottom: 6px; }
+    .legend .lb { height: 10px; border-radius: 5px; }
+    .legend .ll { display: flex; justify-content: space-between; font-family: "WP Mono"; font-size: 9px; color: var(--dim); margin-top: 4px; }
+    .picker { position: absolute; z-index: 8; min-width: 260px; max-width: 320px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.6); overflow: hidden; }
+    .picker header { padding: 8px 12px; font-family: "WP Mono"; font-size: 10px; letter-spacing: .12em; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .picker button { display: flex; width: 100%; gap: 10px; align-items: center; padding: 10px 12px; border: 0; background: none; text-align: left; border-bottom: 1px solid var(--line); }
+    .picker button:hover { background: var(--panel-2); }
+    .picker i { width: 6px; align-self: stretch; border-radius: 3px; background: var(--c); }
+    .picker b { display: block; font-size: 13px; }
+    .picker span span { font-size: 11px; color: var(--muted); }
+
+    /* rail */
+    .tabs { display: flex; gap: 2px; padding: 10px 10px 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; flex: none; }
+    .tabs button { flex: none; padding: 10px 12px; border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 13px; border-bottom: 2px solid transparent; }
+    .tabs button[aria-selected="true"] { color: #fff; border-bottom-color: #fff; }
+    .tabs button em { font-style: normal; font-family: "WP Mono"; font-size: 11px; color: var(--dim); margin-left: 4px; }
+    .list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .row { --c: #888; display: grid; grid-template-columns: 6px 1fr 112px; border-radius: 12px; overflow: hidden; background: var(--panel-2); border: 1px solid var(--line); text-align: left; padding: 0; transition: border-color .15s; flex: none; }
+    .row:hover { border-color: rgba(255,255,255,.25); }
+    .row.sel { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+    .row .bar { background: var(--c); }
+    .row .body { padding: 10px 12px; min-width: 0; display: block; }
+    .row .ev { display: flex; align-items: center; gap: 7px; font-family: "WP Display"; font-size: 17px; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .ev svg { color: var(--c); flex: none; }
+    .row .area { display: block; font-size: 12.5px; color: #c7cfdb; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; font-family: "WP Mono"; font-size: 10.5px; color: var(--muted); }
+    .tagp { padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.08); color: #dfe5ee; letter-spacing: .06em; }
+    .tagp.hot { background: #fff; color: #000; }
+    .tagp.new { background: var(--c); color: #000; }
+    .tagp.vid { background: #ff2d55; color: #fff; }
+    .row .thumb { position: relative; background: #000 center/cover no-repeat; min-height: 70px; }
+    .row .thumb .pend { position: absolute; inset: 0; display: grid; place-items: center; font-family: "WP Mono"; font-size: 9px; color: var(--dim); background: #0a0e15; }
+    .hero { --c: #e40000; border-radius: 14px; overflow: hidden; border: 1px solid var(--c); background: var(--panel-2); text-align: left; padding: 0; flex: none; }
+    .hero img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #000; }
+    .hero .cap { padding: 10px 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .hero .cap b { font-family: "WP Display"; font-size: 19px; text-transform: uppercase; }
+    .hero .cap span { font-family: "WP Mono"; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .section-label { font-family: "WP Mono"; font-size: 10px; letter-spacing: .14em; color: var(--dim); padding: 6px 2px 0; }
+    .shorts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
+    .short-tile { position: relative; aspect-ratio: 9/16; border-radius: 10px; overflow: hidden; border: 1px solid var(--line-2); background: #000 center/cover no-repeat; padding: 0; }
+    .short-tile span { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 8px; font-family: "WP Display"; font-size: 13px; text-transform: uppercase; text-align: left; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+    .short-tile::after { content: "▶"; position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,.6); display: grid; place-items: center; font-size: 11px; }
+    .fsearch { display: flex; gap: 8px; flex: none; }
+    .fsearch input { flex: 1; height: 38px; padding: 0 12px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel-2); font-weight: 700; font-size: 13px; text-decoration: none; color: #fff; }
+    .btn.primary { background: #fff; color: #000; border-color: #fff; }
+    .btn.red { background: #ff2d55; border-color: #ff2d55; color: #fff; }
+    .btn[disabled] { opacity: .55; cursor: progress; }
+    .foot { flex: none; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 11px; color: var(--dim); line-height: 1.45; }
+    .foot b { color: #f2b33d; font-weight: 700; }
+
+    /* detail */
+    .detail { display: none; flex-direction: column; flex: 1; overflow-y: auto; }
+    .rail.has-detail .detail { display: flex; }
+    .rail.has-detail .tabs, .rail.has-detail .list { display: none; }
+    .d-head { --c: #e40000; position: sticky; top: 0; z-index: 2; background: var(--c); color: var(--ink, #fff); padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
+    .d-head button { flex: none; width: 32px; height: 32px; border-radius: 8px; border: 0; background: rgba(0,0,0,.28); color: inherit; font-size: 18px; }
+    .d-head h2 { margin: 0; font-family: "WP Display"; font-size: 26px; line-height: 1.02; text-transform: uppercase; font-weight: 700; }
+    .d-head p { margin: 4px 0 0; font-size: 13px; font-weight: 600; opacity: .92; }
+    .d-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+    .d-card img { display: block; width: 100%; border-radius: 10px; border: 1px solid var(--line-2); background: #000; aspect-ratio: 16/9; object-fit: cover; }
+    .d-card .pending { aspect-ratio: 16/9; border-radius: 10px; border: 1px dashed var(--line-2); display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+    .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fact { padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+    .fact span { display: block; font-family: "WP Mono"; font-size: 10px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+    .fact b { display: block; font-family: "WP Display"; font-size: 22px; margin-top: 2px; }
+    .fact small { font-family: "WP Mono"; font-size: 10px; color: var(--dim); }
+    .todo { padding: 12px; border-radius: 10px; background: var(--panel-2); border-left: 4px solid var(--c, #fff); font-size: 14px; line-height: 1.5; color: #dfe5ee; }
+    .shortbox { border-radius: 12px; border: 1px solid var(--line-2); background: #05070b; overflow: hidden; }
+    .shortbox video { display: block; width: 100%; max-height: 62vh; background: #000; }
+    .shortbox .sb-row { display: flex; gap: 8px; padding: 10px; align-items: center; flex-wrap: wrap; }
+    .shortbox .sb-row p { margin: 0; flex: 1 1 160px; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .modal { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; background: rgba(0,0,0,.82); padding: 16px; }
+    .modal.open { display: grid; }
+    .modal video { max-height: 88vh; max-width: 100%; border-radius: 14px; background: #000; }
+    .modal button { position: absolute; top: 14px; right: 14px; width: 42px; height: 42px; border-radius: 50%; border: 0; background: #fff; color: #000; font-size: 20px; }
+    .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 16px; border-radius: 10px; background: #fff; color: #000; font-weight: 700; font-size: 13px; z-index: 70; opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 1180px) { :root { --rail: 400px; } .tally span:nth-child(n+3) { display: none; } }
+    @media (max-width: 860px) {
+      :root { --top: 56px; }
+      .tally, #live-text { display: none; }
+      .brand small { display: none; }
+      .stage { right: 0; bottom: auto; height: 46vh; }
+      .rail { top: calc(var(--top) + 46vh); width: 100%; border-left: 0; border-top: 1px solid var(--line); }
+      .legend { display: none; }
+      .timeline .tl-track { display: none; }
+      .row { grid-template-columns: 6px 1fr 92px; }
+      .chip { height: 28px; padding: 0 9px; font-size: 11px; }
+      .top { gap: 10px; padding: 0 10px; }
+      .brand b { font-size: 16px; }
+      .brand img { width: 30px; height: 30px; }
+      .search input { padding-left: 32px; font-size: 14px; }
+      .search svg { left: 10px; }
+      .timeline { bottom: 34px; }
+      .foot { font-size: 10px; padding: 6px 12px; }
+      .breaking .msg b { font-size: 17px; }
+    }
+    @media (max-width: 420px) { .brand b { display: none; } }
   </style>
-  <link rel="stylesheet" href="/warningcenter/public/warningcenter-atlas.css?v=20260822-1">
 </head>
 <body>
-  <header class="atlas-header">
-    <a class="atlas-brand" href="/warningcenter" aria-label="WeatherPower Warning Center">
-      <img src="/public/assets/wp-logo.png" alt="WeatherPower" onerror="this.src='/warningcenter/public/assets/wp-logo.png'">
-      <span><b>WeatherPower</b><small>Warning atlas</small></span>
+  <header class="top">
+    <a class="brand" href="https://weatherpower.app/">
+      <img src="/warningcenter/public/assets/wp-logo.png" alt="">
+      <div><b>WARNING CENTER</b><small>WEATHERPOWER LIVE</small></div>
     </a>
-    <label class="atlas-search" for="searchInput">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-      <input id="searchInput" type="search" autocomplete="off" placeholder="Search any active warning, watch, state, or county">
-      <kbd>LIVE</kbd>
+    <div class="live" id="live"><i></i><span id="live-text">CONNECTING</span></div>
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input id="q" type="search" placeholder="Search warnings, counties, states (e.g. tornado KS)" autocomplete="off">
     </label>
-    <div class="atlas-telemetry" aria-live="polite">
-      <div class="operation-cell is-live"><span class="operation-label"><i class="live-dot"></i>Radar</span><strong id="updatedAt">Connecting</strong><small>NEXRAD</small></div>
-      <div class="operation-cell"><span class="operation-label">Sources</span><strong id="signalTitle">Linking</strong><small id="signalDetail">NWS + NOAA</small></div>
-      <div class="operation-cell"><span class="operation-label">Cards</span><strong id="healthTitle">Checking</strong><small id="healthDetail">Renderer</small></div>
-      <button class="icon-button" id="refreshButton" type="button" title="Refresh live data" aria-label="Refresh live data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg></button>
-    </div>
+    <div class="tally" id="tally"></div>
   </header>
 
-  <main class="atlas-app">
-    <section class="map-stage atlas-map" aria-label="Live United States weather map">
-      <div id="map"></div>
+  <button class="breaking" id="breaking" type="button"><span class="tag">BREAKING</span><span class="msg"><b id="breaking-title"></b><span id="breaking-sub"></span></span></button>
 
-      <div class="atlas-map-heading">
-        <span class="atlas-eyebrow"><i class="live-dot"></i>United States live picture</span>
-        <strong id="mapHeadline">Loading active products</strong>
-        <span id="mapSubhead">Warnings, watches, outlooks, discussions, and storm reports</span>
-      </div>
-
-      <div class="summary-list atlas-event-horizon" id="summaryList"><div class="queue-empty">Loading active products...</div></div>
-
-      <nav class="atlas-tools" aria-label="Map tools">
-        <div class="map-controls" aria-label="Radar mode">
-          <button class="map-mode active" id="reflectivityButton" type="button"><span>REF</span><b>Reflectivity</b></button>
-          <button class="map-mode" id="velocityButton" type="button" title="Nearest real NEXRAD velocity product"><span>VEL</span><b>Velocity</b></button>
-        </div>
-        <div class="layer-set">
-          <button class="layer-toggle active" type="button" data-layer="alerts"><i class="toggle-square"></i><span>Warnings</span></button>
-          <button class="layer-toggle active" type="button" data-layer="outlooks"><i class="toggle-square"></i><span>SPC</span></button>
-          <button class="layer-toggle active" type="button" data-layer="discussions"><i class="toggle-square"></i><span>MCD</span></button>
-          <button class="layer-toggle active" type="button" data-layer="reports"><i class="toggle-square"></i><span>Reports</span></button>
-        </div>
-      </nav>
-
-      <div class="map-updated"><b id="mapProductName">National radar</b><span id="mapProductDetail">NEXRAD reflectivity mosaic</span></div>
-
-      <div class="legend" id="radarLegend"><div class="legend-head"><span id="legendTitle">Reflectivity</span><span id="legendUnits">dBZ</span></div><div class="legend-bar"></div><div class="legend-scale"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Extreme</span></div></div>
-
-      <aside class="map-picker" id="mapPicker" hidden aria-live="polite">
-        <section id="pickerChoiceView"><div class="picker-head"><span>Products at this point</span><button class="picker-close" id="pickerClose" type="button" aria-label="Close alert picker">x</button></div><div class="choice-list" id="pickerOptions"></div></section>
-        <section id="pickerSelectedView" hidden><div class="picker-head"><span>Selected product</span><button class="picker-close" id="pickerCloseSelected" type="button" aria-label="Close selected product">x</button></div><strong class="picker-event" id="pickerEvent">Weather product</strong><span class="picker-area" id="pickerArea"></span><div class="picker-meta"><span>Expires</span><b id="pickerExpires">--</b></div><div class="picker-actions"><button class="picker-button" id="pickerFocus" type="button">Recenter</button><a class="picker-detail" id="pickerDetail" href="/warningcenter">Open briefing</a></div></section>
-      </aside>
-
-      <section class="alert-runway" aria-label="Priority alerts">
-        <header><span>Priority runway</span><small>Tap any alert to isolate it on the map</small></header>
-        <div class="incident-list" id="incidentList"><div class="queue-empty">Loading priority alerts...</div></div>
-      </section>
-
-      <aside class="beta-float" aria-label="Public beta notice"><b>Beta</b><span>Live data updates quickly. Card images may arrive a few minutes later during active weather.</span></aside>
-    </section>
-
-    <section class="briefing-stream">
-      <header class="briefing-header">
-        <div><span class="section-index">01 / LIVE PRODUCTS</span><h1>The national weather brief</h1><p>Every current WeatherPower warning card, watch, outlook, discussion, and forecast in one running feed.</p></div>
-        <div class="briefing-filters">
-          <label><span>State</span><select class="filter-select" id="stateFilter" aria-label="State filter"><option value="all">All states</option></select></label>
-          <label><span>Order</span><select class="filter-select" id="sortSelect" aria-label="Alert order"><option value="severity">Highest impact</option><option value="newest">Newest first</option><option value="expires">Expires soon</option></select></label>
-        </div>
-      </header>
-
-      <section class="forecast-lab location-forecast-search">
-        <div><span class="section-index">PERSONAL FORECAST LAB</span><h2>Turn any U.S. place into a seven-day card set.</h2><p id="forecastSearchNote">Search a city, state, or ZIP. WeatherPower uses the latest National Weather Service forecast.</p></div>
-        <form class="forecast-search-row" id="forecastSearchForm"><input class="search-input" id="forecastSearchInput" type="search" autocomplete="postal-code" placeholder="Idabel, OK or 74745" aria-describedby="forecastSearchNote"><button class="forecast-generate" id="forecastGenerateButton" type="submit">Generate cards</button></form>
-      </section>
-
-      <nav class="deck-tabs" aria-label="Card categories">
-        <button class="deck-tab active" data-group="all" type="button">All <span id="count-all">0</span></button>
-        <button class="deck-tab" data-group="warnings" type="button">Warnings <span id="count-warnings">0</span></button>
-        <button class="deck-tab" data-group="watches" type="button">Watches <span id="count-watches">0</span></button>
-        <button class="deck-tab" data-group="outlooks" type="button">SPC <span id="count-outlooks">0</span></button>
-        <button class="deck-tab" data-group="discussions" type="button">MCD <span id="count-discussions">0</span></button>
-        <button class="deck-tab" data-group="forecasts" type="button">Forecast <span id="count-forecasts">0</span></button>
-        <span class="deck-status" id="deckStatus">Checking renderer</span>
-      </nav>
-
-      <section class="rendered-deck"><div class="card-strip" id="cardStrip" aria-live="polite"><div class="empty-state">Loading rendered WeatherPower cards...</div></div></section>
-
-      <section class="generated-forecast-results" id="generatedForecastResults" hidden aria-live="polite"><div class="deck-head"><h2 class="deck-title" id="generatedForecastTitle">Forecast cards</h2><span class="deck-status" id="generatedForecastStatus"></span></div><div class="card-strip" id="generatedForecastCards"></div></section>
-
-      <section class="signal-board">
-        <header><span class="section-index">02 / WEATHER SIGNALS</span><h2>Beyond warnings</h2></header>
-        <div class="intelligence">
-          <section class="intel-panel"><div class="intel-head"><h3 class="intel-title">SPC outlooks</h3><a class="intel-link" href="/warningcenter?group=outlooks">See all</a></div><div class="intel-list" id="outlookList"><div class="queue-empty">Loading SPC outlooks...</div></div></section>
-          <section class="intel-panel"><div class="intel-head"><h3 class="intel-title">Mesoscale discussions</h3><a class="intel-link" href="/warningcenter?group=discussions">See all</a></div><div class="intel-list" id="discussionList"><div class="queue-empty">Loading discussions...</div></div></section>
-          <section class="intel-panel report-panel"><div class="intel-head"><h3 class="intel-title">Storm reports</h3><span class="intel-link">Past 12 hours</span></div><div id="reportSummary"><div class="queue-empty">Loading reports...</div></div></section>
-        </div>
-      </section>
-    </section>
+  <main class="stage">
+    <div id="map"></div>
+    <div class="tools" id="tools">
+      <button class="chip" data-tool="radar" aria-pressed="true"><span class="dot" style="color:#2de06a"></span>Radar</button>
+      <button class="chip" data-tool="rain" aria-pressed="false"><span class="dot" style="color:#e94fe0"></span>24-hr rain</button>
+      <button class="chip" data-tool="sat" aria-pressed="false"><span class="dot" style="color:#7cb6ff"></span>Satellite</button>
+      <button class="chip" data-tool="watches" aria-pressed="true"><span class="dot" style="color:#ffd400"></span>Watches</button>
+      <button class="chip" data-tool="spc" aria-pressed="true"><span class="dot" style="color:#ff8a00"></span>SPC</button>
+      <button class="chip" data-tool="reports" aria-pressed="false"><span class="dot" style="color:#fff"></span>Reports</button>
+    </div>
+    <div class="timeline" id="timeline">
+      <button id="play" aria-label="Pause radar loop">
+        <svg id="play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+      </button>
+      <div class="tl-time" id="tl-time">--:--</div>
+      <div class="tl-track" id="tl-track"></div>
+    </div>
+    <div class="legend" id="legend">
+      <div class="lt"><span id="legend-title">RADAR REFLECTIVITY</span><span>NEXRAD · IEM</span></div>
+      <div class="lb" id="legend-bar"></div>
+      <div class="ll" id="legend-labels"></div>
+    </div>
   </main>
+
+  <aside class="rail" id="rail">
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <div class="list" id="list"><div class="empty">Loading live alerts…</div></div>
+    <section class="detail" id="detail"></section>
+    <div class="foot"><b>BETA</b> · Cards and warning videos render on our servers and can lag a few minutes behind the NWS during busy weather. Always follow your local NWS office and officials.</div>
+  </aside>
+
+  <div class="modal" id="modal"><button type="button" aria-label="Close" id="modal-close">✕</button><video id="modal-video" controls playsinline loop></video></div>
+  <div class="toast" id="toast" role="status"></div>
 
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
   <script>
-    const state = {
-      items: [],
-      reports: [],
-      group: 'all',
-      radarMode: 'reflectivity',
-      map: null,
-      mapReady: false,
-      mapPromise: null,
-      apiBase: window.location.pathname.startsWith('/warningcenter') ? '/warningcenter' : '',
-      selectedKey: '',
-      pickerOptions: [],
-      pickerPoint: null,
-      didFitMap: false,
-      lastMapSignature: '',
-      refreshPromise: null,
-      generatedForecast: { items: [], location: null, loading: false, message: '' },
-      layers: { alerts: true, outlooks: true, discussions: true, reports: true }
+  (() => {
+    const BASE = location.pathname.startsWith('/warningcenter') ? '/warningcenter' : '';
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const api = (path) => BASE + path;
+    const asset = (p) => (p ? BASE + p : '');
+    const ICONS = {
+      tornado: '<path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2" stroke-linecap="round"/>',
+      flood: '<path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 13c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 18c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0" stroke-linecap="round"/>',
+      storm: '<path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z" stroke-linejoin="round"/>',
+      winter: '<path d="M12 2v20M3.5 7l17 10M20.5 7l-17 10" stroke-linecap="round"/>',
+      fire: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.6-2.4-5.7-4.2-8.2-.6 2-1.6 3.2-2.8 3.7.3-3.3-1.2-6.4-4-8.7.2 3.6-3 6.3-3 10.9C5 19.6 8 22 12 22z"/>',
+      wind: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8" stroke-linecap="round"/>',
+      tropical: '<circle cx="12" cy="12" r="3"/><path d="M12 9c0-4 3-7 8-7-2 2-3 4-3 6M12 15c0 4-3 7-8 7 2-2 3-4 3-6" stroke-linecap="round"/>',
+      outlook: '<path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5" stroke-linecap="round"/>',
+      forecast: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22" stroke-linecap="round"/>',
+      alert: '<path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5" stroke-linecap="round"/>'
+    };
+    const icon = (key, size = 16) => '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">' + (ICONS[key] || ICONS.alert) + '</svg>';
+    const ink = (hex) => {
+      const v = String(hex || '#000').replace('#', '');
+      const [r, g, b] = [0, 2, 4].map((o) => parseInt(v.slice(o, o + 2), 16) || 0);
+      return 0.299 * r + 0.587 * g + 0.114 * b > 170 ? '#0b0d12' : '#ffffff';
+    };
+    const LEGENDS = {
+      radar: { title: 'RADAR REFLECTIVITY', bar: 'linear-gradient(90deg,#04e9e7,#019ff4 12%,#02fd02 26%,#01c501 36%,#fdf802 50%,#fd9500 62%,#fd0000 74%,#d40000 82%,#f800fd 92%,#fff)', labels: ['LIGHT', 'MODERATE', 'HEAVY', 'EXTREME'] },
+      rain: { title: 'RADAR-ESTIMATED RAIN · 24 HR', bar: 'linear-gradient(90deg,#8be28b,#2eb82e 18%,#f5f53d 36%,#f59b2e 52%,#e62e2e 68%,#b82eb8 84%,#f2a6f2)', labels: ['0.5"', '1"', '2"', '4"', '8"+'] }
+    };
+    const TABS = [
+      ['warnings', 'Warnings'], ['watches', 'Watches'], ['shorts', 'Videos'], ['statements', 'Statements'],
+      ['discussions', 'SPC MDs'], ['outlooks', 'Outlooks'], ['forecasts', 'Forecasts']
+    ];
+
+    const S = {
+      alerts: [], counts: {}, tab: 'warnings', q: '', selected: null, known: null,
+      radar: null, frame: 0, playing: true,
+      tools: { radar: true, rain: false, sat: false, watches: true, spc: true, reports: false },
+      config: null, map: null, styleReady: false, lastOk: 0, shorts: [], detail: null, shortPoll: null
     };
 
-    const NEXRAD_REFLECTIVITY = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
-    const FALLBACK_BASES = ['/warningcenter', ''];
-    const STALE_WITHOUT_EXPIRE_MS = 48 * 60 * 60 * 1000;
-    const GROUPS = ['all', 'warnings', 'watches', 'outlooks', 'discussions', 'forecasts'];
-    const US_STATE_CODES = new Set(['AL', 'AK', 'AS', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'FM', 'GA', 'GU', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MH', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY']);
-    const $ = (id) => document.getElementById(id);
-    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
-    const lower = (value) => clean(value).toLowerCase();
-    const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
-    const now = () => Date.now();
+    const toast = (msg) => {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toast.t);
+      toast.t = setTimeout(() => el.classList.remove('show'), 2600);
+    };
+    const getJson = async (path, options) => {
+      const response = await fetch(api(path), { headers: { Accept: 'application/json' }, ...options });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw Object.assign(new Error(body.error || response.statusText), { status: response.status });
+      return body;
+    };
+    const until = (iso) => {
+      const ms = Date.parse(iso || '') - Date.now();
+      if (!Number.isFinite(ms)) return '';
+      if (ms <= 0) return 'expired';
+      const m = Math.round(ms / 60000);
+      if (m < 60) return m + ' min left';
+      const h = Math.floor(m / 60);
+      return h < 48 ? h + 'h ' + (m % 60) + 'm left' : Math.round(h / 24) + ' days left';
+    };
+    const fmtNum = (n) => (n == null ? '' : Number(n).toLocaleString('en-US'));
+    const fmtClock = (iso, tz) => {
+      try { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }); } catch { return ''; }
+    };
 
-    function apiPath(path) {
-      return state.apiBase + path;
-    }
-
-    async function fetchApi(path) {
-      const bases = state.apiBase ? [state.apiBase].concat(FALLBACK_BASES.filter((base) => base !== state.apiBase)) : FALLBACK_BASES;
-      let lastError;
-      for (const base of bases) {
-        try {
-          const response = await fetch(base + path, { headers: { Accept: 'application/json' } });
-          if (!response.ok) {
-            const body = await response.json().catch(() => ({}));
-            lastError = new Error(body.error || path + ' returned ' + response.status);
-            lastError.status = response.status;
-            continue;
-          }
-          if (!(response.headers.get('content-type') || '').includes('json')) {
-            lastError = new Error(path + ' returned non-JSON content');
-            continue;
-          }
-          state.apiBase = base;
-          return response;
-        } catch (error) {
-          lastError = error;
-        }
+    /* ---------------- rail ---------------- */
+    const visibleAlerts = () => {
+      const q = S.q.trim().toLowerCase();
+      return S.alerts.filter((a) => a.group === S.tab
+        && (!q || q.split(/\s+/).every((t) => [a.event, a.areaDesc, a.place, a.office, (a.states || []).join(' ')].join(' ').toLowerCase().includes(t))));
+    };
+    const renderTabs = () => {
+      $('tabs').innerHTML = TABS.map(([id, label]) => {
+        const count = id === 'shorts' ? S.shorts.length : (S.counts[id] || 0);
+        return '<button role="tab" data-tab="' + id + '" aria-selected="' + (S.tab === id) + '">' + label + '<em>' + count + '</em></button>';
+      }).join('');
+      $('tally').innerHTML = [['warnings', 'WARNINGS'], ['watches', 'WATCHES'], ['discussions', 'SPC MDS'], ['outlooks', 'OUTLOOKS']]
+        .map(([id, label]) => '<span><b>' + (S.counts[id] || 0) + '</b><small>' + label + '</small></span>').join('');
+    };
+    const rowHtml = (a) => {
+      const thumb = a.card ? 'style="background-image:url(\'' + esc(asset(a.card.path)) + '\')"' : '';
+      const tags = [];
+      if (a.threat) tags.push('<span class="tagp hot">' + esc(a.threat) + '</span>');
+      if (a.status === 'NEW') tags.push('<span class="tagp new">NEW</span>');
+      if (a.short) tags.push('<span class="tagp vid">▶ VIDEO</span>');
+      if (a.expiresAt) tags.push('<span>' + esc(until(a.expiresAt)) + '</span>');
+      if (a.people) tags.push('<span>' + fmtNum(a.people) + ' people</span>');
+      return '<button class="row' + (S.selected === a.key ? ' sel' : '') + '" data-key="' + esc(a.key) + '" style="--c:' + esc(a.color || '#888') + '">'
+        + '<span class="bar"></span><span class="body"><span class="ev">' + icon(a.icon) + esc(a.eventLabel) + '</span>'
+        + '<span class="area">' + esc(a.area || a.areaDesc) + '</span><span class="meta">' + tags.join('') + '</span></span>'
+        + '<span class="thumb" ' + thumb + '>' + (a.card ? '' : '<span class="pend">RENDERING</span>') + '</span></button>';
+    };
+    const renderList = () => {
+      renderTabs();
+      const list = $('list');
+      if (S.tab === 'shorts') {
+        list.innerHTML = S.shorts.length
+          ? '<div class="section-label">WARNING VIDEOS · LIVE RADAR + POLYGON · 15 SEC</div><div class="shorts-grid">' + S.shorts.map((s) => (
+            '<button class="short-tile" data-video="' + esc(asset(s.short.path)) + '" style="background-image:url(\'' + esc(asset(s.short.posterPath)) + '\')"><span>' + esc(s.event) + '</span></button>'
+          )).join('') + '</div>'
+          : '<div class="empty">No warning videos right now.<br>Videos are made automatically for tornado, severe thunderstorm and flash flood warnings — or open any warning and tap <b>Make a video</b>.</div>';
+        return;
       }
-      throw lastError || new Error(path + ' failed');
-    }
-
-    async function fetchForecastSearch(query) {
-      const path = '/api/forecasts/search?q=' + encodeURIComponent(query) + '&_=' + Date.now();
-      const bases = Array.from(new Set(['/warningcenter', state.apiBase, '']));
-      let lastError;
-      for (const base of bases) {
-        try {
-          const response = await fetch(base + path, {
-            cache: 'no-store',
-            headers: { Accept: 'application/json' }
-          });
-          if (!response.ok) {
-            const body = await response.json().catch(() => ({}));
-            lastError = new Error(body.error || path + ' returned ' + response.status);
-            continue;
-          }
-          if (!(response.headers.get('content-type') || '').includes('json')) {
-            lastError = new Error(path + ' returned non-JSON content');
-            continue;
-          }
-          state.apiBase = base;
-          return response;
-        } catch (error) {
-          lastError = error;
-        }
+      const items = visibleAlerts();
+      if (S.tab === 'forecasts') {
+        list.innerHTML = '<form class="fsearch" id="fsearch"><input name="q" placeholder="City or ZIP for 7-day forecast cards" required><button class="btn primary">Generate</button></form>'
+          + '<div id="fresults"></div><div class="section-label">FEATURED</div>' + items.map(rowHtml).join('');
+        return;
       }
-      throw lastError || new Error(path + ' failed');
-    }
+      if (!items.length) {
+        list.innerHTML = '<div class="empty">' + (S.q ? 'Nothing matches “' + esc(S.q) + '”.' : 'No active ' + esc(S.tab) + ' right now.') + '</div>';
+        return;
+      }
+      const top = items[0];
+      const hero = top.rank <= 5 && top.card
+        ? '<button class="hero" data-key="' + esc(top.key) + '" style="--c:' + esc(top.color) + '"><img src="' + esc(asset(top.card.path)) + '" alt="" loading="lazy"><span class="cap"><b>' + esc(top.headline) + '</b><span>' + esc(until(top.expiresAt)) + '</span></span></button>'
+        : '';
+      list.innerHTML = hero + items.slice(hero ? 1 : 0, 300).map(rowHtml).join('');
+    };
 
-    function timeAgo(value) {
-      const stamp = Date.parse(value || '');
-      if (!Number.isFinite(stamp)) return 'now';
-      const minutes = Math.max(0, Math.floor((now() - stamp) / 60000));
-      if (minutes < 1) return 'now';
-      if (minutes < 60) return minutes + 'm ago';
-      if (minutes < 48 * 60) return Math.floor(minutes / 60) + 'h ago';
-      return Math.floor(minutes / 1440) + 'd ago';
-    }
-
-    function formatTime(value, timezone) {
-      const stamp = Date.parse(value || '');
-      if (!Number.isFinite(stamp)) return '--';
-      const options = { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' };
-      if (timezone) options.timeZone = timezone;
+    /* ---------------- detail ---------------- */
+    const shortSection = (a) => {
+      if (a.short) {
+        return '<div class="shortbox"><video src="' + esc(asset(a.short.path)) + '" poster="' + esc(asset(a.short.posterPath)) + '" controls playsinline loop preload="metadata"></video>'
+          + '<div class="sb-row"><p>Live radar video · made ' + esc(fmtClock(a.short.renderedAt, a.timezone)) + '</p><a class="btn" download href="' + esc(asset(a.short.path)) + '">Download video</a></div></div>';
+      }
+      if (!a.geometry || ['outlooks', 'forecasts', 'discussions'].includes(a.group)) return '';
+      const busy = a.shortStatus === 'queued' || a.shortStatus === 'rendering';
+      return '<div class="shortbox"><div class="sb-row"><p>' + (busy
+        ? 'Rendering the warning video with the latest radar loop… usually 1–3 minutes.'
+        : 'Make a 15-second vertical video of this warning with the live radar loop — ready for Shorts, Reels and TikTok.')
+        + '</p><button class="btn red" id="make-short" ' + (busy ? 'disabled' : '') + '>' + (busy ? 'Rendering…' : '🎬 Make a video') + '</button></div></div>';
+    };
+    const renderDetail = (a) => {
+      S.detail = a;
+      const people = a.people ? '<div class="fact"><span>People in area</span><b>' + fmtNum(a.people) + '</b><small>' + (a.homes ? fmtNum(a.homes) + ' homes · ' : '') + '2020 Census</small></div>' : '';
+      const hazards = (a.hazards || []).map((h) => '<div class="fact"><span>' + esc(h.label) + '</span><b>' + esc(h.value) + '</b></div>').join('');
+      $('detail').innerHTML = '<div class="d-head" style="--c:' + esc(a.color) + ';--ink:' + ink(a.color) + '"><button id="back" aria-label="Back to list">←</button><div><h2>' + esc(a.headline) + '</h2><p>' + esc(a.area) + '</p></div></div>'
+        + '<div class="d-body">'
+        + '<div class="d-card">' + (a.card ? '<a href="' + esc(asset(a.card.path)) + '" target="_blank" rel="noopener"><img src="' + esc(asset(a.card.path)) + '" alt="' + esc(a.headline) + ' card"></a>' : '<div class="pending">Card is rendering…</div>') + '</div>'
+        + shortSection(a)
+        + '<div class="facts"><div class="fact"><span>' + (a.group === 'warnings' ? 'Expires' : 'Valid until') + '</span><b>' + esc(a.times?.expires || '--') + '</b><small>' + esc(until(a.expiresAt)) + '</small></div>'
+        + '<div class="fact"><span>Issued</span><b>' + esc(a.times?.issued || '--') + '</b><small>' + esc(a.status) + (a.threat ? ' · ' + esc(a.threat) : '') + '</small></div>'
+        + people + hazards + '</div>'
+        + (a.whatToDo ? '<div class="todo" style="--c:' + esc(a.color) + '"><b>What to do.</b> ' + esc(a.whatToDo) + '</div>' : '')
+        + '<div class="actions"><a class="btn" href="' + esc(BASE + '/warningdetail?key=' + encodeURIComponent(a.key)) + '">Full details</a>'
+        + '<button class="btn" id="copy-link">Copy link</button>'
+        + (a.card ? '<a class="btn" download href="' + esc(asset(a.card.path)) + '">Download card</a>' : '') + '</div>'
+        + '<div class="mono" style="font-size:10.5px;color:var(--dim)">Source: NWS ' + esc(a.office || '') + ' · ' + esc(a.event) + '</div>'
+        + '</div>';
+      $('rail').classList.add('has-detail');
+    };
+    const openDetail = async (key, { fly = true } = {}) => {
+      if (S.selected !== key) $('detail').scrollTop = 0;
+      S.selected = key;
+      const summary = S.alerts.find((a) => a.key === key);
+      if (summary) renderDetail(summary);
+      if (fly && summary) flyTo(summary);
+      highlight();
+      const url = new URL(location.href);
+      url.searchParams.set('alert', key);
+      history.replaceState(null, '', url);
       try {
-        return new Date(stamp).toLocaleTimeString([], options);
+        const full = await getJson('/api/v3/alert?key=' + encodeURIComponent(key));
+        if (S.selected === key) {
+          renderDetail(full);
+          if (!summary && fly) flyTo(full);
+          if (full.shortStatus === 'queued' || full.shortStatus === 'rendering') pollShort(key);
+        }
       } catch {
-        delete options.timeZone;
-        return new Date(stamp).toLocaleTimeString([], options);
+        if (!summary) { toast('That alert has expired'); closeDetail(); }
       }
-    }
-
-    function isCurrent(item) {
-      const expires = Date.parse(item.expiresAt || '');
-      if (Number.isFinite(expires)) return expires > now();
-      const issued = Date.parse(item.issuedAt || '');
-      return !Number.isFinite(issued) || now() - issued < STALE_WITHOUT_EXPIRE_MS;
-    }
-
-    function accent(item) {
-      return item.theme && (item.theme.accent || item.theme.primary) || '#61a8ff';
-    }
-
-    function accentRgb(item) {
-      return item.theme && item.theme.rgb || '97, 168, 255';
-    }
-
-    function eventName(item) {
-      return clean(item.event || item.title || 'Weather product');
-    }
-
-    function categoryFor(item) {
-      const text = lower((item.event || '') + ' ' + (item.title || '') + ' ' + (item.classification && item.classification.family || ''));
-      if (item.cardLayout === 'forecast' || item.classification && item.classification.isForecast || text.includes('daily forecast')) return 'forecasts';
-      if (item.classification && item.classification.isOutlook || text.includes('outlook')) return 'outlooks';
-      if (item.classification && item.classification.isDiscussion || text.includes('mesoscale discussion')) return 'discussions';
-      if (item.classification && item.classification.isWatch || text.includes('watch')) return 'watches';
-      if (item.classification && item.classification.isWarning || text.includes('warning')) return 'warnings';
-      return 'other';
-    }
-
-    function impactRank(item) {
-      const text = lower((item.event || '') + ' ' + (item.title || '') + ' ' + (item.classification && item.classification.alertTag || ''));
-      if (text.includes('tornado emergency')) return 100;
-      if (text.includes('emergency')) return 94;
-      if (text.includes('pds')) return 90;
-      if (text.includes('tornado')) return 82;
-      if (text.includes('destructive')) return 74;
-      if (text.includes('considerable')) return 69;
-      if (text.includes('severe thunderstorm')) return 63;
-      if (text.includes('flash flood')) return 58;
-      if (text.includes('flood')) return 47;
-      if (text.includes('watch')) return 39;
-      if (text.includes('outlook')) return 30;
-      if (text.includes('discussion')) return 28;
-      if (text.includes('forecast')) return 8;
-      return 18;
-    }
-
-    function cardImageUrl(item) {
-      const localPath = item.card && item.card.path;
-      const url = localPath || item.card && item.card.url || '';
-      if (!url) return '';
-      if (/^https?:/i.test(url)) return url;
-      return apiPath(url);
-    }
-
-    function detailUrl(item) {
-      const url = item.detailUrl || '/warningdetail?key=' + encodeURIComponent(item.key || item.nwsId || '');
-      if (/^https?:/i.test(url)) return url;
-      return apiPath(url);
-    }
-
-    function allMapItems(items) {
-      return (items || allFilteredItems()).concat(state.generatedForecast.items || []);
-    }
-
-    function geometryFor(item) {
-      if (item.geometry) return item.geometry;
-      if (item.feature && item.feature.geometry) return item.feature.geometry;
-      if (Array.isArray(item.polygon) && item.polygon.length > 3) return { type: 'Polygon', coordinates: [item.polygon] };
-      return null;
-    }
-
-    function simplifyRing(ring, limit) {
-      if (!Array.isArray(ring) || ring.length <= limit) return ring;
-      const last = ring.length - 1;
-      const step = Math.ceil(last / (limit - 1));
-      const next = [];
-      for (let index = 0; index < last; index += step) next.push(ring[index]);
-      next.push(ring[last]);
-      return next;
-    }
-
-    function simplifyGeometry(geometry) {
-      if (!geometry) return null;
-      if (geometry.type === 'Polygon') return { type: 'Polygon', coordinates: (geometry.coordinates || []).map((ring) => simplifyRing(ring, 200)) };
-      if (geometry.type === 'MultiPolygon') return { type: 'MultiPolygon', coordinates: (geometry.coordinates || []).map((polygon) => polygon.map((ring) => simplifyRing(ring, 200))) };
-      return geometry;
-    }
-
-    function allFilteredItems() {
-      const query = lower($('searchInput').value);
-      const stateCode = $('stateFilter').value;
-      const filtered = state.items.filter((item) => {
-        const category = categoryFor(item);
-        if (state.group !== 'all' && category !== state.group) return false;
-        if (stateCode !== 'all' && !((item.areaDesc || '') + ' ' + (item.state || '')).includes(stateCode)) return false;
-        if (query && !lower([item.title, item.event, item.areaDesc, item.state, item.office, item.sourceText].join(' ')).includes(query)) return false;
-        return true;
-      });
-      const order = $('sortSelect').value;
-      return filtered.sort((a, b) => {
-        if (state.group === 'forecasts') return (Date.parse(a.expiresAt || '') || Number.MAX_SAFE_INTEGER) - (Date.parse(b.expiresAt || '') || Number.MAX_SAFE_INTEGER);
-        if (order === 'newest') return (Date.parse(b.issuedAt || '') || 0) - (Date.parse(a.issuedAt || '') || 0);
-        if (order === 'expires') return (Date.parse(a.expiresAt || '') || Number.MAX_SAFE_INTEGER) - (Date.parse(b.expiresAt || '') || Number.MAX_SAFE_INTEGER);
-        return impactRank(b) - impactRank(a) || (Date.parse(b.issuedAt || '') || 0) - (Date.parse(a.issuedAt || '') || 0);
-      });
-    }
-
-    function countsByGroup(items) {
-      const counts = { all: items.length, warnings: 0, watches: 0, outlooks: 0, discussions: 0, forecasts: 0 };
-      items.forEach((item) => {
-        const category = categoryFor(item);
-        if (Object.prototype.hasOwnProperty.call(counts, category)) counts[category] += 1;
-      });
-      return counts;
-    }
-
-    function stateChoices(items) {
-      const found = new Set();
-      items.forEach((item) => {
-        const matches = clean((item.areaDesc || '') + '; ' + (item.state || '')).match(/\b[A-Z]{2}\b/g) || [];
-        matches.filter((match) => US_STATE_CODES.has(match)).forEach((match) => found.add(match));
-      });
-      return Array.from(found).sort();
-    }
-
-    function updateStateOptions() {
-      const active = $('stateFilter').value;
-      const states = stateChoices(state.items);
-      $('stateFilter').innerHTML = '<option value="all">All states</option>' + states.map((code) => '<option value="' + esc(code) + '">' + esc(code) + '</option>').join('');
-      if (states.includes(active)) $('stateFilter').value = active;
-    }
-
-    function summaryRows() {
-      const rows = new Map();
-      state.items.forEach((item) => {
-        const name = eventName(item);
-        if (!rows.has(name)) rows.set(name, { name, count: 0, accent: accent(item) });
-        rows.get(name).count += 1;
-      });
-      return Array.from(rows.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 10);
-    }
-
-    function renderSummary() {
-      const rows = summaryRows();
-      $('summaryList').innerHTML = rows.length ? rows.map((row) => {
-        const selected = $('searchInput').value === row.name ? ' active' : '';
-        return '<button class="summary-row' + selected + '" data-event="' + esc(row.name) + '" type="button" style="--accent:' + esc(row.accent) + '"><i class="summary-stripe"></i><span class="summary-label">' + esc(row.name) + '</span><b class="summary-count">' + row.count + '</b></button>';
-      }).join('') : '<div class="queue-empty">No current alert products.</div>';
-    }
-
-    function iconFor(item) {
-      const text = lower((item.event || '') + ' ' + (item.title || ''));
-      if (text.includes('tornado')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M6 9h12M8 13h8M10 17h4M12 17v3"/></svg>';
-      if (text.includes('flood')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15c2.2-2 4.4-2 6.6 0s4.4 2 6.6 0 4.4-2 4.4-2"/><path d="M3 19c2.2-2 4.4-2 6.6 0s4.4 2 6.6 0 4.4-2 4.4-2"/><path d="M12 3v8m0 0-3-3m3 3 3-3"/></svg>';
-      if (text.includes('severe') || text.includes('thunderstorm')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
-      if (text.includes('watch')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>';
-      if (text.includes('forecast')) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="3"/><path d="M3 20h15M6 16a4 4 0 0 1 7-2 3 3 0 0 1 5 2"/></svg>';
-      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 21h20Z"/><path d="M12 9v5m0 3h.01"/></svg>';
-    }
-
-    function renderIncidentList(items) {
-      const priority = items.slice(0, 9);
-      $('incidentList').innerHTML = priority.length ? priority.map((item) => {
-        const area = clean(item.areaDesc || item.state || 'United States');
-        return '<button class="incident-row" data-map-pick="' + esc(item.key || item.nwsId || '') + '" type="button" aria-label="Select ' + esc(eventName(item)) + ' on map" style="--accent:' + esc(accent(item)) + ';--rgb:' + esc(accentRgb(item)) + '"><span class="severity-icon">' + iconFor(item) + '</span><span class="incident-copy"><b class="incident-event">' + esc(eventName(item)) + '</b><span class="incident-area">' + esc(area) + '</span></span><time class="incident-time">' + esc(formatTime(item.expiresAt || item.issuedAt, item.timezone)) + '</time></button>';
-      }).join('') : '<div class="queue-empty">No products match the current filters.</div>';
-    }
-
-    function cardMarkup(item) {
-      const image = cardImageUrl(item);
-      const card = '<figure class="media-card" style="--accent:' + esc(accent(item)) + '"><div class="media-thumb">' + (image ? '<img src="' + esc(image) + '" alt="' + esc(eventName(item)) + ' card" loading="lazy">' : '<div class="rendering-thumb"><i class="spinner"></i><span>Rendering</span></div>') + '</div><figcaption><strong>' + esc(eventName(item)) + '</strong><span>' + esc(clean(item.areaDesc || item.state || 'United States')) + '</span></figcaption></figure>';
-      const destination = item.searchResult ? image : detailUrl(item);
-      const target = item.searchResult ? ' target="_blank" rel="noopener"' : '';
-      return '<a href="' + esc(destination || detailUrl(item)) + '"' + target + '>' + card + '</a>';
-    }
-
-    function renderCards(items) {
-      const counts = countsByGroup(state.items);
-      GROUPS.forEach((group) => { const node = $('count-' + group); if (node) node.textContent = counts[group] || 0; });
-      const display = items.slice(0, 28);
-      $('cardStrip').innerHTML = display.length ? display.map(cardMarkup).join('') : '<div class="empty-state">No rendered cards match the current selection.</div>';
-    }
-
-    function renderGeneratedForecasts() {
-      const result = $('generatedForecastResults');
-      const generated = state.generatedForecast;
-      const items = generated.items || [];
-      if (!generated.loading && !items.length && !generated.message) {
-        result.hidden = true;
-        return;
-      }
-      result.hidden = false;
-      $('generatedForecastTitle').textContent = generated.location ? generated.location + ' forecast cards' : 'Forecast cards';
-      $('generatedForecastStatus').textContent = generated.message || (items.length ? items.length + ' cards ready' : '');
-      $('generatedForecastCards').innerHTML = generated.loading
-        ? '<div class="empty-state"><span class="spinner"></span><span>Generating forecast cards...</span></div>'
-        : items.length ? items.map(cardMarkup).join('') : '<div class="empty-state">No daily forecast periods are available for that location.</div>';
-    }
-
-    function renderIntel() {
-      const outlooks = state.items.filter((item) => categoryFor(item) === 'outlooks').slice(0, 4);
-      const discussions = state.items.filter((item) => categoryFor(item) === 'discussions').slice(0, 4);
-      $('outlookList').innerHTML = outlooks.length ? outlooks.map((item) => '<a class="intel-row" href="' + esc(detailUrl(item)) + '"><strong><i class="outlook-swatch" style="--accent:' + esc(accent(item)) + '"></i>' + esc(eventName(item)) + '</strong><time>' + esc(timeAgo(item.issuedAt)) + '</time></a>').join('') : '<div class="queue-empty">No active SPC outlook cards.</div>';
-      $('discussionList').innerHTML = discussions.length ? discussions.map((item) => '<a class="intel-row" href="' + esc(detailUrl(item)) + '"><strong><i class="outlook-swatch" style="--accent:' + esc(accent(item)) + '"></i>' + esc(clean(item.title || item.event)) + '</strong><time>' + esc(formatTime(item.expiresAt, item.timezone)) + '</time></a>').join('') : '<div class="queue-empty">No active mesoscale discussions.</div>';
-    }
-
-    function renderReports() {
-      const reportTypes = [
-        { name: 'Tornado', color: '#f54848' },
-        { name: 'Hail', color: '#61a8ff' },
-        { name: 'Wind', color: '#f7bf2b' }
-      ];
-      const total = state.reports.length;
-      $('reportSummary').innerHTML = '<div class="report-grid">' + reportTypes.map((entry) => {
-        const count = state.reports.filter((report) => lower(report.type) === lower(entry.name)).length;
-        return '<div class="report-stat" style="--accent:' + entry.color + '"><span>' + entry.name + '</span><strong>' + count + '</strong></div>';
-      }).join('') + '</div><p class="report-note">' + total + ' local storm reports received in the past 12 hours. Toggle this layer on the map for report points.</p>';
-    }
-
-    function firstSymbolLayerId(map) {
-      const layers = map.getStyle().layers || [];
-      const layer = layers.find((candidate) => candidate.type === 'symbol');
-      return layer && layer.id;
-    }
-
-    async function loadMapConfig() {
-      const response = await fetchApi('/api/maps/config');
-      const config = await response.json();
-      if (!config.styleUrl) throw new Error('WeatherPower map style is not configured');
-      return config;
-    }
-
-    function addRadarLayers(map) {
-      const before = firstSymbolLayerId(map);
-      map.addSource('nexrad-reflectivity', { type: 'raster', tiles: [NEXRAD_REFLECTIVITY], tileSize: 256, scheme: 'xyz' });
-      map.addLayer({ id: 'nexrad-reflectivity', type: 'raster', source: 'nexrad-reflectivity', paint: { 'raster-opacity': .64, 'raster-resampling': 'nearest' } }, before);
-    }
-
-    function addAlertLayers(map) {
-      const before = firstSymbolLayerId(map);
-      map.addSource('weatherpower-alerts', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({ id: 'alerts-fill', type: 'fill', source: 'weatherpower-alerts', paint: { 'fill-color': ['get', 'accent'], 'fill-opacity': ['case', ['==', ['get', 'category'], 'outlooks'], .13, ['==', ['get', 'category'], 'watches'], .17, .22] } }, before);
-      map.addLayer({ id: 'alerts-shadow', type: 'line', source: 'weatherpower-alerts', paint: { 'line-color': '#020609', 'line-width': ['case', ['==', ['get', 'category'], 'watches'], 5, 4], 'line-opacity': .9 } }, before);
-      map.addLayer({ id: 'alerts-outline', type: 'line', source: 'weatherpower-alerts', paint: { 'line-color': ['get', 'accent'], 'line-width': ['case', ['==', ['get', 'category'], 'watches'], 2.8, 2.2], 'line-opacity': .95 } }, before);
-      map.addLayer({ id: 'forecast-points', type: 'circle', source: 'weatherpower-alerts', filter: ['==', ['get', 'category'], 'forecasts'], paint: { 'circle-radius': 8, 'circle-color': '#ffffff', 'circle-stroke-color': ['get', 'accent'], 'circle-stroke-width': 4, 'circle-opacity': .98 } }, before);
-      map.on('click', (event) => {
-        const features = map.queryRenderedFeatures(event.point, { layers: ['alerts-fill', 'alerts-outline', 'forecast-points'] });
-        const keys = Array.from(new Set(features.map((feature) => feature.properties && feature.properties.key).filter(Boolean)));
-        if (keys.length) showAlertChoices(keys, event.point);
-      });
-      ['alerts-fill', 'alerts-outline', 'forecast-points'].forEach((layerId) => {
-        map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
-      });
-
-      map.addSource('storm-reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({ id: 'storm-reports-dot', type: 'circle', source: 'storm-reports', paint: { 'circle-radius': 4, 'circle-color': ['match', ['get', 'type'], 'Tornado', '#f54848', 'Hail', '#61a8ff', 'Wind', '#f7bf2b', '#30c9ef'], 'circle-stroke-width': 1, 'circle-stroke-color': '#061018', 'circle-opacity': .95 } }, before);
-    }
-
-    function addMissingStyleImage(map, imageId) {
-      if (imageId !== 'wp-shield-square' || map.hasImage(imageId)) return;
-      const size = 48;
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext('2d');
-      context.fillStyle = '#0b1d2d';
-      context.fillRect(0, 0, size, size);
-      context.strokeStyle = '#3dccf4';
-      context.lineWidth = 3;
-      context.strokeRect(2, 2, size - 4, size - 4);
-      context.fillStyle = '#f4f8fa';
-      context.font = 'bold 16px Inter, sans-serif';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.fillText('WP', size / 2, size / 2 + 1);
-      map.addImage(imageId, context.getImageData(0, 0, size, size));
-    }
-
-    async function ensureMap() {
-      if (state.mapReady) return state.map;
-      if (state.mapPromise) return state.mapPromise;
-      state.mapPromise = (async () => {
-        const config = await loadMapConfig();
-        const map = new maplibregl.Map({ container: 'map', style: config.styleUrl, center: [-98.5, 39.4], zoom: 3.35, attributionControl: false, maxBounds: [[-179, 15], [-45, 74]] });
-        map.on('styleimagemissing', (event) => addMissingStyleImage(map, event.id));
-        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
-        await new Promise((resolve, reject) => {
-          map.once('load', resolve);
-          map.once('error', (event) => reject(event && event.error || new Error('WeatherPower map failed to load')));
-        });
-        addRadarLayers(map);
-        addAlertLayers(map);
-        state.map = map;
-        state.mapReady = true;
-        return map;
-      })();
-      return state.mapPromise;
-    }
-
-    function featuresForMap(items) {
-      return {
-        type: 'FeatureCollection',
-        features: items.map((item) => {
-          const category = categoryFor(item);
-          const geometry = category === 'forecasts' && Array.isArray(item.center)
-            ? { type: 'Point', coordinates: item.center }
-            : simplifyGeometry(geometryFor(item));
-          if (!geometry) return null;
-          return { type: 'Feature', properties: { key: item.key || '', category, accent: accent(item), detailUrl: detailUrl(item) }, geometry };
-        }).filter(Boolean)
-      };
-    }
-
-    function positionsForGeometry(geometry) {
-      const positions = [];
-      const collect = (value) => {
-        if (!Array.isArray(value)) return;
-        if (value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1]))) {
-          positions.push([Number(value[0]), Number(value[1])]);
-        } else {
-          value.forEach(collect);
-        }
-      };
-      collect(geometry && geometry.coordinates);
-      return positions;
-    }
-
-    function selectedItem(items) {
-      if (!state.selectedKey) return null;
-      return (items || allMapItems()).find((item) => item.key === state.selectedKey || item.nwsId === state.selectedKey) || null;
-    }
-
-    function pickerStatLine(item) {
-      const stats = (item.hazardStats || []).filter((stat) => /hail|wind/i.test(clean(stat.label)) && clean(stat.value)).slice(0, 2);
-      return stats.length
-        ? stats.map((stat) => clean(stat.label) + ': ' + clean(stat.value)).join('  |  ')
-        : 'Expires: ' + formatTime(item.expiresAt || item.issuedAt, item.timezone);
-    }
-
-    function pickerChoiceItems(items) {
-      const source = items || allMapItems();
-      return state.pickerOptions.map((key) => source.find((item) => item.key === key || item.nwsId === key)).filter(Boolean);
-    }
-
-    function positionChoicePicker(point, choiceCount) {
-      const stage = document.querySelector('.map-stage');
-      const picker = $('mapPicker');
-      const width = Math.min(310, stage.clientWidth - 24);
-      const estimatedHeight = Math.min(300, 54 + choiceCount * 57);
-      const left = Math.max(12, Math.min(point.x - 28, stage.clientWidth - width - 12));
-      const top = Math.max(58, Math.min(point.y - estimatedHeight - 10, stage.clientHeight - estimatedHeight - 12));
-      picker.style.left = left + 'px';
-      picker.style.top = top + 'px';
-      picker.style.right = 'auto';
-      picker.style.bottom = 'auto';
-    }
-
-    function renderMapPicker(items) {
-      const picker = $('mapPicker');
-      const mapStage = document.querySelector('.map-stage');
-      const choices = pickerChoiceItems(items);
-      if (choices.length) {
-        picker.style.setProperty('--accent', '#4d89e8');
-        picker.style.setProperty('--accent-rgb', '77, 137, 232');
-        $('pickerChoiceView').hidden = false;
-        $('pickerSelectedView').hidden = true;
-        $('pickerOptions').innerHTML = choices.map((item) => '<button class="choice-option" data-picker-option="' + esc(item.key || item.nwsId || '') + '" type="button" style="--choice-accent:' + esc(accent(item)) + '"><i class="choice-dot"></i><span class="choice-copy"><strong class="choice-name">' + esc(eventName(item)) + '</strong><span class="choice-stats">' + esc(pickerStatLine(item)) + '</span></span><span class="choice-arrow">›</span></button>').join('');
-        picker.hidden = false;
-        picker.classList.add('choice-mode');
-        mapStage.classList.remove('has-selection');
-        if (state.pickerPoint) positionChoicePicker(state.pickerPoint, choices.length);
-        return;
-      }
-
-      state.pickerOptions = [];
-      const item = selectedItem(items);
-      if (!item) {
-        picker.hidden = true;
-        picker.classList.remove('choice-mode');
-        mapStage.classList.remove('has-selection');
-        return;
-      }
-      picker.style.setProperty('--accent', accent(item));
-      picker.style.setProperty('--accent-rgb', accentRgb(item));
-      picker.style.removeProperty('left');
-      picker.style.removeProperty('top');
-      picker.style.removeProperty('right');
-      picker.style.removeProperty('bottom');
-      $('pickerChoiceView').hidden = true;
-      $('pickerSelectedView').hidden = false;
-      $('pickerEvent').textContent = eventName(item);
-      $('pickerArea').textContent = clean(item.areaDesc || item.state || 'United States');
-      $('pickerExpires').textContent = formatTime(item.expiresAt || item.issuedAt, item.timezone);
-      $('pickerDetail').href = detailUrl(item);
-      picker.hidden = false;
-      picker.classList.remove('choice-mode');
-      mapStage.classList.add('has-selection');
-    }
-
-    async function focusMapProduct(item) {
-      const geometry = geometryFor(item);
-      const points = positionsForGeometry(geometry);
-      if (!points.length) return;
-      const map = await ensureMap();
-      const bounds = points.reduce((next, point) => next.extend(point), new maplibregl.LngLatBounds(points[0], points[0]));
-      const mobile = map.getCanvas().clientWidth < 620;
-      const padding = mobile
-        ? { top: 74, right: 26, bottom: 174, left: 26 }
-        : { top: 100, right: 330, bottom: 80, left: 60 };
-      map.fitBounds(bounds, { padding, maxZoom: 8, duration: 480 });
-    }
-
-    function selectMapProduct(key, focus) {
-      const item = allMapItems().find((entry) => entry.key === key || entry.nwsId === key);
-      if (!item) return;
-      state.selectedKey = key;
-      state.pickerOptions = [];
-      state.pickerPoint = null;
-      renderMapPicker(allMapItems());
-      if (focus !== false) focusMapProduct(item);
-    }
-
-    function showAlertChoices(keys, point) {
-      state.selectedKey = '';
-      state.pickerOptions = keys.slice(0, 5);
-      state.pickerPoint = { x: point.x, y: point.y };
-      renderMapPicker(allMapItems());
-    }
-
-    function clearMapProduct() {
-      state.selectedKey = '';
-      state.pickerOptions = [];
-      state.pickerPoint = null;
-      renderMapPicker([]);
-    }
-
-    function reportFeatures() {
-      return { type: 'FeatureCollection', features: state.reports.filter((report) => report.geometry).map((report) => ({ type: 'Feature', properties: { type: report.type }, geometry: report.geometry })) };
-    }
-
-    function visibleMapItems(items) {
-      return items.filter((item) => {
-        const category = categoryFor(item);
-        if (category === 'outlooks') return state.layers.outlooks;
-        if (category === 'discussions') return state.layers.discussions;
-        return state.layers.alerts;
-      });
-    }
-
-    function setMapLayerVisibility(map) {
-      const reportVisibility = state.layers.reports ? 'visible' : 'none';
-      map.setLayoutProperty('storm-reports-dot', 'visibility', reportVisibility);
-    }
-
-    function currentVelocityItem(items) {
-      return items.find((item) => item.radar && item.radar.velocityTileUrl) || state.items.find((item) => item.radar && item.radar.velocityTileUrl) || null;
-    }
-
-    function updateVelocityLayer(map, item) {
-      const layerId = 'nexrad-velocity';
-      const sourceId = 'nexrad-velocity';
-      if (map.getLayer(layerId)) map.removeLayer(layerId);
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
-      if (state.radarMode === 'velocity' && item && item.radar.velocityTileUrl) {
-        map.addSource(sourceId, { type: 'raster', tiles: [item.radar.velocityTileUrl], tileSize: 256, scheme: 'xyz' });
-        map.addLayer({ id: layerId, type: 'raster', source: sourceId, paint: { 'raster-opacity': .78, 'raster-resampling': 'nearest' } }, firstSymbolLayerId(map));
-      }
-      map.setLayoutProperty('nexrad-reflectivity', 'visibility', state.radarMode === 'reflectivity' ? 'visible' : 'none');
-    }
-
-    function updateRadarReadout(items) {
-      const velocityItem = currentVelocityItem(items);
-      const canVelocity = Boolean(velocityItem);
-      $('velocityButton').disabled = !canVelocity;
-      $('velocityButton').classList.toggle('active', state.radarMode === 'velocity');
-      $('reflectivityButton').classList.toggle('active', state.radarMode === 'reflectivity');
-      if (state.radarMode === 'velocity' && canVelocity) {
-        const site = velocityItem.radar.siteName || velocityItem.radar.site || 'nearest radar';
-        $('mapProductName').textContent = 'Velocity: ' + site;
-        $('mapProductDetail').textContent = 'Real NEXRAD N0U for ' + eventName(velocityItem);
-        $('legendTitle').textContent = 'Velocity';
-        $('legendUnits').textContent = 'kt';
-      } else {
-        $('mapProductName').textContent = 'National radar';
-        $('mapProductDetail').textContent = 'NEXRAD reflectivity mosaic';
-        $('legendTitle').textContent = 'Reflectivity';
-        $('legendUnits').textContent = 'dBZ';
-      }
-    }
-
-    async function drawMap(items, shouldFit) {
-      try {
-        const map = await ensureMap();
-        map.getSource('weatherpower-alerts').setData(featuresForMap(visibleMapItems(items)));
-        map.getSource('storm-reports').setData(reportFeatures());
-        setMapLayerVisibility(map);
-        const velocityItem = currentVelocityItem(items);
-        updateVelocityLayer(map, velocityItem);
-        updateRadarReadout(items);
-        if (shouldFit && items.length) {
-          const coordinates = [];
-          featuresForMap(visibleMapItems(items)).features.forEach((feature) => {
-            const collect = (value) => {
-              if (!Array.isArray(value)) return;
-              if (value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1]))) coordinates.push([Number(value[0]), Number(value[1])]);
-              else value.forEach(collect);
-            };
-            collect(feature.geometry.coordinates);
-          });
-          const conus = coordinates.filter((point) => point[0] >= -127 && point[0] <= -65 && point[1] >= 23 && point[1] <= 51);
-          const selectedState = $('stateFilter').value;
-          const points = selectedState === 'all' && conus.length ? conus : coordinates;
-          if (points.length) {
-            const bounds = points.reduce((bounds, point) => bounds.extend(point), new maplibregl.LngLatBounds(points[0], points[0]));
-            map.fitBounds(bounds, { padding: { top: 86, right: 44, bottom: 44, left: 44 }, maxZoom: 6.7, duration: 360 });
+    };
+    const closeDetail = () => {
+      S.selected = null;
+      clearTimeout(S.shortPoll);
+      $('rail').classList.remove('has-detail');
+      const url = new URL(location.href);
+      url.searchParams.delete('alert');
+      history.replaceState(null, '', url);
+      highlight();
+      renderList();
+    };
+    const pollShort = (key) => {
+      clearTimeout(S.shortPoll);
+      S.shortPoll = setTimeout(async () => {
+        if (S.selected !== key) return;
+        try {
+          const status = await getJson('/api/v3/short?key=' + encodeURIComponent(key));
+          if (status.status === 'ready' && status.short) {
+            toast('Warning video is ready');
+            const full = await getJson('/api/v3/alert?key=' + encodeURIComponent(key));
+            if (S.selected === key) renderDetail(full);
+            refreshShorts();
+            return;
           }
+          if (status.status === 'error') { toast('Video render failed — try again later'); return; }
+        } catch {}
+        pollShort(key);
+      }, 8000);
+    };
+    const requestShort = async () => {
+      const a = S.detail;
+      const button = $('make-short');
+      if (!a || !button) return;
+      button.disabled = true;
+      button.textContent = 'Queuing…';
+      try {
+        const result = await getJson('/api/v3/short/request?key=' + encodeURIComponent(a.key), { method: 'POST' });
+        if (result.ready) { openDetail(a.key, { fly: false }); return; }
+        if (!result.queued) {
+          toast(result.reason || 'Could not queue video');
+          button.disabled = false;
+          button.textContent = '🎬 Make a video';
+          return;
         }
+        button.textContent = 'Rendering…';
+        const position = result.short?.queuePosition;
+        button.closest('.sb-row').querySelector('p').textContent = 'Rendering the warning video with the latest radar loop… usually 1–3 minutes.' + (position > 1 ? ' (#' + position + ' in line)' : '');
+        pollShort(a.key);
       } catch (error) {
-        $('healthTitle').textContent = 'Map unavailable';
-        $('healthDetail').textContent = error.message;
+        toast(error.message);
+        button.disabled = false;
+        button.textContent = '🎬 Make a video';
       }
-    }
+    };
 
-    function updateTopline(payload) {
-      const rendered = state.items.filter((item) => item.status === 'rendered').length;
-      const pending = state.items.filter((item) => item.status === 'pending').length;
-      const errors = state.items.filter((item) => item.status === 'error').length;
-      const stamp = payload.lastStartedAt || payload.lastFinishedAt || new Date().toISOString();
-      $('updatedAt').textContent = 'Updated ' + timeAgo(stamp);
-      $('signalTitle').textContent = state.items.length ? 'Connected' : 'Standby';
-      $('signalDetail').textContent = state.items.length + ' live products';
-      $('healthTitle').textContent = errors ? 'Renderer needs attention' : 'Renderer online';
-      $('healthDetail').textContent = rendered + ' ready' + (pending ? ', ' + pending + ' rendering' : '') + (errors ? ', ' + errors + ' errors' : '');
-      $('deckStatus').textContent = rendered + ' cards ready' + (pending ? ', ' + pending + ' rendering' : '');
-      $('mapHeadline').textContent = state.items.length + ' active products';
-      const counts = countsByGroup(state.items);
-      $('mapSubhead').textContent = (counts.warnings || 0) + ' warnings, ' + (counts.watches || 0) + ' watches, ' + (counts.outlooks || 0) + ' SPC outlooks, ' + (counts.discussions || 0) + ' discussions, ' + (counts.forecasts || 0) + ' forecasts';
-    }
-
-    function renderAll(shouldFit) {
-      const items = allFilteredItems();
-      const mapItems = allMapItems(items);
-      renderSummary();
-      renderIncidentList(items);
-      renderCards(items);
-      renderGeneratedForecasts();
-      renderIntel();
-      if (state.selectedKey && !selectedItem(mapItems)) state.selectedKey = '';
-      renderMapPicker(mapItems);
-      const signature = [state.group, $('searchInput').value, $('stateFilter').value, state.layers.alerts, state.layers.outlooks, state.layers.discussions, (state.generatedForecast.items || []).map((item) => item.key).join(',')].join('|');
-      const mapShouldFit = Boolean(shouldFit || signature !== state.lastMapSignature);
-      state.lastMapSignature = signature;
-      drawMap(mapItems, mapShouldFit);
-    }
-
-    async function loadHealth() {
-      const response = await fetchApi('/api/health');
-      const health = await response.json();
-      if (!health.ok) {
-        $('signalTitle').textContent = 'Service check';
-        $('signalDetail').textContent = health.status || 'Waiting for source';
-        $('healthTitle').textContent = 'Service check';
-        $('healthDetail').textContent = health.status || 'Waiting for service';
-      }
-    }
-
-    async function loadCards() {
-      const response = await fetchApi('/api/warnings/rendered?view=center');
-      const payload = await response.json();
-      state.items = (payload.items || []).filter(isCurrent);
-      updateStateOptions();
-      updateTopline(payload);
-      renderAll(!state.didFitMap);
-      state.didFitMap = true;
-    }
-
-    async function loadReports() {
-      const response = await fetchApi('/api/dashboard/reports?hours=12&limit=90');
-      const payload = await response.json();
-      state.reports = payload.reports || [];
-      renderReports();
-      if (state.mapReady) {
-        state.map.getSource('storm-reports').setData(reportFeatures());
-        setMapLayerVisibility(state.map);
-      }
-    }
-
-    function refreshAll() {
-      if (state.refreshPromise) return state.refreshPromise;
-      state.refreshPromise = Promise.all([loadHealth(), loadCards(), loadReports()])
-        .catch((error) => {
-          $('signalTitle').textContent = 'Feed interrupted';
-          $('signalDetail').textContent = 'Retrying automatically';
-          $('healthTitle').textContent = 'Feed error';
-          $('healthDetail').textContent = error.message;
-          $('deckStatus').textContent = 'Waiting to reconnect';
-        })
-        .finally(() => {
-          state.refreshPromise = null;
+    /* ---------------- map ---------------- */
+    const firstSymbolId = () => S.map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+    const alertFC = () => ({
+      type: 'FeatureCollection',
+      features: S.alerts.filter((a) => a.geometry && a.group !== 'forecasts').map((a) => ({
+        type: 'Feature', geometry: a.geometry,
+        properties: { key: a.key, color: a.accent || a.color || '#888', rank: a.rank, group: a.group, sel: a.key === S.selected ? 1 : 0 }
+      })).sort((x, y) => (y.properties.rank - x.properties.rank) || (x.properties.sel - y.properties.sel))
+    });
+    const groupFilter = () => {
+      const groups = ['warnings', 'statements'];
+      if (S.tools.watches) groups.push('watches');
+      if (S.tools.spc) groups.push('discussions', 'outlooks');
+      return ['in', ['get', 'group'], ['literal', groups]];
+    };
+    const installLayers = () => {
+      const map = S.map;
+      const before = firstSymbolId();
+      if (S.radar) {
+        S.radar.reflectivity.forEach((f, i) => {
+          map.addSource('rf' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256 });
+          map.addLayer({ id: 'rf' + i, type: 'raster', source: 'rf' + i, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0 } }, before);
         });
-      return state.refreshPromise;
-    }
+        map.addSource('rain', { type: 'raster', tiles: [S.radar.rainfall24h], tileSize: 256 });
+        map.addLayer({ id: 'rain', type: 'raster', source: 'rain', layout: { visibility: 'none' }, paint: { 'raster-opacity': .6 } }, before);
+      }
+      map.addSource('alerts', { type: 'geojson', data: alertFC() });
+      map.addLayer({ id: 'alert-fill', type: 'fill', source: 'alerts', filter: groupFilter(), paint: {
+        'fill-color': ['get', 'color'],
+        'fill-opacity': ['case', ['==', ['get', 'sel'], 1], .3, ['==', ['get', 'group'], 'outlooks'], .05, .13]
+      } }, before);
+      map.addLayer({ id: 'alert-shadow', type: 'line', source: 'alerts', filter: groupFilter(), paint: { 'line-color': '#000', 'line-opacity': .55, 'line-width': ['case', ['==', ['get', 'sel'], 1], 8, 4] } });
+      map.addLayer({ id: 'alert-line', type: 'line', source: 'alerts', filter: groupFilter(), paint: {
+        'line-color': ['case', ['==', ['get', 'sel'], 1], '#ffffff', ['get', 'color']],
+        'line-width': ['case', ['==', ['get', 'sel'], 1], 4, ['<=', ['get', 'rank'], 3], 3, ['==', ['get', 'group'], 'watches'], 1.6, 2]
+      } });
+      map.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'reports', type: 'circle', source: 'reports', layout: { visibility: 'none' }, paint: {
+        'circle-radius': 5, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#000',
+        'circle-color': ['match', ['get', 'type'], 'Tornado', '#ff2020', 'Hail', '#3fa9ff', 'Thunderstorm Wind', '#ffd400', 'Flash Flood', '#2ee06f', '#ffffff']
+      } });
+      S.styleReady = true;
+      applyTools();
+      showFrame(S.frame);
+      if (S.tools.reports) loadReports();
+    };
+    const setStyle = (satellite) => {
+      S.styleReady = false;
+      S.map.setStyle(satellite ? S.config.satelliteStyle : S.config.darkStyleUrl);
+      S.map.once('style.load', installLayers);
+    };
+    const applyTools = () => {
+      document.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(Boolean(S.tools[b.dataset.tool]))));
+      const radarOn = S.tools.radar && !S.tools.rain;
+      const legend = LEGENDS[S.tools.rain ? 'rain' : 'radar'];
+      $('legend-title').textContent = legend.title;
+      $('legend-bar').style.background = legend.bar;
+      $('legend-labels').innerHTML = legend.labels.map((l) => '<span>' + l + '</span>').join('');
+      $('legend').style.display = S.tools.radar || S.tools.rain ? '' : 'none';
+      $('timeline').style.display = radarOn ? '' : 'none';
+      if (!S.styleReady) return;
+      const map = S.map;
+      (S.radar?.reflectivity || []).forEach((_, i) => map.setLayoutProperty('rf' + i, 'visibility', radarOn ? 'visible' : 'none'));
+      if (map.getLayer('rain')) map.setLayoutProperty('rain', 'visibility', S.tools.rain ? 'visible' : 'none');
+      for (const id of ['alert-fill', 'alert-shadow', 'alert-line']) map.setFilter(id, groupFilter());
+      map.setLayoutProperty('reports', 'visibility', S.tools.reports ? 'visible' : 'none');
+    };
+    const showFrame = (i) => {
+      if (!S.radar) return;
+      const n = S.radar.reflectivity.length;
+      S.frame = ((i % n) + n) % n;
+      if (S.styleReady) S.radar.reflectivity.forEach((_, k) => S.map.setPaintProperty('rf' + k, 'raster-opacity', k === S.frame ? .72 : 0));
+      const f = S.radar.reflectivity[S.frame];
+      $('tl-time').textContent = new Date(f.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+      $('tl-track').innerHTML = S.radar.reflectivity.map((_, k) => '<i class="' + (k <= S.frame ? 'on' : '') + '"></i>').join('');
+    };
+    let loopTimer = null;
+    const loop = () => {
+      clearTimeout(loopTimer);
+      if (!S.playing || document.hidden || !S.radar) return;
+      const last = S.frame === S.radar.reflectivity.length - 1;
+      loopTimer = setTimeout(() => { showFrame(S.frame + 1); loop(); }, last ? 1600 : 420);
+    };
+    const setPlaying = (on) => {
+      S.playing = on;
+      $('play-icon').innerHTML = on ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4l13 8-13 8z"/>';
+      $('play').setAttribute('aria-label', on ? 'Pause radar loop' : 'Play radar loop');
+      if (on) loop(); else clearTimeout(loopTimer);
+    };
+    const highlight = () => {
+      if (S.styleReady) S.map.getSource('alerts')?.setData(alertFC());
+      document.querySelectorAll('.row').forEach((r) => r.classList.toggle('sel', r.dataset.key === S.selected));
+    };
+    const boundsOf = (geometry) => {
+      const pts = [];
+      const walk = (c) => { if (!Array.isArray(c)) return; if (typeof c[0] === 'number') pts.push(c); else c.forEach(walk); };
+      walk(geometry?.coordinates);
+      if (!pts.length) return null;
+      const xs = pts.map((p) => p[0]); const ys = pts.map((p) => p[1]);
+      return [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]];
+    };
+    const flyTo = (a) => {
+      const b = boundsOf(a.geometry);
+      if (b) S.map.fitBounds(b, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, maxZoom: 9.2, duration: 900 });
+      else if (a.center) S.map.flyTo({ center: a.center, zoom: 8 });
+    };
+    const loadReports = async () => {
+      try {
+        const body = await getJson('/api/dashboard/reports?hours=12&limit=300');
+        S.map.getSource('reports')?.setData({ type: 'FeatureCollection', features: (body.reports || []).filter((r) => r.geometry).map((r) => ({ type: 'Feature', geometry: r.geometry, properties: { type: r.type } })) });
+      } catch {}
+    };
+    const initMap = () => {
+      S.map = new maplibregl.Map({
+        container: 'map', style: S.config.darkStyleUrl, center: [-96, 38.5], zoom: innerWidth < 860 ? 2.7 : 3.8,
+        attributionControl: { compact: true }, fadeDuration: 0
+      });
+      S.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      S.map.once('style.load', installLayers);
+      S.map.once('load', () => {
+        if (innerWidth < 860) document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
+      });
+      S.map.on('click', (e) => {
+        if (!S.styleReady) return;
+        document.querySelector('.picker')?.remove();
+        const hits = S.map.queryRenderedFeatures(e.point, { layers: ['alert-fill'] });
+        const keys = [...new Set(hits.map((h) => h.properties.key))];
+        const items = keys.map((k) => S.alerts.find((a) => a.key === k)).filter(Boolean).sort((x, y) => x.rank - y.rank);
+        if (items.length === 1) { openDetail(items[0].key, { fly: false }); return; }
+        if (items.length > 1) {
+          const box = document.createElement('div');
+          box.className = 'picker';
+          const container = S.map.getContainer();
+          box.style.left = Math.max(8, Math.min(e.point.x, container.clientWidth - 290)) + 'px';
+          box.style.top = Math.max(8, Math.min(e.point.y, container.clientHeight - 56 * Math.min(items.length, 8) - 40)) + 'px';
+          box.innerHTML = '<header>' + items.length + ' ALERTS HERE</header>' + items.slice(0, 8).map((a) => '<button data-key="' + esc(a.key) + '" style="--c:' + esc(a.color) + '"><i></i><span><b>' + esc(a.eventLabel) + '</b><span>' + esc(a.area) + '</span></span></button>').join('');
+          container.parentElement.appendChild(box);
+        }
+      });
+      S.map.on('mousemove', 'alert-fill', () => { S.map.getCanvas().style.cursor = 'pointer'; });
+      S.map.on('mouseleave', 'alert-fill', () => { S.map.getCanvas().style.cursor = ''; });
+    };
 
-    function setGroup(group) {
-      state.group = GROUPS.includes(group) ? group : 'all';
-      document.querySelectorAll('.deck-tab[data-group]').forEach((button) => button.classList.toggle('active', button.dataset.group === state.group));
-      renderAll(true);
-    }
+    /* ---------------- live data ---------------- */
+    const breaking = (a) => {
+      const el = $('breaking');
+      el.style.setProperty('--b', a.color || '#e40000');
+      $('breaking-title').textContent = a.headline;
+      $('breaking-sub').textContent = a.area + (a.times?.expires ? ' · until ' + a.times.expires : '');
+      el.dataset.key = a.key;
+      el.classList.add('show');
+      clearTimeout(breaking.t);
+      breaking.t = setTimeout(() => el.classList.remove('show'), 12000);
+    };
+    const refresh = async () => {
+      try {
+        const body = await getJson('/api/v3/alerts');
+        const previous = S.known;
+        S.alerts = body.alerts || [];
+        S.counts = body.counts || {};
+        S.known = new Set(S.alerts.map((a) => a.key));
+        S.lastOk = Date.now();
+        if (previous) {
+          const fresh = S.alerts.filter((a) => !previous.has(a.key) && a.rank <= 3);
+          if (fresh.length) breaking(fresh[0]);
+        }
+        if (S.selected && !S.known.has(S.selected)) { toast('The selected alert has expired'); closeDetail(); }
+        if (!S.selected) renderList(); else renderTabs();
+        highlight();
+        $('live').classList.remove('stale');
+      } catch {
+        $('live').classList.add('stale');
+      }
+      updateLive();
+    };
+    const refreshShorts = async () => {
+      try {
+        const body = await getJson('/api/v3/shorts');
+        S.shorts = body.items || [];
+        if (S.tab === 'shorts' && !S.selected) renderList(); else renderTabs();
+      } catch {}
+    };
+    const refreshRadar = async () => {
+      try {
+        const radar = await getJson('/api/v3/radar');
+        if (S.radar && S.radar.validAt === radar.validAt) return;
+        S.radar = radar;
+        if (S.styleReady) {
+          radar.reflectivity.forEach((f, i) => S.map.getSource('rf' + i)?.setTiles?.([f.tiles]));
+          showFrame(S.frame);
+        }
+      } catch {}
+    };
+    const updateLive = () => {
+      const s = Math.round((Date.now() - S.lastOk) / 1000);
+      $('live-text').textContent = !S.lastOk ? 'CONNECTING' : s < 50 ? 'LIVE · UPDATED ' + s + 'S AGO' : 'LIVE · UPDATED ' + Math.round(s / 60) + 'M AGO';
+    };
 
-    function setRadarMode(mode) {
-      if (mode === 'velocity' && !currentVelocityItem(allFilteredItems())) return;
-      state.radarMode = mode;
-      renderAll(false);
-    }
-
-    async function generateForecastCards() {
-      const query = clean($('forecastSearchInput').value);
-      if (query.length < 2) {
-        state.generatedForecast = { items: [], location: null, loading: false, message: 'Enter a city and state or a U.S. ZIP code.' };
-        renderGeneratedForecasts();
+    /* ---------------- events ---------------- */
+    document.addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-tab]');
+      if (tab) { S.tab = tab.dataset.tab; renderList(); if (S.tab === 'shorts') refreshShorts(); return; }
+      const row = e.target.closest('.row[data-key], .hero[data-key], .picker button[data-key]');
+      if (row) { document.querySelector('.picker')?.remove(); openDetail(row.dataset.key); return; }
+      const tool = e.target.closest('[data-tool]');
+      if (tool) {
+        const t = tool.dataset.tool;
+        S.tools[t] = !S.tools[t];
+        if (t === 'sat') setStyle(S.tools.sat);
+        if (t === 'rain' && S.tools.rain) S.tools.radar = true;
+        if (t === 'radar' && !S.tools.radar) S.tools.rain = false;
+        if (t === 'reports' && S.tools.reports) loadReports();
+        applyTools();
         return;
       }
-      if (state.generatedForecast.loading) return;
-      state.generatedForecast = { items: [], location: null, loading: true, message: 'Finding the forecast and rendering cards...' };
-      $('forecastGenerateButton').disabled = true;
-      $('forecastGenerateButton').textContent = 'Working';
-      renderAll(false);
+      const tile = e.target.closest('[data-video]');
+      if (tile) { $('modal-video').src = tile.dataset.video; $('modal').classList.add('open'); $('modal-video').play().catch(() => {}); return; }
+      if (e.target.closest('#back')) { closeDetail(); return; }
+      if (e.target.closest('#make-short')) { requestShort(); return; }
+      if (e.target.closest('#copy-link')) { navigator.clipboard?.writeText(location.href).then(() => toast('Link copied')); return; }
+      if (e.target.closest('#breaking')) { $('breaking').classList.remove('show'); openDetail($('breaking').dataset.key); return; }
+      if (e.target.id === 'modal' || e.target.closest('#modal-close')) { $('modal').classList.remove('open'); $('modal-video').pause(); }
+    });
+    document.addEventListener('submit', async (e) => {
+      if (e.target.id !== 'fsearch') return;
+      e.preventDefault();
+      const q = new FormData(e.target).get('q');
+      const out = $('fresults');
+      out.innerHTML = '<div class="empty">Building forecast cards for ' + esc(q) + '… this can take up to a minute.</div>';
       try {
-        const response = await fetchForecastSearch(query);
-        const payload = await response.json();
-        const items = (payload.items || []).filter((item) => categoryFor(item) === 'forecasts');
-        state.generatedForecast = {
-          items,
-          location: clean(payload.location && payload.location.label || query),
-          loading: false,
-          message: payload.cached ? 'Loaded from the recent forecast cache.' : 'National Weather Service forecast cards ready.'
-        };
-        renderAll(false);
-        if (items[0]) selectMapProduct(items[0].key || items[0].nwsId, true);
+        const body = await getJson('/api/forecasts/search?q=' + encodeURIComponent(q));
+        out.innerHTML = '<div class="section-label">' + esc(body.location?.label || body.location?.name || q) + '</div>' + (body.items || []).filter((item) => item.card).map((item) => (
+          '<a href="' + esc(asset(item.card.path)) + '" target="_blank" rel="noopener"><img src="' + esc(asset(item.card.path)) + '" alt="' + esc(item.title) + '" style="display:block;width:100%;border-radius:10px;border:1px solid var(--line-2);margin-top:6px" loading="lazy"></a>'
+        )).join('');
       } catch (error) {
-        state.generatedForecast = { items: [], location: null, loading: false, message: error.message || 'Forecast card generation failed.' };
-        renderAll(false);
-      } finally {
-        $('forecastGenerateButton').disabled = false;
-        $('forecastGenerateButton').textContent = 'Generate';
+        out.innerHTML = '<div class="empty">' + esc(error.message) + '</div>';
       }
-    }
+    });
+    $('q').addEventListener('input', (e) => {
+      S.q = e.target.value;
+      if (S.q && S.tab === 'shorts') S.tab = 'warnings';
+      if (S.selected) closeDetail(); else renderList();
+    });
+    $('play').addEventListener('click', () => setPlaying(!S.playing));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if ($('modal').classList.contains('open')) { $('modal').classList.remove('open'); $('modal-video').pause(); }
+        else if (S.selected) closeDetail();
+        return;
+      }
+      if (/INPUT|TEXTAREA|VIDEO/.test(e.target.tagName)) return;
+      if (e.key === ' ') { e.preventDefault(); setPlaying(!S.playing); }
+      if (e.key === 'ArrowRight') { setPlaying(false); showFrame(S.frame + 1); }
+      if (e.key === 'ArrowLeft') { setPlaying(false); showFrame(S.frame - 1); }
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { refresh(); loop(); } });
 
-    function bindEvents() {
-      $('searchInput').addEventListener('input', () => renderAll(true));
-      $('stateFilter').addEventListener('change', () => renderAll(true));
-      $('sortSelect').addEventListener('change', () => renderAll(false));
-      $('refreshButton').addEventListener('click', refreshAll);
-      $('reflectivityButton').addEventListener('click', () => setRadarMode('reflectivity'));
-      $('velocityButton').addEventListener('click', () => setRadarMode('velocity'));
-      $('forecastSearchForm').addEventListener('submit', (event) => {
-        event.preventDefault();
-        generateForecastCards();
-      });
-      document.querySelectorAll('.deck-tab[data-group]').forEach((button) => button.addEventListener('click', () => setGroup(button.dataset.group)));
-      document.querySelectorAll('.layer-toggle[data-layer]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const name = button.dataset.layer;
-          state.layers[name] = !state.layers[name];
-          button.classList.toggle('active', state.layers[name]);
-          renderAll(false);
-        });
-      });
-      $('summaryList').addEventListener('click', (event) => {
-        const button = event.target.closest('[data-event]');
-        if (!button) return;
-        $('searchInput').value = button.dataset.event;
-        renderAll(true);
-      });
-      $('incidentList').addEventListener('click', (event) => {
-        const button = event.target.closest('[data-map-pick]');
-        if (!button) return;
-        selectMapProduct(button.dataset.mapPick, true);
-      });
-      $('pickerFocus').addEventListener('click', () => {
-        const item = selectedItem();
-        if (item) focusMapProduct(item);
-      });
-      $('pickerClose').addEventListener('click', clearMapProduct);
-      $('pickerCloseSelected').addEventListener('click', clearMapProduct);
-      $('pickerOptions').addEventListener('click', (event) => {
-        const button = event.target.closest('[data-picker-option]');
-        if (!button) return;
-        selectMapProduct(button.dataset.pickerOption, true);
-      });
-
-      const initialGroup = new URLSearchParams(window.location.search).get('group');
-      if (initialGroup && GROUPS.includes(initialGroup)) state.group = initialGroup;
-      document.querySelectorAll('.deck-tab[data-group]').forEach((button) => button.classList.toggle('active', button.dataset.group === state.group));
-    }
-
-    bindEvents();
-    drawMap([], false);
-    refreshAll();
-    setInterval(refreshAll, 5000);
+    /* ---------------- boot ---------------- */
+    (async () => {
+      try {
+        const [config, radar] = await Promise.all([getJson('/api/v3/config'), getJson('/api/v3/radar').catch(() => null)]);
+        S.config = config;
+        S.radar = radar;
+        S.frame = radar ? radar.reflectivity.length - 1 : 0;
+      } catch {
+        $('list').innerHTML = '<div class="empty">Warning Center is temporarily unavailable. Retrying…</div>';
+        setTimeout(() => location.reload(), 15000);
+        return;
+      }
+      initMap();
+      applyTools();
+      showFrame(S.frame);
+      await refresh();
+      refreshShorts();
+      const deep = new URL(location.href).searchParams.get('alert');
+      if (deep) openDetail(deep);
+      setPlaying(true);
+      setInterval(() => { if (!document.hidden) refresh(); }, 20000);
+      setInterval(() => { if (!document.hidden) refreshShorts(); }, 60000);
+      setInterval(() => { if (!document.hidden) refreshRadar(); }, 120000);
+      setInterval(updateLive, 5000);
+    })();
+  })();
   </script>
 </body>
 </html>

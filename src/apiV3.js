@@ -7,7 +7,7 @@ import { compactPublicGeometry } from './publicFeed.js';
 import { compositeValidTime } from './shortVideo.js';
 import { getShort, listShorts, queueShort, requestShort, shortsByKey, shortsStatus } from './shorts.js';
 import {
-  areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
+  SATELLITE_STYLE, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -201,6 +201,15 @@ export const apiV3Router = () => {
     } catch (error) {
       next(error);
     }
+  });
+
+  router.get('/config', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({
+      darkStyleUrl: config.maps.styleUrl,
+      satelliteStyle: SATELLITE_STYLE,
+      shorts: { enabled: config.shorts.enabled, format: config.shorts.format, publicRequests: config.shorts.publicRequestsPerWindow > 0 }
+    });
   });
 
   router.get('/radar', async (req, res, next) => {
