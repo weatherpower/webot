@@ -148,6 +148,8 @@ export const config = {
   },
   // WeatherPower Traffic camera network (Camera Wall). Use a viewer account from that app.
   cameras: {
+    // Path to WeatherPower Traffic's camera catalog (configs/railfan_cameras.json). No login needed.
+    catalogFile: process.env.CAMERA_CATALOG_FILE || '',
     baseUrl: process.env.CAMERA_API_BASE || 'http://127.0.0.1:8778',
     username: process.env.CAMERA_API_USER || '',
     password: process.env.CAMERA_API_PASS || '',

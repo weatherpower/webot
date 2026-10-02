@@ -2058,30 +2058,34 @@
         if (!body.configured) { S.camsOff = true; return; }
         const cam = body.cameras?.[0];
         if (!cam || S.shot !== shot) return;
+        // Video comes through this server's stream proxy (a site-relative /api/ path).
+        const feedUrl = cam.feed.startsWith('/') ? BASE + cam.feed : cam.feed;
         const feed = $('cam-feed');
         feed.innerHTML = '';
         if (cam.kind === 'hls') {
           const video = document.createElement('video');
           video.muted = true; video.autoplay = true; video.playsInline = true;
           feed.appendChild(video);
-          const bail = () => { feed.innerHTML = ''; if (cam.snapshot) feed.appendChild(camImage(cam.snapshot)); else hideCam(); };
-          if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = cam.feed; video.onerror = bail; }
+          // A dead feed: show its still image if it has one, and ask the server again next time
+          // (it skips camera sites that refused us).
+          const bail = () => { camCache.delete(a.key); feed.innerHTML = ''; if (cam.snapshot) feed.appendChild(camImage(cam.snapshot)); else hideCam(); };
+          if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = feedUrl; video.onerror = bail; }
           else {
             try {
               const Hls = await loadHls();
               if (!Hls?.isSupported()) { bail(); return; }
               S.camHls = new Hls({ maxBufferLength: 10 });
               S.camHls.on(Hls.Events.ERROR, (e, data) => { if (data.fatal) bail(); });
-              S.camHls.loadSource(cam.feed);
+              S.camHls.loadSource(feedUrl);
               S.camHls.attachMedia(video);
             } catch { bail(); return; }
           }
         } else {
-          feed.appendChild(camImage(cam.feed));
+          feed.appendChild(camImage(feedUrl));
           // Still cameras refresh every 20 seconds.
           S.camRefresh = setInterval(() => {
             const img = feed.querySelector('img');
-            if (img) img.src = cam.feed + (cam.feed.includes('?') ? '&' : '?') + '_wp=' + Date.now();
+            if (img) img.src = feedUrl + (feedUrl.includes('?') ? '&' : '?') + '_wp=' + Date.now();
           }, 20000);
         }
         $('cam-name').textContent = cam.name;

@@ -374,6 +374,9 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
   Control panel: **Radar map** mode.
 - **Live cameras** from the WeatherPower Traffic camera network (Camera Wall `/api/cameras`): during
   an alert zoom the nearest camera within 30 miles shows in a LIVE box with a marker on the map.
-  Set `CAMERA_API_USER` / `CAMERA_API_PASS` (a viewer account in WeatherPower Traffic) and optionally
-  `CAMERA_API_BASE` (default `http://127.0.0.1:8778`). Only public feeds (state DOT cameras) are used
+  Easiest: `CAMERA_CATALOG_FILE` = the WeatherPower Traffic catalog on this PC (`configs/railfan_cameras.json`),
+  no login needed. Or its API with `CAMERA_API_USER` / `CAMERA_API_PASS` (a viewer account) and `CAMERA_API_BASE`.
+  Video plays through `/api/v3/cameras/stream/:id/index.m3u8` (adds the agency headers some feeds need; only fetches
+  from that camera's own site). Sites that refuse (e.g. DriveTexas, which needs its own session) are skipped for an hour;
+  a dead stream falls back to the camera's still image. Only public feeds (state DOT cameras) are used
   unless `CAMERA_ALLOW_LOCAL=true`. `GET /api/v3/cameras/near?lat=&lon=&miles=`.

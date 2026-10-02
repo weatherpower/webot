@@ -17,7 +17,7 @@ import { openaiSpeech, openaiTtsStatus } from './voice.js';
 import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
-import { camerasNear } from './cameras.js';
+import { cameraStream, camerasNear } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -327,6 +327,18 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=60');
       res.json(await camerasNear({ lat: req.query.lat, lon: req.query.lon, miles: req.query.miles, limit: req.query.limit }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Camera video through this server: index.m3u8 for the camera, then seg?u=… for everything it references.
+  router.get('/cameras/stream/:id/:file', async (req, res, next) => {
+    try {
+      if (!['index.m3u8', 'seg'].includes(req.params.file)) throw Object.assign(new Error('Not found'), { status: 404 });
+      const out = await cameraStream({ id: req.params.id, file: req.params.file, u: req.query.u });
+      res.set('Cache-Control', out.playlist ? 'no-store' : 'public, max-age=30');
+      res.type(out.type).send(out.body);
     } catch (error) {
       next(error);
     }
