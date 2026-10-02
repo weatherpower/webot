@@ -97,8 +97,8 @@
       </section>
 
       <section class="box">
-        <h2>Bot</h2>
-        <textarea id="say" maxlength="300" placeholder="Type something for the bot to say on stream…"></textarea>
+        <h2>WeBot</h2>
+        <textarea id="say" maxlength="300" placeholder="Type something for WeBot to say on stream…"></textarea>
         <div class="row"><button class="btn primary" id="say-btn">Say it</button><span class="status" id="say-count">0 / 300</span></div>
         <div class="row chips" id="quick"></div>
         <div class="row">
@@ -136,7 +136,7 @@
       <ol>
         <li>In OBS add a <b>Browser</b> source. URL: <code id="obs-url"></code>, width <b>1920</b>, height <b>1080</b>.</li>
         <li>Tick <b>Control audio via OBS</b> so the alert chimes go to the stream.</li>
-        <li>The bot's voice uses Windows speech. If it isn't heard on stream, open the stream URL in Chrome instead, add it with <b>Window Capture</b>, and capture desktop audio.</li>
+        <li>WeBot's voice uses Windows speech. If it isn't heard on stream, open the stream URL in Chrome instead, add it with <b>Window Capture</b>, and capture desktop audio.</li>
         <li>URL options: <code>?state=OK</code> focus one state · <code>?voice=0</code> · <code>?sound=0</code> · <code>?bot=0</code> · <code>?tips=0</code> · <code>?speed=1.5</code> slower shots · <code>?tz=America/Chicago</code> clock zone.</li>
       </ol>
     </section>
@@ -230,8 +230,8 @@
     $('unpin').addEventListener('click', () => act({ action: 'unpin' }, 'Unpinned'));
     $('reload').addEventListener('click', () => act({ action: 'reload' }, 'Stream will reload'));
     $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });
-    $('say-btn').addEventListener('click', () => { const text = $('say').value.trim(); if (text) act({ action: 'say', text }, 'Sent to the bot').then(() => { $('say').value = ''; $('say-count').textContent = '0 / 300'; }); });
-    $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to the bot'); });
+    $('say-btn').addEventListener('click', () => { const text = $('say').value.trim(); if (text) act({ action: 'say', text }, 'Sent to WeBot').then(() => { $('say').value = ''; $('say-count').textContent = '0 / 300'; }); });
+    $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to WeBot'); });
     $('voice').addEventListener('click', () => act({ action: 'voice', on: control?.voice === false }));
     $('sound').addEventListener('click', () => act({ action: 'sound', on: control?.sound === false }));
     $('banner-set').addEventListener('click', () => act({ action: 'banner', text: $('banner').value, minutes: Number($('minutes').value) }, 'Banner set'));

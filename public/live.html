@@ -100,19 +100,23 @@
     .sitemark span { font-family: "WP Mono"; font-size: 11px; font-weight: 700; color: #cfe6ff; text-shadow: 0 1px 2px #000; letter-spacing: .08em; }
 
     /* ---------- bot ---------- */
-    .bot { position: absolute; right: 20px; bottom: 88px; width: 250px; height: 292px; z-index: 12; transition: transform .5s; }
+    /* WeBot: the artwork, with live eyes and a visor rim drawn over it in the same 384x393 space. */
+    .bot { position: absolute; right: 22px; bottom: 92px; width: 250px; height: 256px; z-index: 12; --eye: #5ff2ff; }
     .bot.off { display: none; }
-    .bot svg { width: 100%; height: 100%; overflow: visible; animation: bob 4.5s ease-in-out infinite; filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
+    .bot .rig { position: absolute; left: 0; top: 0; width: 100%; height: 100%; animation: bob 4.5s ease-in-out infinite; }
+    .bot .rig img, .bot .rig svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+    .bot .rig img { filter: drop-shadow(0 14px 22px rgba(0,0,0,.55)); }
     @keyframes bob { 50% { transform: translateY(-7px); } }
-    .bot .eye { transition: fill .4s; transform-box: fill-box; transform-origin: center; }
+    .bot .eye { fill: var(--eye); transition: fill .4s, transform .09s; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 7px var(--eye)); }
     .bot.blink .eye { transform: scaleY(.12); }
-    .bot .mouth { transform-box: fill-box; transform-origin: center; transform: scaleY(.25); transition: transform .08s; }
-    .bot.talk .mouth { animation: talk .22s ease-in-out infinite alternate; }
-    @keyframes talk { from { transform: scaleY(.25); } to { transform: scaleY(1.15); } }
-    .bot .beacon { transition: fill .3s; }
-    .bot.danger .beacon { animation: beacon .7s steps(2) infinite; }
-    @keyframes beacon { 50% { fill: #300; } }
-    .bubble { position: absolute; right: 262px; bottom: 236px; z-index: 13; max-width: 600px; padding: 16px 20px; border-radius: 16px 16px 4px 16px; background: #f4f8ff; color: #0b1324; font-family: "WP Sans"; font-weight: 600; font-size: 21px; line-height: 1.38; box-shadow: 0 16px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(12px) scale(.96); transform-origin: 100% 100%; transition: opacity .3s, transform .35s; }
+    .bot.talk .eye { animation: talk .2s ease-in-out infinite alternate; }
+    .bot.talk .eye + .eye { animation-delay: .1s; }
+    @keyframes talk { from { transform: scaleY(1); } to { transform: scaleY(.72); } }
+    .bot .rim { stroke: var(--eye); opacity: 0; transition: opacity .4s, stroke .4s; }
+    .bot.alert .rim { opacity: .9; }
+    .bot.danger .rim { opacity: 1; animation: rim .7s steps(2) infinite; }
+    @keyframes rim { 50% { opacity: .15; } }
+    .bubble { position: absolute; right: 262px; bottom: 214px; z-index: 13; max-width: 600px; padding: 16px 20px; border-radius: 16px 16px 4px 16px; background: #f4f8ff; color: #0b1324; font-family: "WP Sans"; font-weight: 600; font-size: 21px; line-height: 1.38; box-shadow: 0 16px 40px rgba(0,0,0,.45); opacity: 0; transform: translateY(12px) scale(.96); transform-origin: 100% 100%; transition: opacity .3s, transform .35s; }
     .bubble.show { opacity: 1; transform: none; }
     .bubble b { display: block; font-family: "WP Mono"; font-size: 11px; letter-spacing: .2em; color: #2a6fd6; margin-bottom: 4px; }
 
@@ -455,7 +459,7 @@
     const bot = $('bot');
     const bubble = $('bubble');
     let bubbleTimer = null;
-    const showBubble = (text, ms, label = 'WEATHERPOWER BOT') => {
+    const showBubble = (text, ms, label = 'WEBOT') => {
       clearTimeout(bubbleTimer);
       bubble.innerHTML = '<b>' + esc(label) + '</b>' + esc(text);
       bubble.classList.add('show');
@@ -517,34 +521,23 @@
     const hatSvg = () => {
       if (!OPT.hat) return '';
       const month = new Date().getMonth();
-      if (month === 9) return '<g transform="translate(64 -4)"><path d="M10 74 L62 0 L88 66 Z" fill="#2a1446"/><path d="M33 52 L76 46 L80 58 L30 64 Z" fill="#ff8a1e"/><ellipse cx="60" cy="74" rx="66" ry="11" fill="#1c0d31"/></g>';
-      if (month === 11) return '<g transform="translate(66 -2)"><path d="M14 70 Q50 -10 100 30 L86 72 Z" fill="#d81f2a"/><circle cx="102" cy="32" r="11" fill="#fff"/><rect x="4" y="62" width="106" height="16" rx="8" fill="#fff"/></g>';
+      if (month === 9) return '<g transform="translate(111 -60) scale(1.35)"><path d="M10 74 L62 0 L88 66 Z" fill="#2a1446"/><path d="M33 52 L76 46 L80 58 L30 64 Z" fill="#ff8a1e"/><ellipse cx="60" cy="74" rx="66" ry="11" fill="#1c0d31"/></g>';
+      if (month === 11) return '<g transform="translate(115 -55) scale(1.35)"><path d="M14 70 Q50 -10 100 30 L86 72 Z" fill="#d81f2a"/><circle cx="102" cy="32" r="11" fill="#fff"/><rect x="4" y="62" width="106" height="16" rx="8" fill="#fff"/></g>';
       return '';
     };
-    bot.innerHTML = '<svg viewBox="0 0 250 292"><defs>'
-      + '<linearGradient id="bshell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f9ff"/><stop offset="1" stop-color="#c9d6ea"/></linearGradient>'
-      + '<linearGradient id="bscreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14254a"/><stop offset="1" stop-color="#07101f"/></linearGradient></defs>'
-      + '<rect x="120" y="22" width="9" height="34" rx="4" fill="#9fb3d1"/>'
-      + '<path class="beacon" d="M127 0 113 22h10l-4 16 16-22h-10l4-16z" fill="#ffd34d"/>'
-      + '<rect x="46" y="54" width="158" height="124" rx="40" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/>'
-      + '<rect x="62" y="72" width="126" height="88" rx="26" fill="url(#bscreen)"/>'
-      + '<rect class="eye" x="88" y="94" width="20" height="34" rx="10" fill="#3fe0ff"/>'
-      + '<rect class="eye" x="142" y="94" width="20" height="34" rx="10" fill="#3fe0ff"/>'
-      + '<rect class="mouth" x="108" y="138" width="34" height="9" rx="4.5" fill="#3fe0ff"/>'
-      + '<circle cx="44" cy="116" r="15" fill="#1a8cff" stroke="#0d4fae" stroke-width="3"/><circle cx="206" cy="116" r="15" fill="#1a8cff" stroke="#0d4fae" stroke-width="3"/>'
-      + '<path d="M206 130 C206 168 180 178 150 176" fill="none" stroke="#38455c" stroke-width="5" stroke-linecap="round"/><circle cx="148" cy="176" r="6" fill="#38455c"/>'
-      + '<rect x="84" y="182" width="82" height="16" rx="6" fill="#9fb3d1"/>'
-      + '<path d="M58 210 Q125 186 192 210 L184 282 Q125 296 66 282 Z" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/>'
-      + '<rect x="98" y="220" width="54" height="44" rx="11" fill="#0b4fc4"/>'
-      + '<text x="125" y="250" text-anchor="middle" font-family="WP Display, Arial Narrow, sans-serif" font-weight="700" font-size="24" fill="#fff">WP</text>'
-      + '<rect x="30" y="214" width="22" height="58" rx="11" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/><rect x="198" y="214" width="22" height="58" rx="11" fill="url(#bshell)" stroke="#8ea3c4" stroke-width="3"/>'
-      + hatSvg() + '</svg>';
+    // Eye and visor positions are measured from public/assets/webot.png (384x393).
+    bot.innerHTML = '<div class="rig"><img src="/warningcenter/public/assets/webot.png" alt="">'
+      + '<svg viewBox="0 0 384 393">'
+      + '<rect class="rim" x="82" y="81" width="198" height="101" rx="42" fill="none" stroke-width="6"/>'
+      + '<rect x="122" y="96" width="36" height="70" rx="17" fill="#1f2e3a"/><rect x="205" y="96" width="36" height="70" rx="17" fill="#1f2e3a"/>'
+      + '<rect class="eye" x="127" y="101" width="26" height="60" rx="13"/>'
+      + '<rect class="eye" x="210" y="101" width="26" height="60" rx="13"/>'
+      + hatSvg() + '</svg></div>';
     if (!OPT.bot) { bot.classList.add('off'); bubble.style.right = '32px'; }
     const setMood = (mood) => {
-      const color = mood === 'danger' ? '#ff4d5e' : mood === 'alert' ? '#ffc23d' : '#3fe0ff';
-      bot.querySelectorAll('.eye, .mouth').forEach((el) => el.setAttribute('fill', color));
-      bot.querySelector('.beacon').setAttribute('fill', mood === 'danger' ? '#ff2a2a' : '#ffd34d');
+      bot.style.setProperty('--eye', mood === 'danger' ? '#ff4d5e' : mood === 'alert' ? '#ffc23d' : '#5ff2ff');
       bot.classList.toggle('danger', mood === 'danger');
+      bot.classList.toggle('alert', mood === 'alert');
     };
     setInterval(() => { bot.classList.add('blink'); setTimeout(() => bot.classList.remove('blink'), 140); }, 4300);
 
@@ -1141,7 +1134,7 @@
       poll(loadAlerts, 20000);
       poll(loadLive, 6000);
       poll(loadRadar, 120000);
-      setTimeout(() => say('WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.'), 2500);
+      setTimeout(() => say('WeBot here, and WeatherPower Live is on the air. I’ll keep an eye on every warning across the country.'), 2500);
     };
     boot().catch((error) => { $('boot').textContent = 'WEATHERPOWER LIVE · RECONNECTING…'; console.error(error); setTimeout(() => location.reload(), 15000); });
     // Long-running stream: a reload every 6 hours keeps browser memory in check.

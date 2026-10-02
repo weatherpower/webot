@@ -255,11 +255,11 @@ If `CONTROLLER_TOKEN` is set, send it as `x-controller-token` or `?token=...` on
   reflectivity. Tornado warnings switch to storm-relative velocity partway through. National overview,
   SPC Day 1 outlook and storm-report shots are mixed in.
 - **Breaking takeover** for new tornado warnings, PDS/emergency/destructive alerts and tornado
-  watches: full-screen sting, WeatherPower chime (not the EAS tone), and the bot reads it out.
+  watches: full-screen sting, WeatherPower chime (not the EAS tone), and WeBot reads it out.
   Other new warnings get a chime and jump the queue.
 - **Top bar**: TOR / SVR / FFW / watch counters, rotating headline ticker, and the
   **WeatherPower Index (WPI)** with a 24-hour sparkline (QUIET / ACTIVE / BUSY / SEVERE / EXTREME).
-- **WeatherPower bot**: talks with the browser's speech voice, eye color follows the threat,
+- **WeBot** (`public/assets/webot.png`): talks with the browser's speech voice, eye color follows the threat,
   seasonal hat (October / December), safety tips when it's quiet, roundup every 20 minutes.
 - **Bottom bar**: clock, now-tracking line with hazard chips, area crawl, people in the path,
   shot progress and alert countdown.
@@ -267,12 +267,12 @@ If `CONTROLLER_TOKEN` is set, send it as `x-controller-token` or `?token=...` on
 URL options: `?state=OK`, `?voice=0`, `?sound=0`, `?bot=0`, `?hat=0`, `?tips=0`, `?speed=1.5`
 (longer shots), `?tz=America/Chicago`.
 
-The bot's voice uses the operating system's speech engine. If OBS's browser source doesn't pick it
+WeBot's voice uses the operating system's speech engine. If OBS's browser source doesn't pick it
 up, open the stream URL in Chrome, add it with Window Capture, and capture desktop audio.
 
 **Control panel**: `/warningcenter/live/control` (needs `CONTROLLER_TOKEN`; the control API refuses
 to run if no token is configured). Pin an alert, focus a state, switch Auto / National / Outlook /
-Reports, skip, make the bot say something, show a banner message, toggle voice/sounds, run a
+Reports, skip, make WeBot say something, show a banner message, toggle voice/sounds, run a
 labeled breaking-alert test, or reload the stream remotely.
 
 API: `GET /api/v3/live` (tallies, index + history, control state, storm reports),
