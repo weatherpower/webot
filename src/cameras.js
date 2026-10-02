@@ -119,6 +119,8 @@ export const camerasNear = async ({ lat, lon, miles = 30, limit = 3 }) => {
   const la = Number(lat);
   const lo = Number(lon);
   if (!Number.isFinite(la) || !Number.isFinite(lo)) throw Object.assign(new Error('lat and lon are required'), { status: 400 });
+  // No broadcast permission yet: nothing goes to the stream.
+  if (!config.cameras.onAir) return { configured: camerasConfigured(), onAir: false, total: 0, cameras: [] };
   const radius = Math.min(100, Math.max(1, Number(miles) || 30));
   const cameras = (await listCameras())
     .map((c) => ({ ...c, miles: Math.round(milesBetween(la, lo, c.lat, c.lon) * 10) / 10 }))
@@ -151,6 +153,7 @@ export const searchCameras = async ({ q = '', state = '', agency = '', kind = ''
   const start = Math.max(0, Number(offset) || 0);
   return {
     configured: camerasConfigured(),
+    onAir: config.cameras.onAir,
     total: all.length,
     matches: matches.length,
     states: count('state'),
@@ -160,7 +163,9 @@ export const searchCameras = async ({ q = '', state = '', agency = '', kind = ''
   };
 };
 
+// Used by the stream for a pinned camera, so it is refused while cameras are off air.
 export const getCamera = async (id) => {
+  if (!config.cameras.onAir) throw Object.assign(new Error('Cameras are off air (CAMERA_ON_AIR is not enabled)'), { status: 403 });
   const cam = (await listCameras()).find((c) => c.id === String(id));
   if (!cam) throw Object.assign(new Error('Unknown camera'), { status: 404 });
   return forClient(cam);

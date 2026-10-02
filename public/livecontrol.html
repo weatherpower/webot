@@ -215,6 +215,7 @@
         <div class="seg" id="cam-mode"><button data-v="auto">Auto (near alerts)</button><button data-v="pinned">Pinned camera</button><button data-v="off">Off</button></div>
       </div>
       <p class="status live-line" id="cam-line" style="margin:8px 0 0"></p>
+      <p class="note" id="cam-offair" hidden style="border:1px solid var(--warn);border-radius:10px;padding:10px 12px;color:var(--warn)"><b>OFF AIR.</b> Cameras won't appear on the stream until you have permission to broadcast them. You can still preview them here. When you do, set <code>CAMERA_ON_AIR=true</code> in <code>.env</code> and restart the server.</p>
       <div class="camgrid">
         <div>
           <div class="row">
@@ -415,7 +416,7 @@
     });
 
     /* ---------- cameras ---------- */
-    const cams = { items: [], offset: 0, matches: 0, sel: null, hls: null, statesLoaded: false, timer: null };
+    const cams = { items: [], offset: 0, matches: 0, sel: null, hls: null, statesLoaded: false, timer: null, onAir: false };
     let hlsLib = null;
     const loadHlsLib = () => hlsLib || (hlsLib = new Promise((resolve, reject) => {
       const tag = document.createElement('script');
@@ -433,13 +434,18 @@
       document.querySelectorAll('#cam-list .item').forEach((el) => el.classList.toggle('onair', cfg.mode === 'pinned' && el.dataset.id === cfg.id));
     };
     const camRow = (c) => '<div class="item" data-id="' + esc(c.id) + '" style="--c:' + (c.kind === 'hls' ? '#34e07a' : '#1a8cff') + '"><i></i><div><b>' + esc(c.name) + '</b><span>' + esc(camMeta(c)) + '</span></div>'
-      + '<button class="btn" data-air="' + esc(c.id) + '">On stream</button></div>';
+      + (cams.onAir ? '<button class="btn" data-air="' + esc(c.id) + '">On stream</button>' : '') + '</div>';
     const loadCams = async (reset) => {
       if (reset) { cams.offset = 0; cams.items = []; }
       const q = new URLSearchParams({ q: $('cam-q').value.trim(), state: $('cam-state').value, kind: $('cam-kind').value, offset: cams.offset, limit: 60 });
       let body;
       try { body = await fetch(BASE + '/api/v3/cameras?' + q, { cache: 'no-store' }).then((r) => r.json()); } catch { $('cam-list').innerHTML = '<p class="note">Couldn\'t load cameras.</p>'; return; }
       if (!body.configured) { $('cam-list').innerHTML = '<p class="note">No camera source is set up on the server (CAMERA_CATALOG_FILE in .env).</p>'; return; }
+      cams.onAir = body.onAir !== false;
+      // Without broadcast permission the cameras can only be previewed here, never sent to the stream.
+      $('cam-offair').hidden = cams.onAir;
+      $('cam-pin').disabled = !cams.onAir || !cams.sel;
+      document.querySelectorAll('#cam-mode button').forEach((b) => { b.disabled = !cams.onAir && b.dataset.v !== 'off'; });
       if (!cams.statesLoaded) {
         cams.statesLoaded = true;
         body.states.forEach((x) => $('cam-state').insertAdjacentHTML('beforeend', '<option value="' + esc(x.value) + '">' + esc((STATES[x.value] || x.value) + ' (' + x.n + ')') + '</option>'));
@@ -463,7 +469,7 @@
       pv.innerHTML = '<span>Loading…</span>';
       $('cam-pv-name').textContent = c.name;
       $('cam-pv-sub').textContent = camMeta(c);
-      $('cam-pin').disabled = false;
+      $('cam-pin').disabled = !cams.onAir;
       const url = c.feed.startsWith('/') ? BASE + c.feed : c.feed;
       const still = () => { pv.innerHTML = c.snapshot ? '<img alt="" src="' + esc(c.snapshot) + '">' : '<span>This camera isn\'t sending video right now.</span>'; };
       if (c.kind === 'hls') {
@@ -488,7 +494,10 @@
         pv.querySelector('img').onerror = still;
       }
     };
-    const pinCam = (c) => act({ action: 'camera', mode: 'pinned', id: c.id, name: c.name }, 'On stream: ' + c.name);
+    const pinCam = (c) => {
+      if (!cams.onAir) { toast('Cameras are off air: no broadcast permission yet'); return; }
+      act({ action: 'camera', mode: 'pinned', id: c.id, name: c.name }, 'On stream: ' + c.name);
+    };
     $('cam-q').addEventListener('input', () => { clearTimeout(cams.timer); cams.timer = setTimeout(() => loadCams(true), 300); });
     $('cam-state').addEventListener('change', () => loadCams(true));
     $('cam-kind').addEventListener('change', () => loadCams(true));

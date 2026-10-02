@@ -2282,7 +2282,8 @@
           camCache.set(a.key, body);
           if (camCache.size > 80) camCache.delete(camCache.keys().next().value);
         }
-        if (!body.configured) { S.camsOff = true; return; }
+        // No camera source, or cameras are off air (no broadcast permission): stop asking.
+        if (!body.configured || body.onAir === false) { S.camsOff = true; return; }
         const cam = body.cameras?.[0];
         if (!cam || S.shot !== shot || camCfg().mode !== 'auto') return;
         // If it dies, ask the server again next time (it skips camera sites that refused us).

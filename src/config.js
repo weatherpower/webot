@@ -154,6 +154,9 @@ export const config = {
     username: process.env.CAMERA_API_USER || '',
     password: process.env.CAMERA_API_PASS || '',
     noAuth: bool(process.env.CAMERA_API_NO_AUTH, false),
+    // Off until you have permission to broadcast these cameras. While off, the stream gets no cameras
+    // (Live Control can still preview them privately).
+    onAir: bool(process.env.CAMERA_ON_AIR, false),
     allowLocal: bool(process.env.CAMERA_ALLOW_LOCAL, false)
   },
   controllerToken: process.env.CONTROLLER_TOKEN || '',

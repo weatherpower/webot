@@ -418,3 +418,10 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
   "Say it" lines always play. Control action `talk` (`auto` | `on` | `off`). No opening "WeBot here" line.
 - Calm days (WIS under 100, no tornado warnings) are slow and chill: scenes hold 1–3 minutes, mostly the
   national radar map with the now-playing bar, fewer alert hops.
+
+### Cameras are off air by default
+
+`CAMERA_ON_AIR` (default `false`): until you have permission to broadcast the cameras, the stream gets
+none (the nearest-camera lookup returns nothing and a pinned camera is refused), so WeBot never mentions
+them. Live Control can still search and preview cameras privately and shows an OFF AIR notice. Set
+`CAMERA_ON_AIR=true` in `.env` and restart once you have broadcast permission.
