@@ -498,6 +498,11 @@
     const startPuter = () => {
       if (pt.state !== 'off') return;
       pt.state = 'loading';
+      // On a plain-http network address (http://192.168.x.x) the browser hides crypto.randomUUID,
+      // which Puter's sign-in needs. getRandomValues still works there, so rebuild it from that.
+      if (window.crypto && typeof crypto.randomUUID !== 'function') {
+        crypto.randomUUID = () => '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
+      }
       const script = document.createElement('script');
       script.src = PUTER_JS;
       script.onload = () => { pt.state = window.puter?.auth?.isSignedIn() ? 'ready' : 'signed-out'; puterGate(); };
