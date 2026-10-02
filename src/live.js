@@ -1,5 +1,6 @@
 // Live stream support: activity index with history, storm reports, nearest-radar loops and the
 // stream control store (pin an alert, focus a state, make the bot talk, banner messages).
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
@@ -235,14 +236,16 @@ export const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable'
 const DEFAULT_MUSIC = { on: true, volume: 35, source: 'auto', mood: 'auto', duck: true };
 // OpenAI Alloy through Puter.js by default (billed to the Puter account signed in on the stream page).
 const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', speed: 1 };
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, commands: [] };
+// Cameras on stream: auto = nearest camera to the alert on screen, pinned = one chosen camera all the time, off.
+const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, commands: [] };
 let control = null;
 
 const loadControl = async () => {
   if (control) return control;
   try {
     const saved = JSON.parse(await fs.readFile(controlPath, 'utf8'));
-    control = { ...DEFAULT_CONTROL, ...saved, music: { ...DEFAULT_MUSIC, ...saved.music }, tts: { ...DEFAULT_TTS, ...saved.tts } };
+    control = { ...DEFAULT_CONTROL, ...saved, music: { ...DEFAULT_MUSIC, ...saved.music }, tts: { ...DEFAULT_TTS, ...saved.tts }, camera: { ...DEFAULT_CAMERA, ...saved.camera } };
   } catch {
     control = { ...DEFAULT_CONTROL };
   }
@@ -297,11 +300,46 @@ const saveControl = async () => {
   await replaceFile(temp, controlPath);
 };
 
+/* ---------------- Puter sign-in handoff for OBS ---------------- */
+// OBS browser sources can't open Puter's sign-in popup. Live Control signs in (in a normal browser) and
+// hands the token to the server; the stream picks it up with its private stream key (?key= in the OBS URL).
+// The token is kept in its own file and never appears in the public /api/v3/live response.
+const secretsPath = path.join(dataDir, 'live-secrets.json');
+let secrets = null;
+const loadSecrets = async () => {
+  if (secrets) return secrets;
+  try { secrets = JSON.parse(await fs.readFile(secretsPath, 'utf8')); } catch { secrets = {}; }
+  return secrets;
+};
+const saveSecrets = async () => {
+  await ensureRuntimeDirs();
+  const temp = `${secretsPath}.${process.pid}.tmp`;
+  await fs.writeFile(temp, JSON.stringify(secrets));
+  await replaceFile(temp, secretsPath);
+};
+
+// Derived from CONTROLLER_TOKEN, so it changes whenever the control token does.
+export const streamKey = () => (config.controllerToken
+  ? crypto.createHmac('sha256', config.controllerToken).update('weatherpower-live-stream').digest('base64url').slice(0, 24)
+  : '');
+
+export const puterTokenFor = async (key) => {
+  const expected = streamKey();
+  const given = String(key || '');
+  if (!expected || given.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {
+    throw Object.assign(new Error('Wrong stream key'), { status: 403 });
+  }
+  const s = await loadSecrets();
+  return { token: s.puterToken || null, linkedAt: s.puterLinkedAt || null };
+};
+
 export const liveControl = async () => {
   const current = await loadControl();
+  const s = await loadSecrets();
   const now = Date.now();
   return {
     ...current,
+    puter: { linked: Boolean(s.puterToken), user: s.puterUser || '', linkedAt: s.puterLinkedAt || null },
     banner: current.banner && Date.parse(current.banner.until) > now ? current.banner : null,
     commands: current.commands.filter((command) => now - Date.parse(command.at) < 5 * 60 * 1000),
     stream: streamBeat && now - Date.parse(streamBeat.at) < 60 * 1000 ? streamBeat : null
@@ -377,6 +415,31 @@ export const applyLiveCommand = async (body = {}) => {
       if (OPENAI_VOICES.includes(body.openaiVoice)) tts.openaiVoice = body.openaiVoice;
       if ('speed' in body) tts.speed = Math.round(Math.min(1.4, Math.max(0.7, Number(body.speed) || 1)) * 100) / 100;
       current.tts = tts;
+      break;
+    }
+    case 'camera': {
+      const camera = { ...current.camera };
+      if (['auto', 'pinned', 'off'].includes(body.mode)) camera.mode = body.mode;
+      if ('id' in body) {
+        camera.id = cleanText(body.id, 200) || null;
+        camera.name = cleanText(body.name, 140);
+      }
+      if (camera.mode === 'pinned' && !camera.id) camera.mode = 'auto';
+      current.camera = camera;
+      break;
+    }
+    case 'puter-link': {
+      const token = String(body.token || '').trim();
+      if (!token || token.length > 4000) throw Object.assign(new Error('No Puter token'), { status: 400 });
+      const s = await loadSecrets();
+      Object.assign(s, { puterToken: token, puterUser: cleanText(body.user, 80), puterLinkedAt: new Date().toISOString() });
+      await saveSecrets();
+      break;
+    }
+    case 'puter-unlink': {
+      const s = await loadSecrets();
+      Object.assign(s, { puterToken: null, puterUser: '', puterLinkedAt: new Date().toISOString() });
+      await saveSecrets();
       break;
     }
     default:

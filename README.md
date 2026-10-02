@@ -380,3 +380,17 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
   from that camera's own site). Sites that refuse (e.g. DriveTexas, which needs its own session) are skipped for an hour;
   a dead stream falls back to the camera's still image. Only public feeds (state DOT cameras) are used
   unless `CAMERA_ALLOW_LOCAL=true`. `GET /api/v3/cameras/near?lat=&lon=&miles=`.
+
+### Camera picker and Puter in OBS
+
+- **Live Control → Cameras:** search all cameras (name, road, city), filter by state and live video vs
+  stills, preview any camera (live video plays right there), and **Put on stream** to pin it: the pinned
+  camera stays on screen through every shot. Modes: Auto (nearest camera on alert zooms), Pinned, Off.
+  API: `GET /api/v3/cameras?q=&state=&kind=&offset=`, `GET /api/v3/cameras/item/:id`; control action
+  `camera` (`mode`, `id`, `name`). Cameras play with hls.js first (newer Chrome claims native HLS but
+  can't play these agency streams).
+- **Puter sign-in for OBS:** OBS browser sources can't open Puter's sign-in popup. In Live Control →
+  WeBot → Puter, click **Sign in & link for OBS** (in a normal browser). The server keeps the token in
+  `data/live-secrets.json` (never in the public `/api/v3/live`), and the stream fetches it from
+  `GET /api/v3/live/puter?key=` using its private stream key. Use the OBS link shown in Live Control
+  (it ends in `?key=…`); the key is derived from `CONTROLLER_TOKEN`.

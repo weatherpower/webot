@@ -62,6 +62,18 @@
     input[type="range"] { padding: 0; accent-color: var(--brand); background: transparent; border: 0; height: 28px; }
     .row > .status:first-child { min-width: 58px; }
     .live-line b { color: var(--ok); }
+    .camgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-top: 12px; }
+    @media (max-width: 820px) { .camgrid { grid-template-columns: minmax(0, 1fr); } }
+    .camlist { max-height: 470px; margin-top: 10px; }
+    .camlist .item { cursor: pointer; }
+    .camlist .item.sel { border-color: var(--brand); }
+    .camlist .item.onair { border-color: var(--ok); }
+    .camlist .item i { height: 26px; }
+    .campv { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+    .campv video, .campv img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .campre b { display: block; margin-top: 10px; font-family: "WP Display"; font-weight: 500; font-size: 18px; text-transform: uppercase; }
+    .onair-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--ok); color: #06210f; font: 700 10px "WP Mono"; letter-spacing: .1em; vertical-align: middle; }
+    .obs-key { color: var(--warn); }
   </style>
 </head>
 <body class="locked">
@@ -123,6 +135,12 @@
           <button class="btn" id="tts-test">Test</button>
         </div>
         <div class="row">
+          <span class="status">PUTER</span>
+          <span class="status grow" id="puter-line">Not linked</span>
+          <button class="btn" id="puter-link">Sign in &amp; link for OBS</button>
+          <button class="btn" id="puter-unlink" hidden>Unlink</button>
+        </div>
+        <div class="row">
           <label for="tts-speed" class="status">SPEED</label>
           <input id="tts-speed" type="range" min="0.8" max="1.25" step="0.05" class="grow">
           <span class="status" id="tts-speed-n">1.00×</span>
@@ -175,6 +193,36 @@
     </section>
 
     <section class="box needs-token">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">Cameras</h2><span class="status" id="cam-count"></span></div>
+      <div class="row">
+        <span class="status">ON STREAM</span>
+        <div class="seg" id="cam-mode"><button data-v="auto">Auto (near alerts)</button><button data-v="pinned">Pinned camera</button><button data-v="off">Off</button></div>
+      </div>
+      <p class="status live-line" id="cam-line" style="margin:8px 0 0"></p>
+      <div class="camgrid">
+        <div>
+          <div class="row">
+            <input id="cam-q" class="grow" placeholder="Search: road, city, camera name…" autocomplete="off">
+            <select id="cam-state"><option value="">All states</option></select>
+            <select id="cam-kind"><option value="">Video + stills</option><option value="hls">Live video</option><option value="image">Still images</option></select>
+          </div>
+          <div class="list camlist" id="cam-list"><p class="note">Loading cameras…</p></div>
+          <div class="row"><button class="btn" id="cam-more" hidden>Load more</button><span class="status" id="cam-matches"></span></div>
+        </div>
+        <div class="campre">
+          <div class="campv" id="cam-pv"><span>Pick a camera to preview it here</span></div>
+          <b id="cam-pv-name"></b>
+          <span class="status" id="cam-pv-sub"></span>
+          <div class="row">
+            <button class="btn primary" id="cam-pin" disabled>Put on stream</button>
+            <button class="btn" id="cam-auto">Back to auto</button>
+          </div>
+          <p class="note">Pinned stays on screen through every shot until you change it. Auto shows the nearest camera when WeBot zooms to an alert.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="box needs-token">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">Active alerts</h2><input id="filter" placeholder="Filter (event, county, state)" style="min-width:220px"></div>
       <div class="list" id="alerts" style="margin-top:10px"></div>
     </section>
@@ -182,9 +230,9 @@
     <section class="box">
       <h2>Put it on YouTube / Twitch with OBS</h2>
       <ol>
-        <li>In OBS add a <b>Browser</b> source. URL: <code id="obs-url"></code>, width <b>1920</b>, height <b>1080</b>.</li>
+        <li>In OBS add a <b>Browser</b> source. URL: <code id="obs-url"></code>, width <b>1920</b>, height <b>1080</b>. <span class="obs-key" id="obs-key-note">Connect above to get your private link.</span></li>
         <li>Tick <b>Control audio via OBS</b> so the music, chimes and WeBot's voice all go to the stream.</li>
-        <li>WeBot's voice is OpenAI <b>Alloy</b> through Puter.js. The first time, the stream shows a <b>Sign in to Puter</b> button: in OBS right-click the source → <b>Interact</b> and click it. Puter remembers the sign-in. Usage counts against that Puter account (it has a free monthly allowance). Until you sign in, or if the allowance runs out, WeBot uses the computer voice.</li>
+        <li>WeBot's voice is OpenAI <b>Alloy</b> through Puter.js. OBS can't open Puter's sign-in window, so sign in here instead: <b>WeBot → Puter → Sign in &amp; link for OBS</b>. The stream (opened with the private link above) picks it up within a few seconds. Usage counts against that Puter account (it has a free monthly allowance); if it runs out, WeBot uses the computer voice.</li>
         <li>URL options: <code>?state=OK</code> focus one state · <code>?voice=0</code> · <code>?sound=0</code> · <code>?music=0</code> · <code>?tts=browser</code> computer voice · <code>?bot=0</code> · <code>?tips=0</code> · <code>?speed=1.5</code> slower shots · <code>?tz=America/Chicago</code> clock zone.</li>
       </ol>
     </section>
@@ -225,12 +273,20 @@
         throw new Error(data.error || 'Error ' + response.status);
       }
       control = data.control;
+      if (data.streamKey && data.streamKey !== streamKey) { streamKey = data.streamKey; showObsLink(); }
       setConnected(true);
       render();
       if (okMsg) toast(okMsg);
       return data;
     };
     const act = (body, okMsg) => send(body, okMsg).catch((e) => toast(e.message));
+    let streamKey = '';
+    const showObsLink = () => {
+      const url = streamUrl + (streamKey ? '?key=' + streamKey : '');
+      $('obs-url').textContent = url;
+      $('open-stream').href = url;
+      $('obs-key-note').textContent = streamKey ? 'This link has your private stream key (it lets OBS use the Puter sign-in). Keep it private.' : 'Connect above to get your private link.';
+    };
 
     const setConnected = (ok, message) => {
       document.body.classList.toggle('locked', !ok);
@@ -261,6 +317,11 @@
       if (document.activeElement !== $('music-vol')) { $('music-vol').value = music.volume ?? 35; $('music-vol-n').textContent = music.volume ?? 35; }
       document.querySelectorAll('#music-src button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.source || 'auto'))));
       document.querySelectorAll('#music-mood button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.mood || 'auto'))));
+      const pu = control.puter || {};
+      $('puter-line').innerHTML = pu.linked ? '<b style="color:var(--ok)">LINKED</b>' + (pu.user ? ' · ' + esc(pu.user) : '') + ' · OBS uses it automatically' : 'Not linked · OBS can\'t sign in by itself';
+      $('puter-link').textContent = pu.linked ? 'Re-link' : 'Sign in & link for OBS';
+      $('puter-unlink').hidden = !pu.linked;
+      renderCamControl();
       const st = control.stream;
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
@@ -300,6 +361,136 @@
     const loadVoices = async () => {
       try { voices = await fetch(BASE + '/api/v3/live/voice', { cache: 'no-store' }).then((r) => r.json()); fillVoices(); } catch {}
     };
+
+    /* ---------- cameras ---------- */
+    const cams = { items: [], offset: 0, matches: 0, sel: null, hls: null, statesLoaded: false, timer: null };
+    let hlsLib = null;
+    const loadHlsLib = () => hlsLib || (hlsLib = new Promise((resolve, reject) => {
+      const tag = document.createElement('script');
+      tag.src = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js';
+      tag.onload = () => resolve(window.Hls);
+      tag.onerror = reject;
+      document.head.appendChild(tag);
+    }));
+    const camMeta = (c) => [c.agency, c.state, c.kind === 'hls' ? 'LIVE VIDEO' : 'STILL', c.place].filter(Boolean).join(' · ');
+    const renderCamControl = () => {
+      const cfg = control?.camera || { mode: 'auto' };
+      document.querySelectorAll('#cam-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === cfg.mode)));
+      $('cam-line').innerHTML = cfg.mode === 'pinned' ? '<b>● PINNED</b> · ' + esc(cfg.name || cfg.id) + ' is on screen through every shot'
+        : cfg.mode === 'off' ? 'Cameras are off.' : 'Auto: the nearest camera (within 30 miles) shows when WeBot zooms to an alert.';
+      document.querySelectorAll('#cam-list .item').forEach((el) => el.classList.toggle('onair', cfg.mode === 'pinned' && el.dataset.id === cfg.id));
+    };
+    const camRow = (c) => '<div class="item" data-id="' + esc(c.id) + '" style="--c:' + (c.kind === 'hls' ? '#34e07a' : '#1a8cff') + '"><i></i><div><b>' + esc(c.name) + '</b><span>' + esc(camMeta(c)) + '</span></div>'
+      + '<button class="btn" data-air="' + esc(c.id) + '">On stream</button></div>';
+    const loadCams = async (reset) => {
+      if (reset) { cams.offset = 0; cams.items = []; }
+      const q = new URLSearchParams({ q: $('cam-q').value.trim(), state: $('cam-state').value, kind: $('cam-kind').value, offset: cams.offset, limit: 60 });
+      let body;
+      try { body = await fetch(BASE + '/api/v3/cameras?' + q, { cache: 'no-store' }).then((r) => r.json()); } catch { $('cam-list').innerHTML = '<p class="note">Couldn\'t load cameras.</p>'; return; }
+      if (!body.configured) { $('cam-list').innerHTML = '<p class="note">No camera source is set up on the server (CAMERA_CATALOG_FILE in .env).</p>'; return; }
+      if (!cams.statesLoaded) {
+        cams.statesLoaded = true;
+        body.states.forEach((x) => $('cam-state').insertAdjacentHTML('beforeend', '<option value="' + esc(x.value) + '">' + esc((STATES[x.value] || x.value) + ' (' + x.n + ')') + '</option>'));
+      }
+      cams.items = cams.items.concat(body.cameras);
+      cams.offset = cams.items.length;
+      cams.matches = body.matches;
+      $('cam-count').textContent = body.total.toLocaleString() + ' CAMERAS';
+      $('cam-matches').textContent = cams.matches.toLocaleString() + ' match' + (cams.matches === 1 ? '' : 'es') + (cams.items.length < cams.matches ? ' · showing ' + cams.items.length : '');
+      $('cam-more').hidden = cams.items.length >= cams.matches;
+      $('cam-list').innerHTML = cams.items.length ? cams.items.map(camRow).join('') : '<p class="note">No cameras match.</p>';
+      if (cams.sel) $('cam-list').querySelector('[data-id="' + CSS.escape(cams.sel.id) + '"]')?.classList.add('sel');
+      renderCamControl();
+    };
+    const previewCam = async (c) => {
+      cams.sel = c;
+      document.querySelectorAll('#cam-list .item').forEach((el) => el.classList.toggle('sel', el.dataset.id === c.id));
+      cams.hls?.destroy?.();
+      cams.hls = null;
+      const pv = $('cam-pv');
+      pv.innerHTML = '<span>Loading…</span>';
+      $('cam-pv-name').textContent = c.name;
+      $('cam-pv-sub').textContent = camMeta(c);
+      $('cam-pin').disabled = false;
+      const url = c.feed.startsWith('/') ? BASE + c.feed : c.feed;
+      const still = () => { pv.innerHTML = c.snapshot ? '<img alt="" src="' + esc(c.snapshot) + '">' : '<span>This camera isn\'t sending video right now.</span>'; };
+      if (c.kind === 'hls') {
+        const v = document.createElement('video');
+        v.muted = true; v.autoplay = true; v.playsInline = true; v.controls = false;
+        pv.innerHTML = '';
+        pv.appendChild(v);
+        // hls.js first: newer Chrome claims native HLS but can't play these agency streams.
+        const Hls = await loadHlsLib().catch(() => null);
+        if (cams.sel !== c) return;
+        if (Hls?.isSupported()) {
+          cams.hls = new Hls({ maxBufferLength: 8 });
+          cams.hls.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) still(); });
+          cams.hls.loadSource(url);
+          cams.hls.attachMedia(v);
+        } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+          v.src = url;
+          v.onerror = still;
+        } else still();
+      } else {
+        pv.innerHTML = '<img alt="" src="' + esc(url) + '">';
+        pv.querySelector('img').onerror = still;
+      }
+    };
+    const pinCam = (c) => act({ action: 'camera', mode: 'pinned', id: c.id, name: c.name }, 'On stream: ' + c.name);
+    $('cam-q').addEventListener('input', () => { clearTimeout(cams.timer); cams.timer = setTimeout(() => loadCams(true), 300); });
+    $('cam-state').addEventListener('change', () => loadCams(true));
+    $('cam-kind').addEventListener('change', () => loadCams(true));
+    $('cam-more').addEventListener('click', () => loadCams(false));
+    $('cam-list').addEventListener('click', (e) => {
+      const item = e.target.closest('.item');
+      const c = item && cams.items.find((x) => x.id === item.dataset.id);
+      if (!c) return;
+      if (e.target.closest('[data-air]')) pinCam(c);
+      else previewCam(c);
+    });
+    $('cam-pin').addEventListener('click', () => { if (cams.sel) pinCam(cams.sel); });
+    $('cam-auto').addEventListener('click', () => act({ action: 'camera', mode: 'auto' }, 'Cameras: auto'));
+    $('cam-mode').addEventListener('click', (e) => {
+      const v = e.target.closest('button')?.dataset.v;
+      if (!v) return;
+      if (v === 'pinned') {
+        const pick = cams.sel || (control?.camera?.id ? { id: control.camera.id, name: control.camera.name } : null);
+        if (!pick) { toast('Pick a camera below first'); return; }
+        pinCam(pick);
+        return;
+      }
+      act({ action: 'camera', mode: v }, v === 'off' ? 'Cameras off' : 'Cameras: auto');
+    });
+
+    /* ---------- Puter sign-in for OBS ---------- */
+    // OBS can't open Puter's sign-in window, so it happens here and the server hands it to the stream.
+    let puterLoad = null;
+    const loadPuter = () => puterLoad || (puterLoad = new Promise((resolve, reject) => {
+      // On a plain-http network address the browser hides crypto.randomUUID, which Puter needs.
+      if (window.crypto && typeof crypto.randomUUID !== 'function') {
+        crypto.randomUUID = () => '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
+      }
+      const tag = document.createElement('script');
+      tag.src = 'https://js.puter.com/v2/';
+      tag.onload = () => { try { window.puter.quiet = true; } catch {} resolve(window.puter); };
+      tag.onerror = reject;
+      document.head.appendChild(tag);
+    }));
+    $('puter-link').addEventListener('click', async () => {
+      try {
+        const puter = await loadPuter();
+        // Popup has to open straight from the click; Puter is preloaded once you connect.
+        if (!puter.auth.isSignedIn() || control?.puter?.linked) await puter.auth.signIn({ request_auth: Boolean(control?.puter?.linked) });
+        const token = puter.authToken;
+        if (!token) { toast('Puter sign-in didn\'t finish'); return; }
+        let user = '';
+        try { user = (await puter.auth.getUser())?.username || ''; } catch {}
+        await act({ action: 'puter-link', token, user }, 'Puter linked. OBS will pick it up in a few seconds.');
+      } catch (error) {
+        toast('Puter: ' + (error?.msg || error?.message || 'sign-in failed'));
+      }
+    });
+    $('puter-unlink').addEventListener('click', () => act({ action: 'puter-unlink' }, 'Puter unlinked'));
 
     const loadAlerts = async () => {
       try {
@@ -357,7 +548,9 @@
     loadAlerts();
     setInterval(loadAlerts, 30000);
     loadVoices();
-    if (token) send({ action: 'ping' }).catch(() => {});
+    showObsLink();
+    if (token) send({ action: 'ping' }).then(() => { loadCams(true); loadPuter().catch(() => {}); }).catch(() => {});
+    $('connect').addEventListener('click', () => setTimeout(() => { if (control) { loadCams(true); loadPuter().catch(() => {}); } }, 800));
     // Keeps "Stream status" fresh while the panel is open.
     setInterval(() => { if (control && !document.hidden) send({ action: 'ping' }).catch(() => {}); }, 8000);
   })();

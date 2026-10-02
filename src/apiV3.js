@@ -10,14 +10,14 @@ import {
   SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 import {
-  applyLiveCommand, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES,
+  applyLiveCommand, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
   recentReports, requireLiveToken, siteRadar, talliesFor
 } from './live.js';
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
 import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
-import { cameraStream, camerasNear } from './cameras.js';
+import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
@@ -322,6 +322,35 @@ export const apiV3Router = () => {
     }
   });
 
+  // Camera picker (Live Control) and single camera lookup (pinned camera on stream).
+  router.get('/cameras', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json(await searchCameras({ q: String(req.query.q || '').slice(0, 80), state: req.query.state, agency: req.query.agency, kind: req.query.kind, offset: req.query.offset, limit: req.query.limit }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/cameras/item/:id', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json(await getCamera(req.params.id));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // OBS can't open Puter's sign-in popup: the stream fetches the token Live Control linked, with its stream key.
+  router.get('/live/puter', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json(await puterTokenFor(req.query.key));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Nearest live cameras from the WeatherPower Traffic camera network.
   router.get('/cameras/near', async (req, res, next) => {
     try {
@@ -442,7 +471,8 @@ export const apiV3Router = () => {
   router.post('/live/control', requireLiveToken, async (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store');
-      res.json({ ok: true, control: await applyLiveCommand(req.body || {}) });
+      // The stream key only goes to token holders: it's what lets the OBS stream fetch the Puter sign-in.
+      res.json({ ok: true, control: await applyLiveCommand(req.body || {}), streamKey: streamKey() });
     } catch (error) {
       next(error);
     }

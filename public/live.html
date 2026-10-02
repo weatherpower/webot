@@ -254,7 +254,7 @@
     <div class="boot" id="boot">WEATHERPOWER LIVE</div>
   </div>
   <button class="gate" id="gate" hidden>🔊 Click to turn on sound and the bot's voice</button>
-  <button class="gate" id="puter-gate" style="top:72px" hidden>🔑 Sign in to Puter to give WeBot the OpenAI Alloy voice</button>
+  <button class="gate" id="puter-gate" style="top:72px" hidden>🔑 Sign in to Puter for WeBot's Alloy voice (in OBS: use Live Control → Puter)</button>
 
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
   <script>
@@ -272,6 +272,7 @@
       tips: P.get('tips') !== '0',
       music: P.get('music') !== '0',
       tts: ['puter', 'neural', 'openai', 'browser'].includes(P.get('tts')) ? P.get('tts') : '',
+      key: P.get('key') || '',
       speed: Math.min(3, Math.max(0.4, Number(P.get('speed')) || 1)),
       tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone
     };
@@ -520,6 +521,18 @@
     const PUTER_JS = 'https://js.puter.com/v2/';
     const VOICE_STYLE = 'You are WeBot, a friendly robot weather broadcaster on a 24/7 live stream. Speak clearly at a steady broadcast pace, warm and upbeat, but serious and urgent about dangerous weather.';
     const pt = { state: 'off', cache: new Map() };
+    // Takes the Puter sign-in that Live Control linked (needs the private ?key= from the OBS link).
+    const linkPuter = async () => {
+      if (!OPT.key || !window.puter) return;
+      try {
+        const body = await getJson('/api/v3/live/puter?key=' + encodeURIComponent(OPT.key));
+        if (body.token) { puter.setAuthToken(body.token); pt.state = 'ready'; pt.linked = true; }
+        else if (pt.linked) { puter.setAuthToken(null); pt.state = 'signed-out'; pt.linked = false; }
+      } catch (error) {
+        console.warn('Puter link:', error.message);
+      }
+      puterGate();
+    };
     const puterGate = () => {
       $('puter-gate').hidden = !(pt.state === 'signed-out' && voiceOn() && ttsCfg().engine === 'puter');
     };
@@ -533,7 +546,11 @@
       }
       const script = document.createElement('script');
       script.src = PUTER_JS;
-      script.onload = () => { pt.state = window.puter?.auth?.isSignedIn() ? 'ready' : 'signed-out'; puterGate(); };
+      script.onload = async () => {
+        pt.state = window.puter?.auth?.isSignedIn() ? 'ready' : 'signed-out';
+        if (pt.state !== 'ready' && OPT.key) await linkPuter();
+        puterGate();
+      };
       script.onerror = () => { pt.state = 'failed'; console.warn('Puter.js did not load'); };
       document.head.appendChild(script);
     };
@@ -2026,7 +2043,11 @@
       tag.onerror = reject;
       document.head.appendChild(tag);
     }));
-    const hideCam = () => {
+    // One camera player for both modes: Auto (nearest camera to the alert on screen) and Pinned
+    // (a camera chosen in Live Control, kept on screen through every shot until it's changed).
+    const camCfg = () => ({ mode: 'auto', id: null, ...(S.control.camera || {}) });
+    const hideCam = (force) => {
+      if (S.camPinnedId && !force) return;
       clearTimeout(S.camTimer);
       clearInterval(S.camRefresh);
       S.camHls?.destroy?.();
@@ -2040,11 +2061,60 @@
       const img = document.createElement('img');
       img.alt = '';
       img.src = url;
-      img.onerror = () => { if (fallback && img.src !== fallback) img.src = fallback; else hideCam(); };
+      img.onerror = () => { if (fallback && img.src !== fallback) img.src = fallback; else hideCam(true); };
       return img;
     };
+    const playCam = async (cam, { onDead, still } = {}) => {
+      clearInterval(S.camRefresh);
+      S.camHls?.destroy?.();
+      S.camHls = null;
+      S.camMarker?.remove();
+      // Video comes through this server's stream proxy (a site-relative /api/ path).
+      const feedUrl = cam.feed.startsWith('/') ? BASE + cam.feed : cam.feed;
+      const feed = $('cam-feed');
+      feed.innerHTML = '';
+      if (cam.kind === 'hls' && !still) {
+        const video = document.createElement('video');
+        video.muted = true; video.autoplay = true; video.playsInline = true;
+        feed.appendChild(video);
+        // A dead feed: show its still image if it has one.
+        const bail = () => { onDead?.(); feed.innerHTML = ''; if (cam.snapshot) feed.appendChild(camImage(cam.snapshot)); else hideCam(true); };
+        // hls.js first: newer Chrome claims native HLS but can't play these agency streams.
+        // The built-in player is only for browsers without hls.js support (Safari).
+        const Hls = await loadHls().catch(() => null);
+        if (Hls?.isSupported()) {
+          S.camHls = new Hls({ maxBufferLength: 10 });
+          S.camHls.on(Hls.Events.ERROR, (e, data) => { if (data.fatal) bail(); });
+          S.camHls.loadSource(feedUrl);
+          S.camHls.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = feedUrl;
+          video.onerror = bail;
+        } else {
+          bail();
+          return;
+        }
+      } else {
+        const url = cam.kind === 'hls' ? cam.snapshot : feedUrl;
+        if (!url) { hideCam(true); return; }
+        feed.appendChild(camImage(url));
+        // Still cameras refresh every 20 seconds.
+        S.camRefresh = setInterval(() => {
+          const img = feed.querySelector('img');
+          if (img) img.src = url + (url.includes('?') ? '&' : '?') + '_wp=' + Date.now();
+        }, 20000);
+      }
+      $('cam-name').textContent = cam.name;
+      $('cam-sub').textContent = [cam.agency, cam.state, cam.miles != null ? cam.miles + ' MI' : ''].filter(Boolean).join(' · ');
+      $('cam').classList.add('show');
+      const el = document.createElement('div');
+      el.className = 'cammk';
+      el.innerHTML = '<i></i><span>' + esc(cam.name) + '</span>';
+      S.camMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([cam.lon, cam.lat]).addTo(S.map);
+    };
+    // Auto mode: nearest working camera within 30 miles of the alert, a couple of seconds into the zoom.
     const showCamFor = (a, shot) => {
-      if (S.camsOff) return;
+      if (S.camsOff || camCfg().mode !== 'auto') return;
       const c = centerOf(a);
       if (!c) return;
       S.camTimer = setTimeout(async () => {
@@ -2057,46 +2127,29 @@
         }
         if (!body.configured) { S.camsOff = true; return; }
         const cam = body.cameras?.[0];
-        if (!cam || S.shot !== shot) return;
-        // Video comes through this server's stream proxy (a site-relative /api/ path).
-        const feedUrl = cam.feed.startsWith('/') ? BASE + cam.feed : cam.feed;
-        const feed = $('cam-feed');
-        feed.innerHTML = '';
-        if (cam.kind === 'hls') {
-          const video = document.createElement('video');
-          video.muted = true; video.autoplay = true; video.playsInline = true;
-          feed.appendChild(video);
-          // A dead feed: show its still image if it has one, and ask the server again next time
-          // (it skips camera sites that refused us).
-          const bail = () => { camCache.delete(a.key); feed.innerHTML = ''; if (cam.snapshot) feed.appendChild(camImage(cam.snapshot)); else hideCam(); };
-          if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = feedUrl; video.onerror = bail; }
-          else {
-            try {
-              const Hls = await loadHls();
-              if (!Hls?.isSupported()) { bail(); return; }
-              S.camHls = new Hls({ maxBufferLength: 10 });
-              S.camHls.on(Hls.Events.ERROR, (e, data) => { if (data.fatal) bail(); });
-              S.camHls.loadSource(feedUrl);
-              S.camHls.attachMedia(video);
-            } catch { bail(); return; }
-          }
-        } else {
-          feed.appendChild(camImage(feedUrl));
-          // Still cameras refresh every 20 seconds.
-          S.camRefresh = setInterval(() => {
-            const img = feed.querySelector('img');
-            if (img) img.src = feedUrl + (feedUrl.includes('?') ? '&' : '?') + '_wp=' + Date.now();
-          }, 20000);
-        }
-        $('cam-name').textContent = cam.name;
-        $('cam-sub').textContent = [cam.agency, cam.miles != null ? cam.miles + ' MI' : ''].filter(Boolean).join(' · ');
-        $('cam').classList.add('show');
-        const el = document.createElement('div');
-        el.className = 'cammk';
-        el.innerHTML = '<i></i><span>' + esc(cam.name) + '</span>';
-        S.camMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([cam.lon, cam.lat]).addTo(S.map);
+        if (!cam || S.shot !== shot || camCfg().mode !== 'auto') return;
+        // If it dies, ask the server again next time (it skips camera sites that refused us).
+        await playCam(cam, { onDead: () => camCache.delete(a.key) });
         if (Math.random() < 0.5) setTimeout(() => S.shot === shot && chatter('Here’s a live look from the ' + titleCase(cam.name) + ' camera.'), 6000);
       }, 2600);
+    };
+    // Pinned mode / Off, applied whenever Live Control changes the camera setting.
+    const applyCameraControl = async () => {
+      const cfg = camCfg();
+      const want = cfg.mode === 'pinned' && cfg.id ? cfg.id : null;
+      if (cfg.mode === 'off' && !S.camPinnedId) hideCam(true);
+      if (want === S.camPinnedId) return;
+      S.camPinnedId = want;
+      hideCam(true);
+      if (!want) return;
+      try {
+        const cam = await getJson('/api/v3/cameras/item/' + encodeURIComponent(want));
+        if (S.camPinnedId !== want) return;
+        await playCam(cam);
+        chatter('Let’s keep an eye on the ' + titleCase(cam.name) + ' camera.');
+      } catch (error) {
+        console.warn('Pinned camera unavailable:', error.message);
+      }
     };
 
     /* ---------------- national radar + WPC surface map ---------------- */
@@ -2252,6 +2305,9 @@
       }
       if (ttsCfg().engine === 'neural' && OPT.voice) startNeural();
       if (ttsCfg().engine === 'puter' && OPT.voice) startPuter();
+      const linkedAt = S.control.puter?.linkedAt || null;
+      if (linkedAt !== S.puterLinkedAt) { S.puterLinkedAt = linkedAt; if (['ready', 'signed-out'].includes(pt.state)) linkPuter(); }
+      applyCameraControl();
       puterGate();
       loadMusicFiles();
       if (prevRev >= 0 && prevRev !== S.control.rev && (prevCtl.pin !== S.control.pin || prevCtl.mode !== S.control.mode || prevCtl.state !== S.control.state)) {

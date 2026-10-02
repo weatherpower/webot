@@ -46,6 +46,9 @@ export const normalizeCamera = (raw, idx) => {
     name,
     agency,
     roadway: String(pick(raw, 'roadway', 'route', 'road') || ''),
+    state: String(pick(raw, 'state') || '').toUpperCase().slice(0, 2),
+    place: String(pick(raw, 'market', 'camera_location_label', 'district') || ''),
+    view: String(pick(raw, 'camera_view', 'view') || ''),
     lat,
     lon,
     feed,
@@ -122,9 +125,45 @@ export const camerasNear = async ({ lat, lon, miles = 30, limit = 3 }) => {
     .filter((c) => c.miles <= radius && !(c.kind === 'hls' && siteRefused(c.feed)))
     .sort((a, b) => a.miles - b.miles)
     .slice(0, Math.min(10, Math.max(1, Number(limit) || 3)))
-    // Video goes through the stream proxy (agency headers, no CORS trouble); stills load directly.
-    .map(({ headers, ...c }) => (c.kind === 'hls' ? { ...c, feed: `/api/v3/cameras/stream/${encodeURIComponent(c.id)}/index.m3u8` } : c));
+    .map(forClient);
   return { configured: camerasConfigured(), total: cache.cameras?.length || 0, error: cache.error || undefined, cameras };
+};
+
+// Video goes through the stream proxy (agency headers, no CORS trouble); stills load directly.
+// Agency request headers never leave the server.
+const forClient = ({ headers, ...c }) => ({
+  ...c,
+  refused: c.kind === 'hls' && siteRefused(c.feed),
+  feed: c.kind === 'hls' ? `/api/v3/cameras/stream/${encodeURIComponent(c.id)}/index.m3u8` : c.feed
+});
+
+// Camera picker for Live Control: search by name/road/place, filter by state, agency and type.
+export const searchCameras = async ({ q = '', state = '', agency = '', kind = '', offset = 0, limit = 60 } = {}) => {
+  const all = await listCameras();
+  const terms = String(q).toLowerCase().split(/\s+/).filter(Boolean);
+  const st = String(state).toUpperCase();
+  const matches = all.filter((c) => (!st || c.state === st)
+    && (!agency || c.agency === agency)
+    && (!kind || c.kind === kind)
+    && terms.every((t) => `${c.name} ${c.roadway} ${c.place} ${c.agency} ${c.state} ${c.view}`.toLowerCase().includes(t)));
+  const count = (key) => Object.entries(all.reduce((m, c) => { if (c[key]) m[c[key]] = (m[c[key]] || 0) + 1; return m; }, {}))
+    .sort((a, b) => a[0].localeCompare(b[0])).map(([value, n]) => ({ value, n }));
+  const start = Math.max(0, Number(offset) || 0);
+  return {
+    configured: camerasConfigured(),
+    total: all.length,
+    matches: matches.length,
+    states: count('state'),
+    agencies: count('agency'),
+    error: cache.error || undefined,
+    cameras: matches.slice(start, start + Math.min(200, Math.max(1, Number(limit) || 60))).map(forClient)
+  };
+};
+
+export const getCamera = async (id) => {
+  const cam = (await listCameras()).find((c) => c.id === String(id));
+  if (!cam) throw Object.assign(new Error('Unknown camera'), { status: 404 });
+  return forClient(cam);
 };
 
 /* ---------------- HLS stream proxy ---------------- */
