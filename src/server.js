@@ -24,6 +24,7 @@ import { publicWarningCenterFeed } from './publicFeed.js';
 import { generateForecastSearchCards } from './forecastSearch.js';
 import { geocodeMapRequest, publicMapConfig, routeMapRequest } from './mapServices.js';
 import { apiV3Router, webotStatus } from './apiV3.js';
+import { startYoutubeChat } from './youtubeChat.js';
 import { shortsStatus } from './shorts.js';
 
 const app = express();
@@ -609,6 +610,7 @@ const startServer = async () => {
     console.log(`Warning Center: ${config.publicBaseUrl}/warningcenter`);
     startAutoRenderer();
     startWis().catch((error) => console.error('WIS', error.message));
+    startYoutubeChat();
   });
   // PUBLIC_STATUS_PORT: a second, read-only listener with only the WeBot status page (safe to open to
   // the internet while the main port stays behind the home-IP firewall).

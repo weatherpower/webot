@@ -45,6 +45,11 @@
     .next li::before { counter-increment: n; content: counter(n); flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--edge); color: var(--edge); font: 700 13px "WP Mono", monospace; }
     .next b { font: 600 20px "WP Display", sans-serif; text-transform: uppercase; }
     .next span { display: block; color: var(--muted); font-size: 13px; }
+    .req { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px 12px; background: rgba(255,59,74,.12); border-left: 3px solid var(--live); }
+    .req b { font: 600 18px "WP Display", sans-serif; text-transform: uppercase; }
+    .req span { display: block; color: var(--muted); font-size: 13px; }
+    .chat-help { margin: 0; font-size: 14px; }
+    .chat-help code { font: 600 13px "WP Mono", monospace; background: var(--panel2); padding: 2px 6px; color: var(--edge); }
     .note { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
     .said { display: grid; gap: 12px; }
     .said blockquote { margin: 0; padding: 12px 14px; background: var(--panel2); border-left: 3px solid var(--violet); font-size: 15px; overflow-wrap: anywhere; }
@@ -106,8 +111,14 @@
 
         <section class="box">
           <h2>Up next</h2>
+          <div id="requests"></div>
           <ol class="next" id="next"></ol>
           <p class="note" id="next-note">Breaking weather always cuts in line. Tornado warnings and new alerts go first.</p>
+        </section>
+
+        <section class="box" id="chat-box" hidden>
+          <h2>Ask WeBot from YouTube chat</h2>
+          <p class="chat-help">Type <code>!forecast Dallas TX</code> or <code>!gas 74745</code> in the live chat. WeBot takes your city or ZIP code next (within a couple of minutes, when there's no severe weather) and says your name on the stream.</p>
         </section>
 
         <section class="box">
@@ -141,6 +152,7 @@
         <section class="box">
           <h2>Stream details</h2>
           <dl class="facts">
+            <dt>Watching</dt><dd id="f-viewers">—</dd>
             <dt>Voice</dt><dd id="f-voice">—</dd>
             <dt>Music</dt><dd id="f-music">—</dd>
             <dt>Show</dt><dd id="f-mode">—</dd>
@@ -212,6 +224,9 @@
       }
       tick();
 
+      $('requests').innerHTML = (d.onAir && !d.brb ? d.requests || [] : []).map((r) => '<div class="req"><span style="font-size:22px">' + (r.kind === 'gas' ? '⛽' : '🌤️') + '</span><div><b>Viewer request · ' + esc(r.kind === 'gas' ? 'Gas prices' : 'Forecast') + ' for ' + esc(r.place) + '</b><span>' + (r.user ? 'asked by ' + esc(r.user) : 'from YouTube chat') + '</span></div></div>').join('');
+      $('chat-box').hidden = !(d.chat && d.chat.live);
+      $('f-viewers').textContent = d.chat && d.chat.viewers != null ? d.chat.viewers + ' on YouTube' : '—';
       const plan = d.onAir && !d.brb ? d.upNext || [] : [];
       $('next').innerHTML = plan.length
         ? plan.map((k) => { const [ico, label, about] = kind(k); return '<li><div><b>' + ico + ' ' + esc(label) + '</b><span>' + esc(about) + '</span></div></li>'; }).join('')

@@ -281,7 +281,7 @@ export const noteStreamBeat = (query = {}) => {
 
 // WeBot status (public page): the segment on now, the planned next few, recent segments and lines he said.
 const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'forecast', 'gas']);
-const webot = { seg: null, plan: [], history: [], said: [], saidKeys: new Set() };
+const webot = { seg: null, plan: [], requests: [], history: [], said: [], saidKeys: new Set() };
 const parseJson = (value) => { try { return JSON.parse(value); } catch { return null; } };
 const noteWebot = (query, clip) => {
   const seg = parseJson(query.seg);
@@ -294,6 +294,8 @@ const noteWebot = (query, clip) => {
     if (webot.seg && webot.seg.start !== next.start) webot.history = [{ type: webot.seg.type, k: webot.seg.k, title: webot.seg.title, start: webot.seg.start }, ...webot.history].slice(0, 12);
     webot.seg = next;
   }
+  const chatq = parseJson(query.chatq);
+  if (Array.isArray(chatq)) webot.requests = chatq.slice(0, 5).map((r) => ({ kind: r?.kind === 'gas' ? 'gas' : 'forecast', place: clip(r?.place, 70), user: clip(r?.user, 24) }));
   if (typeof query.plan === 'string') webot.plan = query.plan.split(',').filter((k) => SEG_KINDS.has(k) || k === 'pinned').slice(0, 4);
   const said = parseJson(query.said);
   if (Array.isArray(said)) {
@@ -317,6 +319,7 @@ export const webotActivity = () => {
     theme: live ? streamBeat.theme : '',
     now: live ? webot.seg : null,
     upNext: live ? webot.plan : [],
+    requests: live ? webot.requests : [],
     recent: webot.history,
     said: webot.said
   };
@@ -466,6 +469,14 @@ export const applyLiveCommand = async (body = {}) => {
       // Gas prices segment in the calm-day rotation (on by default).
       current.gas = body.on !== false;
       break;
+    case 'chat-request': {
+      // From YouTube chat (src/youtubeChat.js): WeBot does this place next when it's calm enough.
+      const p = body.place || {};
+      const lat = Number(p.lat), lon = Number(p.lon);
+      if (!['forecast', 'gas'].includes(body.kind) || !Number.isFinite(lat) || !Number.isFinite(lon)) throw Object.assign(new Error('Bad chat request'), { status: 400 });
+      pushCommand({ type: 'chat-request', kind: body.kind, place: { name: cleanText(p.name, 60), state: cleanText(p.state, 2).toUpperCase(), lat, lon }, user: cleanText(body.user, 24) });
+      break;
+    }
     case 'gas-now':
       pushCommand({ type: 'segment', kind: 'gas' });
       break;

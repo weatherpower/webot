@@ -1,0 +1,195 @@
+// YouTube live chat commands for WeatherPower Live: viewers type "!forecast Dallas TX" or "!gas 74745" and
+// WeBot does that place next. Reads chat with the YouTube Data API (YOUTUBE_API_KEY) on the channel's
+// current live video (YOUTUBE_CHANNEL_ID, or YOUTUBE_VIDEO_ID to force one). Read-only: it never posts.
+//
+// Quota: the API allows 10,000 units a day and each chat read costs 5, so chat is read about once a
+// minute (every 30 s for a few minutes after someone uses a command), with a daily budget guard.
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { STATE_NAMES } from './broadcast.js';
+import { applyLiveCommand } from './live.js';
+
+const API = 'https://www.googleapis.com/youtube/v3';
+const KEY = () => process.env.YOUTUBE_API_KEY || '';
+const DAILY_BUDGET = Number(process.env.YOUTUBE_DAILY_UNITS || 9000);
+const BASE_MS = 60 * 1000;
+const ACTIVE_MS = 30 * 1000;
+const USER_COOLDOWN_MS = 10 * 60 * 1000;
+const MAX_PER_20_MIN = 6;
+
+/* ---------------- places (U.S. Census Gazetteer, bundled) ---------------- */
+let gaz = null;
+const loadGaz = () => {
+  if (!gaz) gaz = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./places/us-places.json', import.meta.url)), 'utf8'));
+  return gaz;
+};
+const NAME_TO_STATE = Object.fromEntries(Object.entries(STATE_NAMES).map(([code, name]) => [name.toLowerCase(), code]));
+const norm = (s) => String(s || '').toLowerCase().replace(/\bsaint\b/g, 'st').replace(/\bst\./g, 'st').replace(/\bfort\b/g, 'ft').replace(/\bft\./g, 'ft')
+  .replace(/\bmount\b/g, 'mt').replace(/\bmt\./g, 'mt').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+let byName = null;
+const NICKNAMES = { okc: 'oklahoma city ok', nyc: 'new york ny', la: 'los angeles ca', kc: 'kansas city mo', slc: 'salt lake city ut', dc: 'washington dc',
+  nola: 'new orleans la', philly: 'philadelphia pa', vegas: 'las vegas nv', 'san fran': 'san francisco ca', sf: 'san francisco ca', atl: 'atlanta ga',
+  chi: 'chicago il', boise: 'boise city id', dfw: 'dallas tx', htown: 'houston tx', stl: 'st louis mo', 'the bronx': 'new york ny', brooklyn: 'new york ny', manhattan: 'new york ny' };
+
+// "Dallas TX", "dallas, texas", "St. Louis", "74745" -> { name, state, lat, lon } or null.
+export const findPlace = (text) => {
+  const { places, zips } = loadGaz();
+  const raw = String(text || '').trim().slice(0, 60);
+  const zip = raw.match(/^\d{5}$/)?.[0];
+  if (zip) {
+    const z = zips[zip];
+    if (!z) return null;
+    // Name a ZIP after the town it's in: nearest center, with big cities reaching farther.
+    let best = null, bd = Infinity;
+    for (const p of places) {
+      const miles = 69 * Math.sqrt((p[2] - z[0]) ** 2 + ((p[3] - z[1]) * Math.cos((z[0] * Math.PI) / 180)) ** 2);
+      const d = miles - 0.6 * Math.sqrt(p[4] || 0);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return { name: best ? best[0] : zip, state: best ? best[1] : '', lat: z[0], lon: z[1], zip };
+  }
+  if (!byName) {
+    byName = new Map();
+    places.forEach((p) => { const k = norm(p[0]); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(p); });
+  }
+  let words = norm(raw);
+  if (NICKNAMES[words]) words = NICKNAMES[words];
+  let state = '';
+  const parts = words.split(' ');
+  // Trailing state: full name (one or two words) or the two-letter code.
+  for (const n of [2, 1]) {
+    const tail = parts.slice(-n).join(' ');
+    if (parts.length > n && NAME_TO_STATE[tail]) { state = NAME_TO_STATE[tail]; words = parts.slice(0, -n).join(' '); break; }
+  }
+  if (!state && parts.length > 1 && STATE_NAMES[parts[parts.length - 1].toUpperCase()]) {
+    state = parts[parts.length - 1].toUpperCase();
+    words = parts.slice(0, -1).join(' ');
+  }
+  const list = (byName.get(words) || []).filter((p) => !state || p[1] === state);
+  if (!list.length) return null;
+  // Same name in several places: incorporated first, then the biggest.
+  const p = [...list].sort((a, b) => b[5] - a[5] || b[4] - a[4])[0];
+  return { name: p[0], state: p[1], lat: p[2], lon: p[3] };
+};
+
+/* ---------------- who can show up on the stream ---------------- */
+const BLOCK = /(nigg|fag|retard|rape|nazi|hitler|kkk|fuck|shit|bitch|cunt|whore|slut|porn|sex|dick|cock|pussy|penis|vagina|kill ?your|suicide)/i;
+export const safeName = (name) => {
+  const n = String(name || '').replace(/^@/, '').trim();
+  return n.length >= 2 && n.length <= 24 && /^[\p{L}\p{N} ._'-]+$/u.test(n) && !BLOCK.test(n.replace(/[\s._'-]/g, '')) ? n : '';
+};
+
+/* ---------------- chat reader ---------------- */
+const state = {
+  enabled: false, videoId: '', chatId: '', pageToken: '', primed: false, viewers: null, viewersAt: 0,
+  lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: []
+};
+const ptDay = () => new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
+const spend = (units) => {
+  if (state.unitsDay !== ptDay()) { state.unitsDay = ptDay(); state.units = 0; }
+  state.units += units;
+};
+const overBudget = () => state.unitsDay === ptDay() && state.units >= DAILY_BUDGET;
+
+const api = async (path, params, units) => {
+  spend(units);
+  const url = `${API}/${path}?${new URLSearchParams({ ...params, key: KEY() })}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(body?.error?.errors?.[0]?.reason || body?.error?.message || 'YouTube ' + r.status), { status: r.status });
+  return body;
+};
+
+// The channel's live video, from the public /live page (no quota), then its chat id and viewer count.
+const findLive = async () => {
+  state.lastFind = Date.now();
+  let videoId = process.env.YOUTUBE_VIDEO_ID || '';
+  const channel = process.env.YOUTUBE_CHANNEL_ID || '';
+  if (!videoId && channel) {
+    const html = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channel)}/live`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (WeatherPower Live chat)', 'Accept-Language': 'en-US' }, signal: AbortSignal.timeout(15000)
+    }).then((r) => r.text()).catch(() => '');
+    videoId = html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1] || '';
+  }
+  if (!videoId) { state.videoId = ''; state.chatId = ''; return; }
+  const body = await api('videos', { part: 'liveStreamingDetails', id: videoId }, 1);
+  const live = body.items?.[0]?.liveStreamingDetails;
+  state.viewers = live?.concurrentViewers != null ? Number(live.concurrentViewers) : null;
+  state.viewersAt = Date.now();
+  const chatId = live?.activeLiveChatId || '';
+  if (videoId !== state.videoId || chatId !== state.chatId) {
+    state.videoId = videoId;
+    state.chatId = chatId;
+    state.pageToken = '';
+    state.primed = false;
+    if (chatId) console.log(`[chat] reading live chat on ${videoId}`);
+  }
+};
+
+const handle = async (message) => {
+  const text = String(message.snippet?.displayMessage || '').trim();
+  const m = text.match(/^!(forecast|fc|weather|wx|gas)\b\s*(.*)$/i);
+  if (!m) return;
+  const kind = /^gas$/i.test(m[1]) ? 'gas' : 'forecast';
+  const author = message.authorDetails || {};
+  const userKey = author.channelId || author.displayName;
+  const now = Date.now();
+  state.activeUntil = now + 5 * 60 * 1000;
+  if (!m[2]) return;
+  if (!(author.isChatOwner || author.isChatModerator) && now - (state.users.get(userKey) || 0) < USER_COOLDOWN_MS) return;
+  state.recent = state.recent.filter((t) => now - t < 20 * 60 * 1000);
+  if (state.recent.length >= MAX_PER_20_MIN) return;
+  const place = findPlace(m[2]);
+  if (!place) return;
+  state.users.set(userKey, now);
+  state.recent.push(now);
+  state.lastCommandAt = new Date().toISOString();
+  await applyLiveCommand({ action: 'chat-request', kind, place, user: safeName(author.displayName) });
+  console.log(`[chat] ${kind} request: ${place.name}, ${place.state}`);
+};
+
+const readChat = async () => {
+  const params = { liveChatId: state.chatId, part: 'snippet,authorDetails', maxResults: '200' };
+  if (state.pageToken) params.pageToken = state.pageToken;
+  const body = await api('liveChat/messages', params, 5);
+  state.pageToken = body.nextPageToken || state.pageToken;
+  // The first read returns recent history: skip it so old commands don't replay after a restart.
+  if (state.primed) for (const message of body.items || []) await handle(message).catch((e) => console.warn('[chat]', e.message));
+  state.primed = true;
+  return Number(body.pollingIntervalMillis) || 0;
+};
+
+const loop = async () => {
+  let wait = BASE_MS;
+  try {
+    if (overBudget()) wait = 15 * 60 * 1000;
+    else {
+      if (!state.chatId && Date.now() - state.lastFind > 5 * 60 * 1000) await findLive();
+      else if (state.chatId && Date.now() - state.viewersAt > 3 * 60 * 1000) await findLive();
+      if (state.chatId) {
+        const min = await readChat();
+        wait = Math.max(min, Date.now() < state.activeUntil ? ACTIVE_MS : BASE_MS);
+      } else wait = 5 * 60 * 1000;
+    }
+  } catch (error) {
+    // Chat ended / stream changed: look for the live video again. Out of quota: wait it out.
+    if (/quota/i.test(error.message)) { state.units = DAILY_BUDGET; wait = 30 * 60 * 1000; }
+    else { state.chatId = ''; state.lastFind = 0; wait = 2 * 60 * 1000; }
+    console.warn('[chat]', error.message);
+  }
+  state.timer = setTimeout(loop, wait);
+};
+
+export const startYoutubeChat = () => {
+  if (!KEY() || !(process.env.YOUTUBE_CHANNEL_ID || process.env.YOUTUBE_VIDEO_ID) || process.env.YOUTUBE_CHAT === 'off') return;
+  state.enabled = true;
+  console.log('[chat] YouTube chat commands on');
+  state.timer = setTimeout(loop, 5000);
+};
+
+export const chatStatus = () => ({
+  enabled: state.enabled,
+  live: Boolean(state.chatId),
+  viewers: Date.now() - state.viewersAt < 10 * 60 * 1000 ? state.viewers : null,
+  lastCommandAt: state.lastCommandAt
+});

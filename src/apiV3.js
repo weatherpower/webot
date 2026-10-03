@@ -18,7 +18,8 @@ import { localSpeech, localVoiceStatus, warmLocalVoice } from './localVoice.js';
 import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
-import { randomCityForecast } from './cityForecast.js';
+import { cityForecast, randomCityForecast } from './cityForecast.js';
+import { chatStatus } from './youtubeChat.js';
 import { getHeadlines } from './headlines.js';
 import { gasSegment } from './gasPrices.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
@@ -164,6 +165,7 @@ export const webotStatus = async () => {
     focus: control.state || '',
     talk: control.talk || 'auto',
     pinned: Boolean(control.pin),
+    chat: (({ enabled, live, viewers }) => ({ enabled, live, viewers }))(chatStatus()),
     wis: wis?.loaded ? { score: Math.round(wis.score), label: wis.label, trend: wis.trend ?? null } : null,
     tallies: talliesFor(alerts),
     // Same warning type in the same place (one per county zone) shows once, with a count.
@@ -331,7 +333,7 @@ export const apiV3Router = () => {
       const { alerts } = await currentAlerts();
       const [index, control, reports] = await Promise.all([indexSummary(alerts), liveControl(), recentReports()]);
       res.set('Cache-Control', 'no-store');
-      res.json({ generatedAt: new Date().toISOString(), tallies: talliesFor(alerts), index, wis: wisSummary(), control, reports });
+      res.json({ generatedAt: new Date().toISOString(), tallies: talliesFor(alerts), index, wis: wisSummary(), control, reports, chat: chatStatus() });
     } catch (error) {
       next(error);
     }
@@ -385,11 +387,30 @@ export const apiV3Router = () => {
     }
   });
 
-  // Gas prices segment: EIA weekly averages + stations near a random city (inside ?state= when focused).
+  // A city picked by name and point (viewer requests from YouTube chat); ?lat=&lon=&name=&state=.
+  const cityParam = (q) => {
+    const lat = Number(q.lat), lon = Number(q.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { name: String(q.name || '').slice(0, 60) || 'That spot', state: String(q.state || '').toUpperCase().slice(0, 2), lat, lon };
+  };
+
+  router.get('/forecast/city', async (req, res, next) => {
+    try {
+      const city = cityParam(req.query);
+      if (!city) return res.status(400).json({ ok: false, error: 'lat and lon are required' });
+      res.set('Cache-Control', 'no-store');
+      res.json(await cityForecast(city));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Gas prices segment: EIA weekly averages + stations near a random city (inside ?state= when focused),
+  // or near ?lat=&lon=&name=&state= for a viewer request.
   router.get('/gas', async (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store');
-      res.json(await gasSegment({ state: String(req.query.state || '').toUpperCase() }));
+      res.json(await gasSegment({ state: String(req.query.state || '').toUpperCase(), city: cityParam(req.query) }));
     } catch (error) {
       next(error);
     }

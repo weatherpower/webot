@@ -123,14 +123,15 @@ const OFF_CONUS = new Set(['AK', 'HI']);
 let recent = [];
 
 // The gas price segment: national + regional averages, and a spotlight city (in `state` when focused).
-export const gasSegment = async ({ state = '' } = {}) => {
+export const gasSegment = async ({ state = '', city: wanted = null } = {}) => {
   const areas = await loadPrices();
   const st = /^[A-Z]{2}$/.test(state) ? state : '';
   const pool = FORECAST_CITIES.filter((c) => (st ? c.state === st : !OFF_CONUS.has(c.state)));
   const fresh = pool.filter((c) => !recent.includes(c.name + ',' + c.state));
   const list = fresh.length ? fresh : pool;
-  const { name, state: cityState, lat, lon } = list[Math.floor(Math.random() * list.length)] || { name: 'Kansas City', state: 'MO', lat: 39.0997, lon: -94.5786 };
-  recent = [...recent, name + ',' + cityState].slice(-12);
+  // A viewer's pick (YouTube chat), or a random city the show hasn't done lately.
+  const { name, state: cityState, lat, lon } = wanted || list[Math.floor(Math.random() * list.length)] || { name: 'Kansas City', state: 'MO', lat: 39.0997, lon: -94.5786 };
+  if (!wanted) recent = [...recent, name + ',' + cityState].slice(-12);
   const city = { name, state: cityState, lat, lon };
   const regions = REGIONS.filter((a) => areas[a]?.EPMR).map((a) => ({ area: a, name: GAS_AREAS[a], regular: areas[a].EPMR.price, change: areas[a].EPMR.change }))
     .sort((a, b) => a.regular - b.regular);
