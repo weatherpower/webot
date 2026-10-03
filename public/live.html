@@ -551,7 +551,10 @@
 
     /* ---------------- sound + voice ---------------- */
     let actx = null;
-    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+    // TV boxes: bigger audio buffers (no dropouts while the map draws) and 24 kHz, which halves the work
+    // of the music generator; WeBot's voice is 24 kHz to begin with.
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(OPT.tv ? { latencyHint: 'playback', sampleRate: 24000 } : undefined); } catch {}
+    if (!actx && OPT.tv) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
     const tone = (freq, at, dur, type = 'triangle', peak = 0.16) => {
       const osc = actx.createOscillator();
       const gain = actx.createGain();
@@ -931,7 +934,8 @@
       const rate = ctx.sampleRate;
       const noise = ctx.createBuffer(1, rate, rate);
       { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
-      const ir = ctx.createBuffer(2, Math.floor(rate * 2.6), rate);
+      const lite = Boolean(opts.lite);
+      const ir = ctx.createBuffer(2, Math.floor(rate * (lite ? 0.9 : 2.6)), rate);
       for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2); }
 
       const master = ctx.createGain();
@@ -972,7 +976,7 @@
       const crackleGain = ctx.createGain();
       crackleGain.gain.value = 0.06;
       crackle.connect(crackleTone).connect(crackleGain).connect(master);
-      crackle.start();
+      if (!lite) crackle.start();
 
       const env = (param, t, peak, attack, decay, floor = 0.0001) => {
         param.setValueAtTime(0.0001, t);
@@ -1028,7 +1032,7 @@
         g.gain.linearRampToValueAtTime(0, t + dur + 0.8);
         filter.connect(g);
         g.connect(master); g.connect(verbIn);
-        notes.slice(0, 4).forEach((m) => [-8, 8].forEach((cents) => {
+        notes.slice(0, lite ? 3 : 4).forEach((m) => (lite ? [0] : [-8, 8]).forEach((cents) => {
           const o = ctx.createOscillator();
           o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = cents;
           o.connect(filter);
@@ -1164,7 +1168,8 @@
           }
         },
         stop() {
-          try { crackle.stop(); wob.stop(); } catch {}
+          try { if (!lite) crackle.stop(); } catch {}
+          try { wob.stop(); } catch {}
           master.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
           setTimeout(() => { try { master.disconnect(); } catch {} }, 2000);
         }
@@ -1216,10 +1221,11 @@
     };
     const startRadio = () => {
       if (M.radio) return;
-      M.radio = makeRadio(actx, M.bus, { mood: M.mood });
+      M.radio = makeRadio(actx, M.bus, { mood: M.mood, lite: OPT.tv });
       M.radio.onTrack = (track) => { M.playing = track.name + ' · WeBot Radio'; renderNp(); };
-      M.radio.schedule(actx.currentTime + 0.4);
-      M.timer = setInterval(() => M.radio?.schedule(actx.currentTime + 0.4), 100);
+      const ahead = OPT.tv ? 2.5 : 0.4;
+      M.radio.schedule(actx.currentTime + ahead);
+      M.timer = setInterval(() => M.radio?.schedule(actx.currentTime + ahead), OPT.tv ? 250 : 100);
     };
     const stopMusic = () => {
       clearInterval(M.timer);
