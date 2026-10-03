@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeatherPower Stream House</title>
+  <link rel="icon" href="/assets/wp-logo.png">
+  <link rel="stylesheet" href="/house.css">
+</head>
+<body class="house">
+  <main>
+    <div class="strip">
+      <div class="brand"><img src="/assets/wp-logo.png" alt=""><div><b>WEATHERPOWER</b><span>STREAM HOUSE</span></div></div>
+      <div class="onair" id="s-scene"><i></i><strong id="s-scene-t">CONNECTING</strong></div>
+      <div class="grow"><small>Overlay</small><strong id="s-overlay">—</strong></div>
+      <div><small>Weather data</small><strong id="s-data">—</strong></div>
+      <div><small>Alerts</small><strong id="s-alerts">—</strong></div>
+      <div class="links"><a href="#" id="copy-obs">Copy OBS link</a><a href="/overlay?preview=1" target="_blank" rel="noopener">Open overlay</a></div>
+    </div>
+
+    <div class="pages"><div class="console">
+      <!-- ================= LEFT ================= -->
+      <div class="stack" style="gap:12px">
+        <div class="panel">
+          <h2>Program preview <span class="r">what OBS shows (checkerboard = your camera / screen)</span></h2>
+          <div class="preview" id="preview"><iframe id="preview-frame" src="/overlay?preview=1" title="Overlay preview"></iframe></div>
+          <div class="scenes" style="margin-top:12px">
+            <button class="scenebtn" data-scene="live"><b>Live</b><span>Bars over your shot · 1</span></button>
+            <button class="scenebtn" data-scene="starting"><b>Starting soon</b><span>Countdown · 2</span></button>
+            <button class="scenebtn" data-scene="brb"><b>Be right back</b><span>Break · 3</span></button>
+            <button class="scenebtn" data-scene="ending"><b>Ending</b><span>Thanks for watching · 4</span></button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Active alerts <span class="r" id="a-count"></span></h2>
+          <div class="row" style="margin-bottom:10px">
+            <div class="seg" id="a-filter"><button data-v="warnings" aria-pressed="true">Warnings</button><button data-v="watches">Watches</button><button data-v="all">All</button></div>
+            <input type="text" id="a-search" placeholder="Search: tornado, Oklahoma, Tulsa…" style="flex:1;min-width:200px">
+          </div>
+          <div class="alerts" id="alerts"></div>
+          <p class="dim" style="margin:10px 0 0">Card shows the alert on the left. Bottom puts it in the bottom bar. Break runs the breaking takeover now.</p>
+        </div>
+      </div>
+
+      <!-- ================= RIGHT ================= -->
+      <div class="stack" style="gap:12px">
+        <div class="panel">
+          <h2>Lower third <span class="r"><span class="kbd">L</span> show / hide</span></h2>
+          <div class="two">
+            <div class="field"><label>Name</label><input type="text" id="lw-name" maxlength="60"></div>
+            <div class="field"><label>Line under it</label><input type="text" id="lw-title" maxlength="90"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="lw-show">Show</button><button class="btn" id="lw-hide">Hide</button>
+            <span class="k" style="margin-left:auto">Hide after</span><input type="number" id="lw-auto" min="0" step="5" style="width:80px"><span class="k">sec (0 = stay)</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>On screen</h2>
+          <div class="toggles" id="layout">
+            <label class="toggle"><input type="checkbox" data-l="top">Top bar</label>
+            <label class="toggle"><input type="checkbox" data-l="bottom">Bottom bar</label>
+            <label class="toggle"><input type="checkbox" data-l="tallies">Warning counts</label>
+            <label class="toggle"><input type="checkbox" data-l="wis">WIS box</label>
+            <label class="toggle"><input type="checkbox" data-l="clock">Clock</label>
+            <label class="toggle"><input type="checkbox" data-l="brand">Logo box</label>
+            <label class="toggle"><input type="checkbox" data-l="card">Alert card</label>
+            <label class="toggle"><input type="checkbox" data-l="webot">WeBot in the corner</label>
+          </div>
+          <div class="sep"></div>
+          <div class="two">
+            <div class="field"><label>Bar colors</label><select id="theme">
+              <option value="auto">Auto (follows the weather, After Dark at night)</option><option value="violet">WeatherPower violet</option><option value="afterdark">After Dark (stars)</option>
+              <option value="clear">Clear skies</option><option value="storm">Storm</option><option value="tornado">Tornado</option><option value="flood">Flood</option>
+              <option value="winter">Winter</option><option value="heat">Heat</option><option value="tropical">Tropical</option><option value="fall">Fall</option><option value="night">Night</option></select></div>
+            <div class="field"><label>Focus on a state</label><select id="focus"><option value="">Whole country</option></select></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Bottom bar</h2>
+          <div class="seg" id="b-mode"><button data-v="auto">Auto · top warning</button><button data-v="custom">My text</button><button data-v="alert">Picked alert</button></div>
+          <div class="stack" style="margin-top:10px">
+            <div class="two"><div class="field"><label>Label</label><input type="text" id="b-label" maxlength="24"></div><div class="field"><label>Title</label><input type="text" id="b-title" maxlength="90"></div></div>
+            <div class="field"><label>Scrolling line</label><input type="text" id="b-crawl" maxlength="400"></div>
+            <div class="row"><button class="btn" id="b-apply">Update my text</button><span class="dim" id="b-picked"></span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Top bar headlines</h2>
+          <div class="seg" id="h-mode"><button data-v="alertsweather">Warnings + weather news</button><button data-v="alerts">Warnings</button><button data-v="weather">Weather news</button><button data-v="mix">+ Top news</button><button data-v="custom">Only mine</button></div>
+          <div class="field" style="margin-top:10px"><label>My messages (one per line, mixed into the headlines)</label><textarea id="h-msgs" rows="3"></textarea></div>
+          <div class="row" style="margin-top:8px"><span class="k">One every</span><input type="number" id="h-every" min="1" step="1" style="width:70px"><span class="k">headlines</span>
+            <span class="k" style="margin-left:14px">Logo box text</span><input type="text" id="brand" maxlength="24" style="width:180px"><button class="btn" id="h-apply" style="margin-left:auto">Update</button></div>
+        </div>
+
+        <div class="panel">
+          <h2>Breaking alerts</h2>
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="br-auto">Automatic for new alerts</label>
+            <label class="toggle"><input type="checkbox" id="br-sound">Alarm sound</label>
+            <label class="toggle"><input type="checkbox" data-br="tor">Tornado warnings</label>
+            <label class="toggle"><input type="checkbox" data-br="ffe">Emergencies</label>
+            <label class="toggle"><input type="checkbox" data-br="pds">Destructive / PDS</label>
+            <label class="toggle"><input type="checkbox" data-br="svr">All severe t-storm warnings</label>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div class="seg" id="br-style"><button data-v="full">Full screen</button><button data-v="banner">Banner</button></div>
+            <span class="k">Seconds</span><input type="number" id="br-secs" min="3" step="1" style="width:70px">
+            <button class="btn warn" id="br-test" style="margin-left:auto">Test</button>
+          </div>
+          <p class="dim" style="margin:10px 0 0">Automatic takeovers only fire for alerts issued after Stream House started (and only in your focus state, if you set one). For sound in OBS, tick “Control audio via OBS” on the Browser Source.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Scene text</h2>
+          <div class="stack">
+            <div class="two"><div class="field"><label>Starting soon title</label><input type="text" id="st-title"></div><div class="field"><label>Countdown</label><div class="row" style="flex-wrap:nowrap"><input type="number" id="st-min" min="0" step="1" value="5" style="width:70px"><span class="k">min</span><button class="btn sm" id="st-go">Start</button><button class="btn sm" id="st-clear">Clear</button></div></div></div>
+            <div class="field"><label>Starting soon message</label><input type="text" id="st-msg"></div>
+            <div class="field"><label>Be right back message</label><input type="text" id="brb-msg"></div>
+            <div class="two"><div class="field"><label>Ending title</label><input type="text" id="en-title"></div><div class="field"><label>Ending message</label><input type="text" id="en-msg"></div></div>
+            <div class="row"><button class="btn" id="sc-apply">Update scene text</button></div>
+          </div>
+        </div>
+
+        <div class="panel urls">
+          <h2>OBS setup</h2>
+          <ol class="dim" style="margin:0;padding-left:18px;line-height:1.7">
+            <li>In OBS: <b>Sources → + → Browser</b>, name it “WeatherPower Overlay”.</li>
+            <li>URL <code>http://localhost:7788/overlay</code> Width <b>1920</b>, Height <b>1080</b>. Tick <b>Control audio via OBS</b>.</li>
+            <li>Put it at the <b>top</b> of your scene, above your camera, screen or radar.</li>
+            <li>Leave Stream House running while you’re live (its black window).</li>
+          </ol>
+          <div class="sep"></div>
+          <h2 style="margin-bottom:6px">Stream Deck / hotkey links</h2>
+          <p class="dim" style="margin:0 0 6px">Use a Stream Deck “Website” action (tick “GET request in background”).</p>
+          <code>http://localhost:7788/do/scene/live</code><code>http://localhost:7788/do/scene/starting</code><code>http://localhost:7788/do/scene/brb</code><code>http://localhost:7788/do/scene/ending</code>
+          <code>http://localhost:7788/do/lower/toggle</code><code>http://localhost:7788/do/card/hide</code><code>http://localhost:7788/do/breaking/test</code>
+          <div class="sep"></div>
+          <div class="row"><button class="btn sm" id="refresh">Refresh weather now</button><button class="btn sm danger" id="reset">Reset everything</button><span class="k" id="src"></span></div>
+        </div>
+      </div>
+    </div></div>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script src="/house.js"></script>
+</body>
+</html>

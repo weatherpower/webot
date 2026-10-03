@@ -5,3 +5,5 @@ cards/
 *.log
 studio/.backups/
 studio/studio.config.json
+house/house.state.json
+house/house.config.json

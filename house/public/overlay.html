@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WeatherPower Overlay</title>
+  <style>
+    /* OBS Browser Source: 1920x1080, transparent. Same look as WeBot's stream (public/live.html). */
+    @font-face { font-family: "WP Display"; src: url("/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 400 700; }
+    @font-face { font-family: "WP Sans"; src: url("/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 400 900; }
+    @font-face { font-family: "WP Mono"; src: url("/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 400 700; }
+    :root {
+      --ink: #f4f6fb; --muted: #8f9bb3; --line: rgba(255,255,255,.12); --edge: #33d4ff;
+      --violet: linear-gradient(180deg, #7457ec 0%, #5b3fd3 100%); --violet-dark: #3e2a9c; --violet-deep: #141d47;
+      --panel: rgba(9,16,30,.93);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+    body.preview { background: repeating-conic-gradient(#1a1f2b 0 25%, #121620 0 50%) 0 0 / 40px 40px; }
+    #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; color: var(--ink); font-family: "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    .hide { display: none !important; }
+
+    /* ---------- top bar ---------- */
+    .top { position: absolute; left: 0; right: 0; top: 0; height: 80px; display: flex; background: var(--violet); z-index: 20; transition: transform .5s cubic-bezier(.3,.8,.3,1); }
+    .top.away { transform: translateY(-100%); }
+    .tally { display: flex; flex: none; }
+    .tile { width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--t); border-right: 1px solid rgba(0,0,0,.35); }
+    .tile .n { display: flex; align-items: center; gap: 7px; font: 700 36px/1 "WP Display"; color: #fff; }
+    .tile .n svg { opacity: .75; }
+    .tile .l { font: 400 12px "WP Mono"; letter-spacing: .24em; color: rgba(255,255,255,.75); }
+    .tile.zero .n span { opacity: .55; }
+    .tile.bump { animation: bump 1.2s ease-out; }
+    @keyframes bump { 0%, 40% { filter: brightness(1.9); } 100% { filter: none; } }
+    .hl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0 26px; background: var(--hc, transparent); transition: background .6s; overflow: hidden; }
+    .hl .tag { flex: none; font: 700 13px "WP Mono"; letter-spacing: .2em; padding: 6px 10px; border: 1px solid rgba(255,255,255,.55); color: #fff; }
+    .hl .slot { position: relative; flex: 1; min-width: 0; height: 80px; }
+    .hl .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); font: 700 40px "WP Display"; letter-spacing: .01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; transition: transform .45s ease, opacity .3s; }
+    .hl .txt.enter { transform: translateY(30%); opacity: 0; }
+    .hl .txt.leave { transform: translateY(-130%); opacity: 0; }
+    .wpi { flex: none; width: 214px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--violet-deep); border-left: 2px solid rgba(255,255,255,.12); }
+    .wpi .meta { font: 400 11px "WP Mono"; letter-spacing: .16em; color: #9fb3e6; display: flex; gap: 8px; }
+    .wpi .v { font: 700 34px/1 "WP Display"; color: var(--wc, #4fb4ff); }
+    .wpi .lab { font: 400 11px "WP Mono"; letter-spacing: .3em; color: var(--wc, #4fb4ff); }
+    .wpi canvas { width: 88px; height: 46px; margin-left: auto; }
+    /* After dark stars */
+    .top > *, .bottom > * { position: relative; z-index: 1; }
+    .top::before, .bottom::before, .top::after, .bottom::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1.5s; }
+    .top::before, .bottom::before { background-image: radial-gradient(1.4px 1.4px at 23px 17px, #fff 60%, transparent 65%), radial-gradient(1px 1px at 87px 52px, #dfe8ff 60%, transparent 65%), radial-gradient(1.6px 1.6px at 151px 29px, #fff 60%, transparent 65%), radial-gradient(1px 1px at 213px 66px, #cfe0ff 60%, transparent 65%), radial-gradient(1.2px 1.2px at 268px 12px, #fff 60%, transparent 65%); background-size: 311px 80px; }
+    .top::after, .bottom::after { background-image: radial-gradient(1.8px 1.8px at 41px 61px, #fff8d8 60%, transparent 65%), radial-gradient(1.1px 1.1px at 122px 23px, #fff 60%, transparent 65%), radial-gradient(1.3px 1.3px at 179px 47px, #e6eeff 60%, transparent 65%); background-size: 197px 80px; }
+    body.stars .top::before, body.stars .bottom::before { opacity: .85; }
+    body.stars .top::after, body.stars .bottom::after { opacity: .9; animation: twinkle 6s steps(6) infinite alternate; }
+    @keyframes twinkle { 0% { opacity: .9; } 50% { opacity: .25; } 100% { opacity: .75; } }
+
+    /* ---------- panels ---------- */
+    .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); z-index: 10; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%); }
+    .panel::before { content: ""; position: absolute; left: -1px; top: -1px; width: 26px; height: 26px; border-left: 3px solid var(--edge); border-top: 3px solid var(--edge); pointer-events: none; }
+    .panel::after { content: ""; position: absolute; right: 0; bottom: 0; width: 26px; height: 26px; background: linear-gradient(135deg, transparent 45%, var(--edge) 45%, var(--edge) 58%, transparent 58%); pointer-events: none; }
+    .card { left: 32px; top: 104px; width: 500px; transform: translateX(-112%); transition: transform .5s cubic-bezier(.3,.8,.3,1); }
+    .card.show { transform: none; }
+    .card .head { display: flex; align-items: flex-start; gap: 14px; padding: 22px 26px 12px; }
+    .card h2 { margin: 0; font: 700 40px/1 "WP Display"; text-transform: uppercase; color: #fff; }
+    .card .sub { margin-top: 8px; font: 400 14px "WP Mono"; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+    .card .status { margin-left: auto; flex: none; font: 700 12px "WP Mono"; letter-spacing: .16em; padding: 5px 8px; border: 1px solid var(--c, var(--edge)); color: #fff; }
+    .life { height: 3px; width: 150px; margin: 0 26px; background: var(--c, var(--edge)); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 26px 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.035); font: 400 13px "WP Mono"; letter-spacing: .1em; color: #b8c2d6; text-transform: uppercase; }
+    .chip b { color: #fff; font-weight: 700; }
+    .chip.hot { border-color: var(--c); color: #fff; }
+    .card dl { margin: 0; padding: 8px 26px 26px; display: grid; grid-template-columns: 110px 1fr; }
+    .card dt, .card dd { padding: 13px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .card dt { font: 400 12px/1.9 "WP Mono"; letter-spacing: .18em; color: var(--muted); }
+    .card dd { margin: 0; text-align: right; font: 400 21px/1.25 "WP Display"; text-transform: uppercase; color: #fff; }
+    .card dd.prose { font: 500 17px/1.42 "WP Sans"; text-transform: none; color: #e3e8f1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-align: left; }
+
+    /* ---------- lower third (your name) ---------- */
+    .lower { left: 48px; bottom: 112px; min-width: 560px; max-width: 1100px; padding: 18px 34px 20px 26px; transform: translateX(-120%); transition: transform .55s cubic-bezier(.3,.8,.3,1); }
+    .lower.show { transform: none; }
+    .lower .k { display: flex; align-items: center; gap: 10px; font: 700 13px "WP Mono"; letter-spacing: .28em; color: var(--edge); }
+    .lower .k i { width: 10px; height: 10px; background: #ff3b4a; box-shadow: 0 0 0 0 rgba(255,59,74,.6); animation: pulse 1.8s infinite; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(255,59,74,0); } 100% { box-shadow: 0 0 0 0 rgba(255,59,74,0); } }
+    .lower h3 { margin: 10px 0 6px; font: 700 54px/1 "WP Display"; text-transform: uppercase; letter-spacing: .01em; }
+    .lower p { margin: 0; font: 500 22px/1.3 "WP Sans"; color: #cfd8ea; }
+    .lower .bar { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: var(--violet); }
+
+    /* ---------- WeBot in the corner ---------- */
+    .webot { position: absolute; right: 22px; bottom: 88px; width: 230px; z-index: 12; animation: bob 4.5s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(0,0,0,.55)); }
+    .webot img { width: 100%; display: block; }
+    .webot .tag { position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%); display: flex; align-items: baseline; gap: 7px; padding: 3px 10px 4px; background: rgba(9,16,30,.88); border: 1px solid rgba(95,242,255,.35); border-left: 3px solid #5ff2ff; white-space: nowrap; }
+    .webot .tag b { font: 700 17px/1 "WP Display"; letter-spacing: .06em; text-transform: uppercase; }
+    .webot .tag small { font: 600 9px/1 "WP Mono"; letter-spacing: .14em; color: #5ff2ff; text-transform: uppercase; }
+    @keyframes bob { 50% { transform: translateY(-8px); } }
+
+    /* ---------- bottom bar ---------- */
+    .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; display: flex; background: var(--violet); z-index: 20; transition: transform .5s cubic-bezier(.3,.8,.3,1); }
+    .bottom.away { transform: translateY(100%); }
+    .clock { flex: none; width: 350px; display: flex; align-items: center; gap: 16px; padding: 0 22px; background: var(--violet-dark); }
+    .clock img { width: 50px; height: 50px; }
+    .clock b { display: block; font: 700 31px/1 "WP Display"; white-space: nowrap; }
+    .clock small { display: block; margin-top: 6px; font: 400 12px "WP Mono"; letter-spacing: .2em; color: #c9bff5; }
+    .now { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 26px; }
+    .now .l1 { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .now .l1 .k { flex: none; font: 700 31px "WP Display"; color: #fff; }
+    .now .l1 .k::after { content: ":"; }
+    .now .l1 b { font: 700 31px "WP Display"; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .now .l1 .hz { flex: none; display: flex; gap: 8px; }
+    .now .l1 .hz span { font: 700 14px "WP Mono"; padding: 4px 8px; background: rgba(10,10,40,.45); border: 1px solid rgba(255,255,255,.2); }
+    .now .l2 { display: flex; align-items: center; gap: 18px; font: 400 14px "WP Mono"; letter-spacing: .1em; color: #e0dafc; min-width: 0; }
+    .crawl { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-transform: uppercase; }
+    .crawl span { display: inline-block; will-change: transform; }
+    .brandbox { flex: none; width: 250px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--violet-dark); }
+    .brandbox img { width: 40px; height: 40px; }
+    .brandbox b { font: 700 13px "WP Mono"; letter-spacing: .14em; white-space: nowrap; }
+
+    /* ---------- full-screen scenes: starting soon, be right back, ending ---------- */
+    .scene { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 15; display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity .6s;
+      background: radial-gradient(1200px 700px at 70% 40%, rgba(116,87,236,.35), transparent 70%), radial-gradient(900px 600px at 15% 90%, rgba(51,212,255,.12), transparent 70%), #070b19; }
+    .scene.show { opacity: 1; }
+    .scene::before { content: ""; position: absolute; inset: 0; opacity: .7; background-image: radial-gradient(1.6px 1.6px at 40px 60px, #fff 60%, transparent 65%), radial-gradient(1.2px 1.2px at 180px 140px, #cfe0ff 60%, transparent 65%), radial-gradient(1.8px 1.8px at 300px 40px, #fff 60%, transparent 65%), radial-gradient(1px 1px at 420px 210px, #fff 60%, transparent 65%); background-size: 480px 260px; animation: drift 90s linear infinite; }
+    @keyframes drift { to { background-position: -480px 0; } }
+    .scene .in { position: relative; display: flex; align-items: center; gap: 70px; }
+    .scene img.bot { width: 360px; animation: bob 4s ease-in-out infinite; filter: drop-shadow(0 0 40px rgba(51,212,255,.35)); }
+    .scene .k { display: inline-flex; align-items: center; gap: 14px; font: 700 26px "WP Mono"; letter-spacing: .28em; color: #ffd34d; }
+    .scene .k i { width: 16px; height: 16px; background: #ffd34d; animation: blinkdot 1.4s steps(2) infinite; }
+    @keyframes blinkdot { 50% { opacity: .2; } }
+    .scene h1 { margin: 18px 0 20px; font: 700 150px/.88 "WP Display"; text-transform: uppercase; color: #fff; max-width: 1150px; }
+    .scene p { margin: 0; max-width: 900px; font: 500 34px/1.3 "WP Sans"; color: #cfd8ea; }
+    .scene .count { margin-top: 30px; display: inline-flex; align-items: baseline; gap: 16px; padding: 12px 22px; background: rgba(0,0,0,.35); border-left: 4px solid var(--edge); }
+    .scene .count b { font: 700 72px/1 "WP Display"; letter-spacing: .02em; }
+    .scene .count small { font: 600 18px "WP Mono"; letter-spacing: .2em; color: var(--muted); }
+
+    /* ---------- breaking takeover (full) and banner ---------- */
+    .brk { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; background: var(--c, #c00); color: var(--ci, #fff); overflow: hidden; text-align: center; }
+    .brk.show { display: flex; animation: brkIn .4s ease-out; }
+    .brk.out { animation: brkOut .45s forwards; }
+    @keyframes brkIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+    @keyframes brkOut { to { clip-path: inset(0 0 0 100%); } }
+    .brk .stripes { position: absolute; left: -200px; top: -200px; right: -200px; bottom: -200px; background: repeating-linear-gradient(45deg, rgba(0,0,0,.14) 0 46px, rgba(0,0,0,0) 46px 92px); animation: stripes 1.6s linear infinite; }
+    @keyframes stripes { to { transform: translateX(130px); } }
+    .brk > *:not(.stripes) { position: relative; }
+    .brk .k { font: 700 30px "WP Mono"; letter-spacing: .5em; padding: 10px 18px 10px 30px; background: #fff; color: #0a0f1c; animation: flash 1s linear infinite; }
+    @keyframes flash { 0%, 49.9% { background: #fff; color: #0a0f1c; } 50%, 100% { background: #0a0f1c; color: #fff; } }
+    .brk h1 { margin: 24px 60px 10px; font: 700 156px/.95 "WP Display"; text-transform: uppercase; }
+    .brk .p { font: 700 58px "WP Display"; text-transform: uppercase; max-width: 1600px; }
+    .brk .u { margin-top: 16px; font: 400 28px "WP Mono"; letter-spacing: .2em; }
+    .brk .t { margin-top: 16px; display: inline-block; padding: 8px 18px; background: rgba(0,0,0,.3); font: 400 30px "WP Display"; letter-spacing: .06em; }
+    .brk .test { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: #ffd34d; color: #111; font: 400 20px "WP Mono"; letter-spacing: .2em; }
+    .bann { position: absolute; left: 0; right: 0; top: 80px; z-index: 19; display: flex; align-items: center; gap: 22px; padding: 16px 30px; background: var(--c, #c00); color: var(--ci, #fff); transform: translateY(-110%); visibility: hidden; transition: transform .45s cubic-bezier(.3,.8,.3,1), visibility 0s .45s; overflow: hidden; }
+    .bann.show { transform: none; visibility: visible; transition: transform .45s cubic-bezier(.3,.8,.3,1); }
+    .bann .k { flex: none; font: 700 22px "WP Mono"; letter-spacing: .4em; padding: 8px 12px 8px 18px; background: #fff; color: #0a0f1c; animation: flash 1s linear infinite; }
+    .bann b { font: 700 52px/1 "WP Display"; text-transform: uppercase; white-space: nowrap; }
+    .bann span { font: 700 30px "WP Display"; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .92; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <header class="top" id="top">
+      <div class="tally" id="tally">
+        <div class="tile" id="t-tor" style="--t:#7a1c2a"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2"/></svg><span>0</span></div><div class="l">TOR</div></div>
+        <div class="tile" id="t-svr" style="--t:#7c5517"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span>0</span></div><div class="l">SVR</div></div>
+        <div class="tile" id="t-ffw" style="--t:#245a2f"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/></svg><span>0</span></div><div class="l">FFW</div></div>
+        <div class="tile" id="t-wch" style="--t:#46308f"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>0</span></div><div class="l">WATCHES</div></div>
+      </div>
+      <div class="hl" id="hl"><span class="tag" id="hl-tag">LIVE</span><div class="slot" id="hl-slot"></div></div>
+      <div class="wpi" id="wpi"><div><div class="meta"><span id="wpi-delta">—</span><span>WIS</span></div><div class="v" id="wpi-v">—</div><div class="lab" id="wpi-l">LOADING</div></div><canvas id="spark" width="176" height="92"></canvas></div>
+    </header>
+
+    <section class="panel card" id="card"></section>
+    <section class="panel lower" id="lower"><div class="k"><i></i><span id="lower-k">LIVE</span></div><h3 id="lower-name"></h3><p id="lower-title"></p><div class="bar"></div></section>
+    <div class="webot hide" id="webot"><img src="/assets/webot.png" alt=""><div class="tag"><b>WeBot</b><small>AI weather bot</small></div></div>
+
+    <section class="scene" id="scene"><div class="in"><img class="bot" src="/assets/webot.png" alt=""><div>
+      <div class="k"><i></i><span id="sc-k">WEATHERPOWER LIVE</span></div>
+      <h1 id="sc-title"></h1><p id="sc-msg"></p>
+      <div class="count hide" id="sc-count"><b id="sc-time">0:00</b><small>UNTIL WE’RE LIVE</small></div>
+    </div></div></section>
+
+    <footer class="bottom" id="bottom">
+      <div class="clock" id="clockbox"><img src="/assets/wp-logo.png" alt=""><div><b id="clk">--:--:--</b><small id="clk-d"></small></div></div>
+      <div class="now"><div class="l1"><span class="k" id="now-k">LIVE</span><b id="now-t">WEATHERPOWER LIVE</b><span class="hz" id="now-hz"></span></div>
+        <div class="l2"><div class="crawl" id="crawl"><span id="crawl-s"></span></div></div></div>
+      <div class="brandbox" id="brandbox"><img src="/assets/wp-logo.png" alt=""><b id="brand-t">WEATHERPOWER.APP</b></div>
+    </footer>
+
+    <div class="bann" id="bann"></div>
+    <div class="brk" id="brk"></div>
+  </div>
+
+  <script>
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const params = new URLSearchParams(location.search);
+    if (params.has('preview')) document.body.classList.add('preview');
+    const S = { state: null, data: { alerts: [], tallies: {}, wis: null, headlines: {} }, hlIndex: 0, list: [], cardKey: null, nowKey: '' };
+
+    // Fit the 1920x1080 stage to whatever size the source is.
+    const fit = () => {
+      const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+      $('stage').style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
+    };
+    addEventListener('resize', fit); fit();
+
+    const ink = (hex) => { const v = String(hex || '#000').replace('#', ''); const [r, g, b] = [0, 2, 4].map((o) => parseInt(v.slice(o, o + 2), 16) || 0); return 0.299 * r + 0.587 * g + 0.114 * b > 170 ? '#0b0d12' : '#ffffff'; };
+    const shortNum = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : String(n));
+    const STATES = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'D.C.', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming', PR: 'Puerto Rico', GU: 'Guam' };
+    const stateLine = (a) => (a.states || []).map((s) => STATES[s] || s).join(' & ');
+    const headlineFor = (a) => (a.eventLabel + ' FOR ' + (a.area || stateLine(a)) + (a.times?.expires ? ' UNTIL ' + a.times.expires : '')).toUpperCase();
+    const alerts = () => { const f = S.state?.focus; return S.data.alerts.filter((a) => !f || a.states.includes(f)); };
+    const tallies = () => {
+      if (!S.state?.focus) return S.data.tallies || {};
+      const list = alerts();
+      const c = (re) => list.filter((a) => re.test(a.event || '')).length;
+      return { tor: c(/^tornado warning$/i), svr: c(/^severe thunderstorm warning$/i), ffw: c(/^flash flood warning$/i), watches: list.filter((a) => a.group === 'watches').length };
+    };
+
+    /* ---------- theme (same palettes as WeBot's stream) ---------- */
+    const THEMES = {
+      violet: { a: '#7457ec', b: '#5b3fd3', dark: '#3e2a9c', deep: '#141d47' }, clear: { a: '#2f8cff', b: '#1f6fe0', dark: '#164a9e', deep: '#0f2a55' },
+      storm: { a: '#e0453a', b: '#b52a22', dark: '#7c1a16', deep: '#3a0f0d' }, tornado: { a: '#c8102e', b: '#8e0a1f', dark: '#4d0612', deep: '#24040a' },
+      flood: { a: '#1fa36b', b: '#14804f', dark: '#0c5534', deep: '#08301f' }, winter: { a: '#5aa7f0', b: '#3d8fe0', dark: '#255f9e', deep: '#14304f' },
+      heat: { a: '#ff8a2a', b: '#e0631a', dark: '#9e3f10', deep: '#4f2008' }, tropical: { a: '#14b8a6', b: '#0e8f82', dark: '#0a5f57', deep: '#06332f' },
+      night: { a: '#2a3550', b: '#1d2740', dark: '#121a2c', deep: '#0b1120' }, afterdark: { a: '#151c42', b: '#0a0f2a', dark: '#070b1f', deep: '#04071a', stars: true },
+      fall: { a: '#ff7a1a', b: '#d9520b', dark: '#4a2378', deep: '#261040' }
+    };
+    const autoTheme = () => {
+      const t = tallies(); const level = S.data.wis?.level || '';
+      if (t.tor || ['intense', 'extreme'].includes(level)) return 'tornado';
+      if ((t.svr || 0) >= 3 || level === 'active') return 'storm';
+      if ((t.ffw || 0) >= 3) return 'flood';
+      const h = new Date().getHours();
+      return h >= 20 || h < 6 ? 'afterdark' : 'violet';
+    };
+    const applyTheme = () => {
+      const key = S.state.theme && S.state.theme !== 'auto' ? S.state.theme : autoTheme();
+      const th = THEMES[key] || THEMES.violet;
+      const r = document.documentElement.style;
+      r.setProperty('--violet', `linear-gradient(180deg, ${th.a} 0%, ${th.b} 100%)`);
+      r.setProperty('--violet-dark', th.dark);
+      r.setProperty('--violet-deep', th.deep);
+      document.body.classList.toggle('stars', Boolean(th.stars));
+    };
+
+    /* ---------- top bar ---------- */
+    const setTile = (id, n) => {
+      const el = $(id), span = el.querySelector('span'), old = Number(span.textContent);
+      span.textContent = n;
+      el.classList.toggle('zero', !n);
+      if (n > old) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    };
+    const renderTop = () => {
+      const t = tallies();
+      setTile('t-tor', t.tor || 0); setTile('t-svr', t.svr || 0); setTile('t-ffw', t.ffw || 0); setTile('t-wch', t.watches || 0);
+      const w = S.data.wis;
+      const colors = { low: '#4fb4ff', elevated: '#ffd34d', active: '#ff9f2a', intense: '#ff4d5a', extreme: '#ff2ad4' };
+      $('wpi').style.setProperty('--wc', colors[w?.level] || '#4fb4ff');
+      $('wpi-v').textContent = w ? Number(w.score).toFixed(1) : '—';
+      $('wpi-l').textContent = w ? String(w.label).toUpperCase() : 'LOADING';
+      const d = w && w.ago30 != null ? w.score - w.ago30 : null;
+      $('wpi-delta').textContent = d == null ? '—' : (d > 0.05 ? '▲ ' : d < -0.05 ? '▼ ' : '• ') + Math.abs(d).toFixed(1);
+      const c = $('spark'), g = c.getContext('2d'), pts = (w?.history || []).map((p) => p.v);
+      g.clearRect(0, 0, c.width, c.height);
+      if (pts.length > 1) {
+        const lo = Math.min(...pts), hi = Math.max(...pts), span = Math.max(4, hi - lo);
+        const x = (i) => 6 + (i / (pts.length - 1)) * (c.width - 12), y = (v) => c.height - 8 - ((v - lo) / span) * (c.height - 16);
+        g.strokeStyle = colors[w.level] || '#4fb4ff'; g.lineWidth = 3; g.beginPath();
+        pts.forEach((v, i) => (i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)))); g.stroke();
+        g.fillStyle = g.strokeStyle; g.beginPath(); g.arc(x(pts.length - 1), y(pts[pts.length - 1]), 4.5, 0, Math.PI * 2); g.fill();
+      }
+    };
+    const buildHeadlines = () => {
+      const st = S.state, mode = st.headlines;
+      const fresh = (a) => Date.now() - Date.parse(a.issuedAt || 0) < 30 * 60 * 1000;
+      const alertItem = (a) => ({ tag: fresh(a) && a.status === 'NEW' ? 'NEW' : a.rank <= 3 ? 'ALERT' : 'LATEST', text: headlineFor(a), color: a.rank <= 3 ? a.color : null });
+      const warn = alerts().filter((a) => ['warnings', 'watches'].includes(a.group)).sort((x, y) => x.rank - y.rank || Date.parse(y.issuedAt || 0) - Date.parse(x.issuedAt || 0)).slice(0, 10).map(alertItem);
+      const story = (tag) => (h) => ({ tag, text: h.title + (h.source ? ' · ' + h.source : '') });
+      const weather = (S.data.headlines?.weather || []).map(story('WEATHER NEWS'));
+      const news = (S.data.headlines?.news || []).map(story('NEWS'));
+      const zip = (a, b) => { const out = []; for (let i = 0; i < Math.max(a.length, b.length); i++) { if (a[i]) out.push(a[i]); if (b[i]) out.push(b[i]); } return out; };
+      let list = mode === 'alerts' ? warn : mode === 'weather' ? weather : mode === 'mix' ? zip(weather, news) : mode === 'custom' ? [] : zip(warn, weather);
+      const custom = (st.ticker.messages || []).map((m) => ({ tag: 'WEATHERPOWER', text: m, color: null }));
+      if (mode === 'custom') list = custom;
+      else if (custom.length && list.length) {
+        const every = Math.max(1, st.ticker.everyItems || 5), out = [];
+        list.forEach((it, i) => { out.push(it); if ((i + 1) % every === 0) out.push(custom[Math.floor(i / every) % custom.length]); });
+        list = out;
+      }
+      S.list = list.length ? list : [{ tag: 'LIVE', text: 'WEATHERPOWER LIVE · SEVERE WEATHER COVERAGE', color: null }];
+    };
+    const showHeadline = () => {
+      if (!S.state) return;
+      const item = S.list[S.hlIndex % S.list.length];
+      S.hlIndex += 1;
+      const slot = $('hl-slot');
+      slot.querySelectorAll('.txt').forEach((el) => { el.classList.add('leave'); setTimeout(() => el.remove(), 600); });
+      const el = document.createElement('div');
+      el.className = 'txt enter';
+      el.textContent = item.text;
+      slot.appendChild(el);
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('enter')));
+      $('hl-tag').textContent = item.tag;
+      $('hl').style.setProperty('--hc', item.color ? item.color + 'cc' : 'transparent');
+    };
+    setInterval(showHeadline, 8000);
+
+    /* ---------- bottom bar ---------- */
+    const setNow = (k, title, hazards, crawl) => {
+      const key = k + title + crawl + hazards.join();
+      if (key === S.nowKey) return;
+      S.nowKey = key;
+      $('now-k').textContent = k;
+      $('now-t').textContent = title;
+      $('now-hz').innerHTML = hazards.slice(0, 3).map((h) => `<span>${esc(h)}</span>`).join('');
+      const span = $('crawl-s');
+      span.getAnimations?.().forEach((a) => a.cancel());
+      span.textContent = crawl;
+      requestAnimationFrame(() => {
+        const box = $('crawl'), w = span.scrollWidth;
+        if (w > box.clientWidth) span.animate([{ transform: `translateX(${box.clientWidth}px)` }, { transform: `translateX(-${w}px)` }], { duration: ((w + box.clientWidth) / 85) * 1000, iterations: Infinity });
+      });
+    };
+    const alertNow = (a, k) => setNow(k, a.eventLabel + (stateLine(a) ? ' IN ' + stateLine(a) : ''), [a.threat, ...(a.hazards || []).filter((h) => h.value && !/^(RISK|DAY)$/.test(h.label)).map((h) => h.value)].filter(Boolean),
+      String(a.areaDesc || a.area || '').toUpperCase().split(/;\s*/).join(' · '));
+    const renderBottom = () => {
+      const b = S.state.bottom;
+      const featured = b.alertKey && S.data.alerts.find((a) => a.key === b.alertKey);
+      if (b.mode === 'alert' && featured) return alertNow(featured, 'TRACKING');
+      if (b.mode === 'custom') return setNow(b.label || 'LIVE', b.title || '', [], b.crawl || '');
+      const top = alerts().filter((a) => a.group === 'warnings').sort((x, y) => x.rank - y.rank)[0];
+      if (top) return alertNow(top, 'TOP ALERT');
+      setNow(b.label || 'LIVE', b.title || 'WEATHERPOWER LIVE', [], b.crawl || '');
+    };
+    const tickClock = () => {
+      const d = new Date();
+      $('clk').textContent = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }).toUpperCase();
+      $('clk-d').textContent = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+    };
+    setInterval(tickClock, 1000); tickClock();
+
+    /* ---------- alert card ---------- */
+    const renderCard = () => {
+      const st = S.state, card = $('card');
+      const a = st.layout.card && st.card.alertKey && S.data.alerts.find((x) => x.key === st.card.alertKey);
+      if (!a) { card.classList.remove('show'); S.cardKey = null; return; }
+      if (S.cardKey === a.key + a.status) return;
+      S.cardKey = a.key + a.status;
+      card.style.setProperty('--c', a.color || '#33d4ff');
+      const chips = [];
+      if (a.threat) chips.push(`<span class="chip hot"><b>${esc(a.threat)}</b></span>`);
+      (a.hazards || []).filter((h) => h.value).slice(0, 4).forEach((h) => chips.push(`<span class="chip">${esc(h.label)} <b>${esc(h.value)}</b></span>`));
+      if (a.people) chips.push(`<span class="chip"><b>~${esc(shortNum(a.people))}</b> PEOPLE</span>`);
+      card.innerHTML = `<div class="head"><div><h2>${esc(a.eventLabel)}</h2><div class="sub">${esc(a.times?.expires ? 'UNTIL ' + a.times.expires : '')}${a.office ? ' · NWS ' + esc(a.office) : ''}</div></div><span class="status">${esc(a.status || 'ACTIVE')}</span></div>
+        <div class="life"></div>${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
+        <dl><dt>AREAS</dt><dd>${esc(a.area || stateLine(a))}</dd>${a.summary ? `<dt>DETAILS</dt><dd class="prose">${esc(a.summary)}</dd>` : ''}<dt>ISSUED</dt><dd>${esc(a.times?.issued || '')}</dd></dl>`;
+      card.classList.add('show');
+    };
+
+    /* ---------- lower third ---------- */
+    let lowerTimer = null;
+    const renderLower = () => {
+      const st = S.state, el = $('lower');
+      $('lower-name').textContent = st.lower.name || '';
+      $('lower-title').textContent = st.lower.title || '';
+      $('lower-k').textContent = 'LIVE · ' + (st.brandText || 'WEATHERPOWER.APP');
+      const on = st.layout.lower && st.scene === 'live';
+      el.classList.toggle('show', on);
+      clearTimeout(lowerTimer);
+      const hideIn = st.lower.autoHideSec > 0 && st.lower.shownAt ? Date.parse(st.lower.shownAt) + st.lower.autoHideSec * 1000 - Date.now() : null;
+      if (on && hideIn != null) { if (hideIn <= 0) el.classList.remove('show'); else lowerTimer = setTimeout(() => el.classList.remove('show'), hideIn); }
+    };
+
+    /* ---------- scenes ---------- */
+    let countTimer = null;
+    const renderScene = () => {
+      const st = S.state, sc = st.scene, el = $('scene');
+      el.classList.toggle('show', sc !== 'live');
+      clearInterval(countTimer);
+      $('sc-count').classList.add('hide');
+      if (sc === 'starting') {
+        $('sc-k').textContent = 'WEATHERPOWER LIVE'; $('sc-title').textContent = st.starting.title; $('sc-msg').textContent = st.starting.message;
+        if (st.starting.endsAt) {
+          const tick = () => {
+            const left = Math.max(0, Math.round((Date.parse(st.starting.endsAt) - Date.now()) / 1000));
+            $('sc-time').textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+            $('sc-count').classList.toggle('hide', false);
+          };
+          tick(); countTimer = setInterval(tick, 1000);
+        }
+      } else if (sc === 'brb') {
+        $('sc-k').textContent = 'WEATHERPOWER LIVE'; $('sc-title').innerHTML = 'We’ll be<br>right back'; $('sc-msg').textContent = st.brb.message;
+      } else if (sc === 'ending') {
+        $('sc-k').textContent = 'WEATHERPOWER LIVE'; $('sc-title').textContent = st.ending.title; $('sc-msg').textContent = st.ending.message;
+      }
+    };
+
+    /* ---------- breaking ---------- */
+    let actx = null;
+    const chime = () => {
+      if (!S.state.breaking.sound) return;
+      try {
+        actx = actx || new AudioContext();
+        [[880, 0], [660, 0.22], [880, 0.44], [660, 0.66]].forEach(([f, d]) => {
+          const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + d;
+          o.type = 'square'; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+          o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.22);
+        });
+      } catch {}
+    };
+    const breaking = ({ alert: a, test }) => {
+      const secs = Math.max(3, S.state.breaking.seconds || 7) * 1000;
+      chime();
+      if (S.state.breaking.style === 'banner') {
+        const b = $('bann');
+        b.style.setProperty('--c', a.color || '#c00'); b.style.setProperty('--ci', ink(a.color || '#c00'));
+        b.innerHTML = `<span class="k">${test ? 'TEST' : 'BREAKING'}</span><b>${esc(a.eventLabel)}</b><span>${esc(a.area || stateLine(a))}${a.times?.expires ? ' · UNTIL ' + esc(a.times.expires) : ''}</span>`;
+        b.classList.add('show');
+        setTimeout(() => b.classList.remove('show'), secs + 3000);
+        return;
+      }
+      const brk = $('brk');
+      brk.style.setProperty('--c', a.color || '#c00'); brk.style.setProperty('--ci', ink(a.color || '#c00'));
+      brk.innerHTML = '<div class="stripes"></div>' + (test ? '<div class="test">TEST · NOT A NEW ALERT</div>' : '')
+        + `<div class="k">BREAKING</div><h1>${esc(a.eventLabel)}</h1><div class="p">${esc(a.area || stateLine(a))}</div>`
+        + `<div class="u">UNTIL ${esc(a.times?.expires || '')}${a.people ? ' · ~' + esc(shortNum(a.people)) + ' PEOPLE' : ''}</div>` + (a.threat ? `<div class="t">${esc(a.threat)}</div>` : '');
+      brk.classList.remove('out'); brk.classList.add('show');
+      setTimeout(() => { brk.classList.add('out'); setTimeout(() => brk.classList.remove('show', 'out'), 520); }, secs);
+    };
+
+    /* ---------- render everything from state ---------- */
+    const render = () => {
+      const st = S.state; if (!st) return;
+      const L = st.layout;
+      $('top').classList.toggle('away', !L.top);
+      $('bottom').classList.toggle('away', !L.bottom);
+      $('tally').classList.toggle('hide', !L.tallies);
+      $('wpi').classList.toggle('hide', !L.wis);
+      $('clockbox').classList.toggle('hide', !L.clock);
+      $('brandbox').classList.toggle('hide', !L.brand);
+      $('brand-t').textContent = st.brandText || 'WEATHERPOWER.APP';
+      $('webot').classList.toggle('hide', !L.webot || st.scene !== 'live');
+      applyTheme(); renderTop(); renderBottom(); renderCard(); renderLower(); renderScene();
+    };
+
+    /* ---------- live connection to Stream House ---------- */
+    const connect = () => {
+      const es = new EventSource('/api/events');
+      es.addEventListener('state', (e) => {
+        const prev = S.state;
+        S.state = JSON.parse(e.data);
+        const rebuild = !prev || prev.headlines !== S.state.headlines || prev.focus !== S.state.focus || JSON.stringify(prev.ticker) !== JSON.stringify(S.state.ticker);
+        if (rebuild) { buildHeadlines(); S.hlIndex = 0; showHeadline(); }
+        render();
+      });
+      es.addEventListener('data', (e) => { S.data = JSON.parse(e.data); if (!S.state) return; buildHeadlines(); render(); if (!$('hl-slot').children.length) showHeadline(); });
+      es.addEventListener('breaking', (e) => { if (S.state) breaking(JSON.parse(e.data)); });
+      es.onerror = () => { es.close(); setTimeout(connect, 3000); };
+    };
+    connect();
+  })();
+  </script>
+</body>
+</html>
