@@ -634,7 +634,12 @@
       if (!window.puter) return;
       try {
         const body = await getJson('/api/v3/live/puter' + (OPT.key ? '?key=' + encodeURIComponent(OPT.key) : ''));
-        if (body.token) { puter.setAuthToken(body.token); pt.state = 'ready'; pt.linked = true; }
+        if (body.token) {
+          // A new link (say, a fresh Puter account after the old one ran out) gets Alloy back right away.
+          if (body.token !== pt.token) { puter.setAuthToken(body.token); pt.token = body.token; pt.failedAt = 0; }
+          pt.state = 'ready';
+          pt.linked = true;
+        }
         else if (pt.linked) { puter.setAuthToken(null); pt.state = 'signed-out'; pt.linked = false; }
       } catch (error) {
         console.warn('Puter link:', error.message);
@@ -656,7 +661,9 @@
       script.src = PUTER_JS;
       script.onload = async () => {
         pt.state = window.puter?.auth?.isSignedIn() ? 'ready' : 'signed-out';
-        if (pt.state !== 'ready') await linkPuter();
+        // The sign-in linked in Live Control always wins over one this browser saved earlier (OBS kept an
+        // old account that had run out and never picked up the new link).
+        await linkPuter();
         puterGate();
       };
       script.onerror = () => { pt.state = 'failed'; console.warn('Puter.js did not load'); };
@@ -2795,11 +2802,12 @@
         }
       }
       if (ttsCfg().engine === 'neural' && OPT.voice) startNeural();
-      if (ttsCfg().engine === 'puter' && OPT.voice) startPuter();
+      if ((OPT.tts || S.control.tts?.engine || 'puter') === 'puter' && OPT.voice) startPuter();
       if (focusState()) loadShapes();
       if (!talkAllowed() && speech.queue.some((item) => !item.force)) speech.queue = speech.queue.filter((item) => item.force);
       const linkedAt = S.control.puter?.linkedAt || null;
-      if (linkedAt !== S.puterLinkedAt) { S.puterLinkedAt = linkedAt; if (['ready', 'signed-out'].includes(pt.state)) linkPuter(); }
+      // Only mark a link as taken once Puter.js has loaded, so a link made while it loads isn't skipped.
+      if (linkedAt !== S.puterLinkedAt && ['ready', 'signed-out', 'failed'].includes(pt.state)) { S.puterLinkedAt = linkedAt; linkPuter(); }
       applyCameraControl();
       puterGate();
       loadMusicFiles();
