@@ -619,6 +619,10 @@
     const ttsCfg = () => {
       const cfg = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', speed: 1, ...(S.control.tts || {}), ...(OPT.tts ? { engine: OPT.tts } : {}) };
       if (cfg.engine === 'openai' && S.openaiVoice === false) cfg.engine = 'neural';
+      // Puter out of usage (or not linked): the free voice on the stream PC takes over. Puter gets
+      // another try every 20 minutes, so it comes back by itself when the allowance resets.
+      if (cfg.engine === 'puter' && S.localVoice && (pt.state === 'signed-out' || pt.state === 'failed' || Date.now() - (pt.failedAt || 0) < 20 * 60 * 1000)) { cfg.engine = 'local'; cfg.fallback = true; }
+      if (cfg.engine === 'local' && !S.localVoice) cfg.engine = 'neural';
       return cfg;
     };
     const PUTER_JS = 'https://js.puter.com/v2/';
@@ -683,6 +687,10 @@
         })
         .catch((error) => {
           if (!puter.auth.isSignedIn()) { pt.state = 'signed-out'; puterGate(); }
+          // Out of usage or any other Puter error: switch to the free voice for a while.
+          pt.failedAt = Date.now();
+          pt.lastError = String(error?.error?.message || error?.message || error?.error?.code || error).slice(0, 120);
+          console.warn('Puter voice failed, using the free voice:', pt.lastError);
           throw error;
         });
     };
@@ -748,6 +756,11 @@
       const cfg = ttsCfg();
       if (cfg.engine === 'puter' && pt.state === 'ready') return puterAudio(text, cfg);
       if (cfg.engine === 'neural' && neural.state === 'ready') return neuralAudio(text, cfg.voice, cfg.speed);
+      if (cfg.engine === 'local') {
+        return fetch(BASE + '/api/v3/live/tts-local?' + new URLSearchParams({ text, voice: cfg.voice, speed: cfg.speed, ...(OPT.key ? { key: OPT.key } : {}) }))
+          .then((r) => { if (!r.ok) throw new Error('free voice ' + r.status); return r.arrayBuffer(); })
+          .then((bytes) => actx.decodeAudioData(bytes));
+      }
       if (cfg.engine === 'openai' && S.openaiVoice) {
         noteTtsChars(text.length);
         return fetch(BASE + '/api/v3/live/tts?' + new URLSearchParams({ text, voice: cfg.openaiVoice, speed: cfg.speed }))
@@ -758,6 +771,7 @@
     };
     const ttsLabel = () => {
       const cfg = ttsCfg();
+      if (cfg.engine === 'local') return (cfg.fallback ? (pt.state === 'signed-out' ? 'free voice (Puter unlinked)' : 'free voice (Puter out)') : 'free voice (this PC)') + ' · ' + cfg.voice;
       if (cfg.engine === 'neural') return 'neural ' + neural.state + ' · ' + cfg.voice;
       if (cfg.engine === 'openai') return 'openai · ' + cfg.openaiVoice;
       if (cfg.engine === 'puter') return 'puter ' + ({ ready: 'openai ' + cfg.openaiVoice, 'signed-out': 'needs sign-in' }[pt.state] || pt.state);
@@ -765,7 +779,7 @@
     };
     const canNeural = () => {
       const engine = ttsCfg().engine;
-      return (engine === 'puter' && pt.state === 'ready') || (engine === 'neural' && neural.state === 'ready') || (engine === 'openai' && S.openaiVoice);
+      return (engine === 'local' && S.localVoice) || (engine === 'puter' && pt.state === 'ready') || (engine === 'neural' && neural.state === 'ready') || (engine === 'openai' && S.openaiVoice);
     };
 
     const browserSpeak = (item, done) => {
@@ -2844,7 +2858,10 @@
       S.sites = sites.sites || [];
       S.home = config.home || null;
       S.soundings = Boolean(config.soundings);
-      S.openaiVoice = Boolean((await getJson('/api/v3/live/voice').catch(() => null))?.openai?.available);
+      const voiceInfo = await getJson('/api/v3/live/voice' + (OPT.key ? '?key=' + encodeURIComponent(OPT.key) : '')).catch(() => null);
+      S.openaiVoice = Boolean(voiceInfo?.openai?.available);
+      // The free voice made on the stream PC (home network or the private key only).
+      S.localVoice = Boolean(voiceInfo?.local?.available);
       await Promise.all([loadAlerts(), loadLive()]).catch((e) => console.warn(e.message));
       S.map = new maplibregl.Map({
         container: 'map', style: config.darkStyleUrl, center: [-96, 38.6], zoom: 4.1,

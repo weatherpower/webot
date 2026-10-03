@@ -10,10 +10,11 @@ import {
   SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 import {
-  applyLiveCommand, fromHomeNetwork, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
+  applyLiveCommand, fromHomeNetwork, streamKeyOk, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
   recentReports, requireLiveToken, siteRadar, talliesFor
 } from './live.js';
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
+import { localSpeech, localVoiceStatus, warmLocalVoice } from './localVoice.js';
 import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
@@ -411,7 +412,22 @@ export const apiV3Router = () => {
 
   router.get('/live/voice', (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ neural: NEURAL_VOICES, openai: { ...openaiTtsStatus(), voices: OPENAI_VOICES } });
+    // Only screens on the home network (or with the private stream key) may use this PC's free voice.
+    const local = fromHomeNetwork(req) || streamKeyOk(req.query.key);
+    if (local) warmLocalVoice();
+    res.json({ neural: NEURAL_VOICES, openai: { ...openaiTtsStatus(), voices: OPENAI_VOICES }, local: local ? { ...localVoiceStatus(), voices: NEURAL_VOICES } : { available: false } });
+  });
+
+  // WeBot's free voice, made on this PC (Kokoro). Home network or the private stream key only.
+  router.get('/live/tts-local', async (req, res, next) => {
+    try {
+      if (!fromHomeNetwork(req) && !streamKeyOk(req.query.key)) throw Object.assign(new Error('Free voice is only for the stream screens'), { status: 403 });
+      const audio = await localSpeech({ text: req.query.text, voice: req.query.voice, speed: req.query.speed });
+      res.set('Cache-Control', 'private, max-age=86400');
+      res.type('audio/wav').send(audio);
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get('/live/tts', async (req, res, next) => {

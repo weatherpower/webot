@@ -145,7 +145,8 @@
         <div class="row">
           <label for="tts-engine" class="status">VOICE</label>
           <select id="tts-engine" class="grow">
-            <option value="puter">OpenAI voice via Puter.js</option>
+            <option value="puter">OpenAI voice via Puter.js (free voice if Puter runs out)</option>
+            <option value="local">Free voice on this PC (Kokoro, no limits)</option>
             <option value="openai">OpenAI voice (needs server key)</option>
             <option value="neural">Free neural voice (Kokoro)</option>
             <option value="browser">Computer voice</option>
@@ -389,13 +390,13 @@
     const fillVoices = () => {
       const engine = $('tts-engine').value;
       const openaiStyle = engine === 'openai' || engine === 'puter';
-      const list = openaiStyle ? voices.openai.voices : engine === 'neural' ? voices.neural : [];
+      const list = openaiStyle ? voices.openai.voices : engine === 'neural' || engine === 'local' ? voices.neural : [];
       const want = openaiStyle ? control?.tts?.openaiVoice : control?.tts?.voice;
       const key = engine + '|' + list.join();
       if ($('tts-voice').dataset.key !== key) {
         $('tts-voice').dataset.key = key;
         $('tts-voice').innerHTML = list.length
-          ? list.map((id) => '<option value="' + esc(id) + '">' + esc(engine === 'neural' ? voiceLabel(id) : id.charAt(0).toUpperCase() + id.slice(1)) + '</option>').join('')
+          ? list.map((id) => '<option value="' + esc(id) + '">' + esc(engine === 'neural' || engine === 'local' ? voiceLabel(id) : id.charAt(0).toUpperCase() + id.slice(1)) + '</option>').join('')
           : '<option value="">Best voice on the computer</option>';
       }
       if (want && list.includes(want)) $('tts-voice').value = want;

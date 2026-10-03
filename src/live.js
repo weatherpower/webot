@@ -224,7 +224,7 @@ export const siteRadar = async (siteInput) => {
 
 export const MUSIC_SOURCES = ['auto', 'radio', 'files'];
 export const MUSIC_MOODS = ['auto', 'calm', 'chill', 'tense'];
-export const TTS_ENGINES = ['puter', 'openai', 'neural', 'browser'];
+export const TTS_ENGINES = ['puter', 'local', 'openai', 'neural', 'browser'];
 // Kokoro voices (free, run inside the stream page). The af_/am_ ones are American, bf_/bm_ British.
 export const NEURAL_VOICES = [
   'af_alloy', 'am_michael', 'am_fenrir', 'am_puck', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'am_adam',
@@ -343,6 +343,13 @@ export const fromHomeNetwork = (req) => {
   const ip = String(req.socket?.remoteAddress || '').replace(/^::ffff:/i, '');
   const proxied = ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'forwarded'].some((h) => req.headers[h]);
   return !proxied && PRIVATE_IP.test(ip);
+};
+
+// The private stream key from the OBS link (constant-time compare).
+export const streamKeyOk = (key) => {
+  const expected = streamKey();
+  const given = String(key || '');
+  return Boolean(expected) && given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 };
 
 export const puterTokenFor = async (key, { homeNetwork = false } = {}) => {
