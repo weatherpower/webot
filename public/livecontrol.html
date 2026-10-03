@@ -203,6 +203,17 @@
       </section>
 
       <section class="box">
+        <h2>Be right back</h2>
+        <p class="note" style="margin-top:0">Covers the stream with a "We'll be right back" card (music keeps playing, WeBot and the show pause). Use it before switching servers or fixing something, then end it to pick the show back up.</p>
+        <input id="brb-msg" maxlength="140" style="width:100%" placeholder="Hang tight, live weather coverage is coming right back.">
+        <div class="row">
+          <button class="btn primary" id="brb-on">Start BRB</button>
+          <button class="btn" id="brb-off">End BRB</button>
+        </div>
+        <p class="status" id="brb-line"></p>
+      </section>
+
+      <section class="box">
         <h2>Banner message</h2>
         <input id="banner" maxlength="160" style="width:100%" placeholder="e.g. Live coverage tonight at 7 PM — subscribe!">
         <div class="row">
@@ -373,6 +384,7 @@
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
         : 'The stream page hasn’t checked in for a minute. Open it in OBS or click "Open stream".';
+      $('brb-line').innerHTML = control.brb ? '<b style="color:#ffd34d">BRB IS ON AIR</b> since ' + esc(new Date(control.brb.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + (control.brb.message ? ': ' + esc(control.brb.message) : '') : 'Off: the show is running.';
       $('banner-line').innerHTML = control.banner ? 'SHOWING UNTIL <b>' + esc(new Date(control.banner.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '</b>: ' + esc(control.banner.text) : 'No banner message.';
       renderAlerts();
     };
@@ -609,6 +621,8 @@
     $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to WeBot'); });
     $('voice').addEventListener('click', () => act({ action: 'voice', on: control?.voice === false }));
     $('sound').addEventListener('click', () => act({ action: 'sound', on: control?.sound === false }));
+    $('brb-on').addEventListener('click', () => act({ action: 'brb', on: true, message: $('brb-msg').value }, 'BRB card is up'));
+    $('brb-off').addEventListener('click', () => act({ action: 'brb', on: false }, 'BRB ended, back to the show'));
     $('banner-set').addEventListener('click', () => act({ action: 'banner', text: $('banner').value, minutes: Number($('minutes').value) }, 'Banner set'));
     $('banner-clear').addEventListener('click', () => act({ action: 'banner', text: '' }, 'Banner cleared'));
     $('test').addEventListener('click', () => act({ action: 'test-breaking' }, 'Breaking test sent'));

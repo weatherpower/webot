@@ -153,6 +153,19 @@
     .bot .rig img, .bot .rig svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
     .bot .rig img { filter: drop-shadow(0 12px 18px rgba(0,0,0,.55)); }
     @keyframes bob { 50% { transform: translateY(-6px); } }
+    /* Be-right-back card (Live Control → Be right back): covers everything between the bars. */
+    .brb { position: absolute; left: 0; right: 0; top: 80px; bottom: 80px; z-index: 18; display: none; place-items: center;
+      background: radial-gradient(ellipse at 50% 45%, rgba(16,24,46,.9) 0%, rgba(5,8,16,.97) 70%); }
+    .brb.show { display: grid; }
+    .brb .in { display: flex; align-items: center; gap: 64px; }
+    .brb img { width: 340px; animation: brbbob 4s ease-in-out infinite; }
+    @keyframes brbbob { 50% { transform: translateY(-14px); } }
+    .brb .k { display: inline-flex; align-items: center; gap: 14px; font: 700 26px "WP Mono"; letter-spacing: .28em; color: #ffd34d; }
+    .brb .k i { width: 16px; height: 16px; border-radius: 50%; background: #ffd34d; animation: blinkdot 1.4s steps(2) infinite; }
+    .brb h1 { margin: 18px 0 20px; font: 700 150px/.88 "WP Display"; text-transform: uppercase; color: #fff; }
+    .brb p { margin: 0; max-width: 900px; font: 500 34px/1.3 "WP Sans"; color: #cfd8ea; }
+    .brb small { display: block; margin-top: 26px; font: 600 20px "WP Mono"; letter-spacing: .18em; color: #8a96ad; }
+    body.brb-on .bot { display: none; }
     .bot .eye { fill: var(--eye); transition: fill .4s, transform .09s; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 6px var(--eye)); }
     .bot.blink .eye { transform: scaleY(.12); }
     .bot.talk .eye { animation: talk .2s ease-in-out infinite alternate; }
@@ -257,6 +270,12 @@
     <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
 
     <div class="bot" id="bot" aria-hidden="true"></div>
+    <div class="brb" id="brb"><div class="in"><img src="/warningcenter/public/assets/webot.png" alt=""><div>
+      <div class="k"><i></i>WEATHERPOWER LIVE</div>
+      <h1>We'll be<br>right back</h1>
+      <p id="brb-msg">Hang tight, live weather coverage is coming right back.</p>
+      <small id="brb-since"></small>
+    </div></div></div>
 
     <footer class="bottom">
       <div class="clock"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><div><b id="clk">--:--:--</b><small id="clk-d"></small></div></div>
@@ -849,6 +868,8 @@
     // let the neural voice start talking sooner.
     const say = (text, opts = {}) => {
       if (!text) return;
+      // Under the BRB card WeBot only says lines typed in Live Control.
+      if (S.control.brb && !opts.force) return;
       if (!opts.force && !talkAllowed()) return;
       // Typed lines always play; urgent alerts skip the wait; a follow-up (like the camera intro) may finish
       // the thought just started; everything else waits for the talk timer.
@@ -1612,6 +1633,25 @@
       root.setProperty('--violet-deep', th.deep);
     };
 
+    // Be-right-back card on/off (Live Control). The bottom bar says so; the show resumes when it comes down.
+    const applyBrb = () => {
+      const brb = S.control.brb;
+      const on = Boolean(brb);
+      if (on) {
+        $('brb-msg').textContent = brb.message || 'Hang tight, live weather coverage is coming right back.';
+        $('brb-since').textContent = 'STEPPED AWAY AT ' + new Date(brb.since).toLocaleTimeString('en-US', { timeZone: OPT.tz, hour: 'numeric', minute: '2-digit' }) + ' ' + tzAbbr(OPT.tz);
+      }
+      if (on === S.brbOn) return;
+      S.brbOn = on;
+      $('brb').classList.toggle('show', on);
+      document.body.classList.toggle('brb-on', on);
+      if (on) {
+        speech.queue = speech.queue.filter((item) => item.force);
+        setNow({ k: 'BE RIGHT BACK', title: (brb.message || 'WeatherPower Live will be right back').toUpperCase(), color: '#ffd34d' });
+      } else if (S.styleReady) {
+        nextShot(true);
+      }
+    };
     const renderTop = () => {
       applyTheme();
       const st = focusState();
@@ -1957,6 +1997,8 @@
     const nextShot = (force) => {
       clearTimeout(S.shotTimer);
       if (S.inBreaking) return;
+      // Be right back: the show waits under the card and picks up when it comes down.
+      if (S.control.brb) { S.shotTimer = setTimeout(nextShot, 3000); return; }
       // Let WeBot finish what he's saying before cutting away (up to 15 more seconds).
       if (!force && !S.breaking.length && !S.fresh.length && speech.busy && Date.now() - S.shotStart < S.shotDur + 15000) {
         S.shotTimer = setTimeout(nextShot, 1200);
@@ -2786,6 +2828,7 @@
       S.live = body;
       S.control = body.control || S.control;
       if (S.fitKey !== fitKeyNow()) fit();
+      applyBrb();
       renderTop();
       if (S.styleReady) S.map.getSource('reports')?.setData(reportFC());
       const st = focusState();
