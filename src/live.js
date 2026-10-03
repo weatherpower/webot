@@ -1,5 +1,6 @@
 // Live stream support: activity index with history, storm reports, nearest-radar loops and the
 // stream control store (pin an alert, focus a state, make the bot talk, banner messages).
+import { saveBrain } from './brain.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -486,6 +487,11 @@ export const applyLiveCommand = async (body = {}) => {
     }
     case 'chat-read':
       current.chatRead = body.on !== false;
+      break;
+    case 'brain':
+      // WeBot Studio saved new brain settings; brainAt tells the stream page to fetch them now.
+      await saveBrain(body.brain || {});
+      current.brainAt = new Date().toISOString();
       break;
     case 'gas-now':
       pushCommand({ type: 'segment', kind: 'gas' });

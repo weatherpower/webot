@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeBot Studio</title>
+  <link rel="icon" href="/assets/webot.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="/studio.css">
+</head>
+<body>
+  <aside class="rail">
+    <div class="brand"><img src="/assets/webot.png" alt=""><div><b>WEBOT</b><span>STUDIO</span></div></div>
+    <nav class="nav" id="nav">
+      <button data-page="overview" class="on"><svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/></svg>Overview</button>
+      <button data-page="brain"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4v1a3 3 0 0 0-2 5 3 3 0 0 0 2 5 4 4 0 0 0 8 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5V7a4 4 0 0 0-4-4zM12 3v18"/></svg>Brain<span class="badge" id="brain-badge" hidden>EDIT</span></button>
+      <button data-page="server"><svg viewBox="0 0 24 24"><path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01"/></svg>Server</button>
+      <button data-page="code"><svg viewBox="0 0 24 24"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/></svg>Code<span class="badge" id="code-badge" hidden>0</span></button>
+      <button data-page="logs"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg>Logs</button>
+      <button data-page="checks"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Checks</button>
+      <button data-page="help"><svg viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/></svg>Help</button>
+    </nav>
+    <div class="rail-foot">
+      <div class="row"><span>SERVER</span><b id="f-host">—</b></div>
+      <div class="row"><span>SSH</span><b id="f-ssh"><span class="dot"></span></b></div>
+      <div class="row"><span>CODE</span><b id="f-head">—</b></div>
+      <div class="row"><span>ON SERVER</span><b id="f-deployed">—</b></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="strip">
+      <div class="onair" id="s-onair"><i></i><strong id="s-onair-t">CONNECTING</strong></div>
+      <div class="grow"><small>On the stream</small><strong id="s-now">—</strong></div>
+      <div><small>Viewers</small><strong id="s-viewers">—</strong></div>
+      <div><small>CPU</small><strong id="s-cpu">—</strong></div>
+      <div><small>Quality</small><strong id="s-quality">—</strong></div>
+      <div class="links"><a id="l-status" target="_blank" rel="noopener">Status page</a><a id="l-control" target="_blank" rel="noopener">Live Control</a><a id="l-stream" target="_blank" rel="noopener">Stream page</a></div>
+    </div>
+
+    <div class="pages">
+      <!-- ================= OVERVIEW ================= -->
+      <section class="page on" id="page-overview">
+        <div class="grid">
+          <div class="panel s7">
+            <h2>On air <span class="r" id="o-updated"></span></h2>
+            <div class="k" id="o-kind">—</div>
+            <div class="big" id="o-label" style="margin-top:6px">—</div>
+            <div class="dim" id="o-title" style="margin-top:6px;min-height:20px"></div>
+            <div class="bar" style="margin-top:12px"><i id="o-bar" style="width:0"></i></div>
+            <div class="row" style="justify-content:space-between;margin-top:6px"><span class="k" id="o-start"></span><span class="k" id="o-left"></span></div>
+            <div class="sep"></div>
+            <div class="k" style="margin-bottom:8px">Up next</div>
+            <div class="row" id="o-next"></div>
+            <div id="o-requests" class="stack" style="margin-top:10px"></div>
+            <div class="sep"></div>
+            <div class="k" style="margin-bottom:8px">WeBot last said</div>
+            <div id="o-said" class="quote empty">Nothing yet.</div>
+          </div>
+
+          <div class="panel s5">
+            <h2>Stream server <span class="r" id="o-srv-at"></span></h2>
+            <div class="meter"><span class="k">CPU (container)</span><b id="o-cpu">—</b><div class="bar"><i id="o-cpu-bar"></i></div></div>
+            <div class="meter" style="margin-top:10px"><span class="k">Memory (server)</span><b id="o-mem">—</b><div class="bar"><i id="o-mem-bar"></i></div></div>
+            <div class="sep"></div>
+            <dl class="kv">
+              <dt>Container</dt><dd id="o-container">—</dd>
+              <dt>Sending</dt><dd id="o-sending">—</dd>
+              <dt>Quality</dt><dd id="o-q">—</dd>
+              <dt>Load</dt><dd id="o-load">—</dd>
+              <dt>Disk</dt><dd id="o-disk">—</dd>
+              <dt>Server up</dt><dd id="o-up">—</dd>
+              <dt>Chat</dt><dd id="o-chat">—</dd>
+            </dl>
+            <div class="sep"></div>
+            <div class="k" style="margin-bottom:6px">Recent stream log</div>
+            <div id="o-log" class="mono faint" style="font-size:11.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere"></div>
+          </div>
+
+          <div class="panel s7">
+            <h2>Show control</h2>
+            <div class="stack">
+              <div class="row">
+                <button class="btn" data-act="next">Skip segment</button>
+                <button class="btn" data-act="reload">Reload stream page</button>
+                <button class="btn warn" id="c-brb">Start BRB</button>
+                <button class="btn" data-act="music-next">Next song</button>
+              </div>
+              <div class="row"><span class="k" style="width:70px">Talk</span><div class="seg" id="c-talk"><button data-v="auto">Auto</button><button data-v="on">On</button><button data-v="off">Off</button></div>
+                <span class="k" style="margin-left:14px">Voice</span><div class="seg" id="c-voice"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+              <div class="row"><span class="k" style="width:70px">Show</span>
+                <select id="c-mode" style="width:auto"><option value="auto">Auto (WeBot picks)</option><option value="national">National</option><option value="surface">Radar map</option><option value="outlook">Outlook</option><option value="reports">Reports</option><option value="models">Models</option><option value="tropics">Tropics</option><option value="forecast">Forecasts</option><option value="gas">Gas prices</option></select>
+                <span class="k" style="margin-left:14px">Radio</span><div class="seg" id="c-genre"><button data-v="mix">Mix</button><button data-v="lofi">Lo-fi</button><button data-v="country">Country</button></div></div>
+              <div class="row"><span class="k" style="width:70px">Chat</span><div class="seg" id="c-chat"><button data-v="on">Read chat</button><button data-v="off">Commands only</button></div>
+                <button class="btn sm" data-act="gas-now" style="margin-left:14px">Gas prices now</button></div>
+              <div class="row" style="flex-wrap:nowrap"><input type="text" id="c-say" maxlength="300" placeholder="Make WeBot say something on the stream…"><button class="btn primary" id="c-say-btn">Say it</button></div>
+            </div>
+          </div>
+
+          <div class="panel s5">
+            <h2>Weather</h2>
+            <div class="row" style="align-items:baseline;gap:12px"><span class="big ok" id="o-wis">—</span><span class="mid" id="o-wis-l"></span></div>
+            <div class="tallies" style="margin-top:12px">
+              <div style="--c:#e0202e"><b id="o-tor">0</b><small>TORNADO</small></div>
+              <div style="--c:#f08a1c"><b id="o-svr">0</b><small>SEVERE</small></div>
+              <div style="--c:#25b45a"><b id="o-ffw">0</b><small>FLASH FLOOD</small></div>
+              <div style="--c:#8b6cff"><b id="o-wat">0</b><small>WATCHES</small></div>
+            </div>
+            <ul class="list warnings" id="o-warn" style="margin-top:10px"></ul>
+          </div>
+
+          <div class="panel s7">
+            <h2>Snapshot <span class="r"><label class="toggle"><input type="checkbox" id="snap-auto">Every 30 s</label></span></h2>
+            <div class="snap" id="snap">Press “Take snapshot” to see the stream right now.</div>
+            <div class="row" style="margin-top:10px"><button class="btn" id="snap-btn">Take snapshot</button><span class="k" id="snap-at"></span></div>
+          </div>
+
+          <div class="panel s5">
+            <h2>Earlier on the stream</h2>
+            <ul class="list" id="o-recent"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= BRAIN ================= -->
+      <section class="page" id="page-brain">
+        <div class="page-head"><h1>WeBot’s brain</h1><p>What WeBot says, how long segments last, how chat works and what the radio plays. Saving sends it straight to the stream: no restart.</p></div>
+        <div class="brain">
+          <div class="subnav" id="brain-nav"></div>
+          <div id="brain-form"></div>
+        </div>
+        <div class="savebar" id="brain-bar">
+          <span class="state" id="brain-state">Loaded from the stream</span>
+          <span style="flex:1"></span>
+          <button class="btn danger" id="brain-reset">Reset all to defaults</button>
+          <button class="btn" id="brain-discard">Discard changes</button>
+          <button class="btn primary" id="brain-save">Save to stream</button>
+        </div>
+      </section>
+
+      <!-- ================= SERVER ================= -->
+      <section class="page" id="page-server">
+        <div class="page-head"><h1>Stream server</h1><p>Picture quality, keys and access for the cloud server. Settings take effect after a restart (the stream blips for about a minute).</p></div>
+        <div class="banner" id="env-banner">Settings saved. Restart the stream for them to take effect.<button class="btn warn" id="env-restart2">Restart now</button></div>
+        <div class="grid">
+          <div class="panel s7">
+            <h2>Picture quality</h2>
+            <div class="presets" id="presets"></div>
+            <p class="dim" style="margin:10px 0 0">The map is drawn without a graphics card, so resolution costs a lot of CPU. On the current 4-core plan, 720p is the safe maximum; 1080p needs the 8-core plan (and Stream CPUs set to 6).</p>
+          </div>
+          <div class="panel s5">
+            <h2>Server actions</h2>
+            <div class="stack">
+              <div class="row"><button class="btn warn" id="env-restart">Restart stream</button><span class="dim">Applies settings. About 1 minute off air.</span></div>
+              <div class="row"><button class="btn" id="srv-rebuild">Rebuild from code</button><span class="dim">Rebuilds with the code already on the server.</span></div>
+            </div>
+            <div class="sep"></div>
+            <h2 style="margin-bottom:8px">Who can open Live Control</h2>
+            <div id="fw-list" class="stack"></div>
+            <div class="row" style="margin-top:10px;flex-wrap:nowrap"><input type="text" id="fw-add" placeholder="IP address, like 192.24.21.67"><button class="btn" id="fw-add-btn">Add</button></div>
+            <div class="row" style="margin-top:8px"><button class="btn sm" id="fw-mine">Add this PC’s address</button><span class="k" id="fw-myip"></span></div>
+          </div>
+          <div class="panel s12">
+            <h2>All settings (.env) <span class="r">secrets stay hidden until you press Show</span></h2>
+            <table class="env" id="env-table"></table>
+            <div class="row" style="margin-top:12px">
+              <input type="text" id="env-new-k" placeholder="NEW_SETTING" style="width:240px;font-family:'WP Mono'">
+              <input type="text" id="env-new-v" placeholder="value" style="width:320px">
+              <button class="btn" id="env-add">Add setting</button>
+              <span style="flex:1"></span>
+              <span class="k" id="env-dirty"></span>
+              <button class="btn primary" id="env-save" disabled>Save settings</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= CODE ================= -->
+      <section class="page" id="page-code">
+        <div class="page-head"><h1>Code</h1><p>Everything that runs the stream. Saving checks the code for mistakes and keeps a backup. Deploy sends your changes to the server.</p>
+          <span class="spacer"></span>
+          <button class="btn" id="git-history">History</button>
+          <button class="btn" id="git-commit">Save version</button>
+          <button class="btn primary" id="deploy-btn">Deploy to server</button>
+        </div>
+        <div class="code">
+          <div class="files">
+            <div class="tools"><input type="text" id="file-filter" placeholder="Find a file…"><label class="toggle"><input type="checkbox" id="file-changed">Changed only</label></div>
+            <div class="tree" id="tree"></div>
+          </div>
+          <div class="editor">
+            <div class="tools"><span class="path" id="ed-path">Pick a file</span><span class="chip a" id="ed-dirty" hidden>Unsaved</span><span style="flex:1"></span>
+              <button class="btn sm" id="ed-revert" disabled>Undo my changes</button><button class="btn sm primary" id="ed-save" disabled>Save · Ctrl+S</button></div>
+            <div class="host" id="ed-host"></div>
+            <div class="note" id="ed-note">Files marked M are changed since the last saved version.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= LOGS ================= -->
+      <section class="page" id="page-logs">
+        <div class="page-head"><h1>Logs</h1><p>What the stream server is printing.</p><span class="spacer"></span>
+          <div class="seg" id="log-filter"><button data-v="all" aria-pressed="true">All</button><button data-v="stream">Stream</button><button data-v="chat">Chat</button><button data-v="err">Problems</button></div>
+          <input type="text" id="log-search" placeholder="Search…" style="width:200px">
+          <select id="log-n" style="width:auto"><option value="200">200 lines</option><option value="500" selected>500 lines</option><option value="1500">1500 lines</option></select>
+          <label class="toggle"><input type="checkbox" id="log-auto" checked>Live</label>
+          <button class="btn" id="log-refresh">Refresh</button>
+        </div>
+        <div class="logbox" id="logbox"></div>
+      </section>
+
+      <!-- ================= CHECKS ================= -->
+      <section class="page" id="page-checks">
+        <div class="page-head"><h1>Checks</h1><p>Quick tests for when something seems off.</p></div>
+        <div class="grid">
+          <div class="panel s4"><h2>Connections</h2><p class="dim">Can Studio reach the server, Live Control and the public status page?</p><button class="btn" id="chk-conn">Run</button><dl class="kv" id="chk-conn-out" style="margin-top:12px"></dl></div>
+          <div class="panel s4"><h2>Audio</h2><p class="dim">Records 15 seconds of the stream’s sound and looks for dropouts (sputtering).</p><button class="btn" id="chk-audio">Run</button><dl class="kv" id="chk-audio-out" style="margin-top:12px"></dl></div>
+          <div class="panel s4"><h2>Mark server up to date</h2><p class="dim">Tells Studio the server already has the code you have now (use after deploying by hand).</p><button class="btn" id="chk-mark">Mark as deployed</button><div class="k" id="chk-mark-out" style="margin-top:12px"></div></div>
+        </div>
+      </section>
+
+      <!-- ================= HELP ================= -->
+      <section class="page" id="page-help">
+        <div class="page-head"><h1>Help</h1></div>
+        <div class="panel help-doc">
+          <h3>Starting Studio</h3>
+          <p>Double-click <code>WeBot Studio</code> on your desktop (or <code>studio\WeBot Studio.cmd</code> in the project). A black window opens (leave it open) and Studio opens in your browser at <code>http://localhost:7777</code>. Close the black window to stop Studio. The stream keeps running either way.</p>
+          <h3>Changing what WeBot says and does</h3>
+          <p>Use <b>Brain</b>. Lines with <code>{city}</code> or <code>{name}</code> get the city or viewer’s name filled in. Segment weights decide how often each one comes up on calm days (0 turns it off). Press <b>Save to stream</b>: the stream picks it up within seconds. <b>Reset all to defaults</b> puts everything back the way it was built.</p>
+          <h3>Live show buttons</h3>
+          <p>The Overview’s Show control does the same as Live Control: skip, BRB, talk on/off, radio style, make WeBot say something.</p>
+          <h3>Picture quality and keys</h3>
+          <p><b>Server</b> holds the stream settings (resolution, bitrate, YouTube keys). Save, then <b>Restart stream</b>. Every save keeps a backup of the old settings on the server (<code>.env.bak-…</code>, last 10).</p>
+          <h3>Editing code</h3>
+          <ol>
+            <li>Open <b>Code</b>, pick a file, edit, press <b>Ctrl+S</b>. Studio checks it for mistakes and keeps a backup in <code>studio\.backups</code>.</li>
+            <li>Press <b>Save version</b> with a short note (this is a git commit, so you can always go back).</li>
+            <li>Press <b>Deploy to server</b>. Page-only changes go live with a quick page reload; anything else rebuilds the stream (about 1–2 minutes off air).</li>
+          </ol>
+          <p>Broke something? In Code, <b>Undo my changes</b> puts a file back to the last saved version. To go back further, use <b>History</b> and deploy again.</p>
+          <h3>If the stream looks wrong</h3>
+          <ul>
+            <li>Map blank or frozen: <b>Reload stream page</b>.</li>
+            <li>Sound sputtering: run <b>Checks → Audio</b>; if CPU is near its limit, lower the quality in Server.</li>
+            <li>Nothing works: <b>Restart stream</b>. Then check <b>Logs → Problems</b>.</li>
+            <li>Studio can’t connect: your home internet address may have changed. Add it on the server page from another network’s SSH, or ask for help.</li>
+          </ul>
+          <h3>Where things live</h3>
+          <ul>
+            <li>Brain settings: <code>/opt/weatherpower/data/webot-brain.json</code> on the server.</li>
+            <li>Stream settings: <code>/opt/weatherpower/.env</code> on the server.</li>
+            <li>Code: this project folder (git). Studio itself: <code>studio\</code>.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="modal" id="modal"><div class="panel"><h2 id="m-title">—</h2><div id="m-body"></div><div class="row" id="m-actions" style="margin-top:14px;justify-content:flex-end"></div></div></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+  <script src="/studio.js"></script>
+</body>
+</html>

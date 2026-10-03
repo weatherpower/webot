@@ -3,3 +3,5 @@ node_modules/
 data/
 cards/
 *.log
+studio/.backups/
+studio/studio.config.json

@@ -20,6 +20,7 @@ import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
 import { cityForecast, randomCityForecast } from './cityForecast.js';
 import { chatStatus } from './youtubeChat.js';
+import { loadBrain } from './brain.js';
 import { getHeadlines } from './headlines.js';
 import { gasSegment } from './gasPrices.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
@@ -343,6 +344,16 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=3');
       res.json(await webotStatus());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // WeBot's brain settings (lines, timing, chat rules, radio): read by the stream page; saved from WeBot Studio.
+  router.get('/live/brain', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json(await loadBrain());
     } catch (error) {
       next(error);
     }

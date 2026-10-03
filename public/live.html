@@ -1310,7 +1310,7 @@
       };
       const newTrack = (mood) => {
         // Mix: about 4 in 10 calm/chill songs are country, never two in a row... unless it's set to Country.
-        const country = mood !== 'tense' && (genre === 'country' || (genre === 'mix' && !lastCountry && Math.random() < 0.45));
+        const country = mood !== 'tense' && (genre === 'country' || (genre === 'mix' && !lastCountry && Math.random() < api.countryShare));
         lastCountry = country;
         if (country) {
           let name = pick(COUNTRY_NAMES);
@@ -1372,6 +1372,7 @@
       };
       const api = {
         started: false,
+        countryShare: 0.45,
         onTrack: null,
         get track() { return track; },
         setMood(mood) { if (STYLES[mood]) wantMood = mood; },
@@ -1403,6 +1404,7 @@
     window.WeBotRadio = { makeRadio };
 
     const musicCfg = () => ({ on: true, volume: 35, source: 'auto', mood: 'auto', genre: 'mix', duck: true, ...(S.control.music || {}) });
+    const B = { brain: null, at: 0 };
     const M = { bus: null, duck: null, radio: null, timer: null, el: null, files: [], filesAt: 0, order: [], idx: -1, playing: '', mode: '', mood: '', fading: false, fails: 0 };
     const autoMood = () => {
       const t = S.live?.tallies || {};
@@ -1447,6 +1449,7 @@
       if (M.radio) return;
       M.radio = makeRadio(actx, M.bus, { mood: M.mood, genre: musicCfg().genre, lite: OPT.lite });
       M.radio.onTrack = (track) => { M.playing = track.name + ' · WeBot Radio'; renderNp(); };
+      if (Number.isFinite(B.brain?.radio?.countryShare)) M.radio.countryShare = B.brain.radio.countryShare;
       const ahead = OPT.lite ? 2.5 : 0.4;
       M.radio.schedule(actx.currentTime + ahead);
       M.timer = setInterval(() => M.radio?.schedule(actx.currentTime + ahead), OPT.lite ? 250 : 100);
@@ -1924,7 +1927,7 @@
       const ack = S.chatAck;
       if (ack) { items.splice(0, 0, { tag: 'LIVE CHAT', text: ack.toUpperCase(), color: '#ff3b4a' }); S.chatAck = null; S.hlIndex = 0; }
       const chatTurn = !ack && S.live?.chat?.live && (S.hlChat = (S.hlChat || 0) + 1) % 7 === 0;
-      const item = chatTurn ? { tag: 'LIVE CHAT', text: 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP IN CHAT · WEBOT WILL CHECK IT ON THE STREAM', color: '#ff3b4a' } : items[S.hlIndex % items.length];
+      const item = chatTurn ? { tag: 'LIVE CHAT', text: (B.brain?.chat?.hint || 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP IN CHAT · WEBOT WILL CHECK IT ON THE STREAM').toUpperCase(), color: '#ff3b4a' } : items[S.hlIndex % items.length];
       if (!chatTurn) S.hlIndex += 1;
       if (!item) return;
       const slot = $('hl-slot');
@@ -2073,7 +2076,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, think: 13 };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, think: 13, ...(B.brain?.calmSeconds || {}) };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -2268,7 +2271,7 @@
       if (!shot && S.forceShot) { shot = S.forceShot; S.forceShot = null; }
       // Viewer requests from YouTube chat: next in line when it's calm (they wait out severe weather, up to 30 min).
       S.chatQueue = (S.chatQueue || []).filter((r) => Date.now() - r.at < 30 * 60 * 1000);
-      if (!shot && S.chatQueue.length && isCalm() && !S.control.pin && Date.now() - (S.chatAt || 0) > 2 * 60 * 1000) {
+      if (!shot && S.chatQueue.length && isCalm() && !S.control.pin && Date.now() - (S.chatAt || 0) > chatGapMs()) {
         const req = S.chatQueue.shift();
         S.chatAt = Date.now();
         shot = { type: req.kind, request: req };
@@ -2321,8 +2324,12 @@
         gas: 0
       };
       const calm = isCalm();
-      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: forecastWeather() ? 2.5 : 0,
-        gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > 40 * 60 * 1000 ? 0.9 : 0 });
+      // Calm-day weights come from WeBot's brain (WeBot Studio → Brain → Segments).
+      const bw = B.brain?.calmWeights || {};
+      const num = (v, d) => (Number.isFinite(v) ? v : d);
+      if (calm) Object.assign(w, { surface: S.surface ? num(bw.surface, 5) : 0, alert: list.length ? num(bw.alert, 1.5) : 0, think: num(bw.think, 1), national: num(bw.national, 1),
+        outlook: w.outlook * num(bw.outlook, 0.5), reports: w.reports * num(bw.reports, 0.5), forecast: forecastWeather() ? num(bw.forecast, 2.5) : 0,
+        gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > num(B.brain?.gasEveryMinutes, 40) * 60 * 1000 ? num(bw.gas, 0.9) : 0 });
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
         // On calm days the radar map may come back sooner; nothing else repeats back to back.
@@ -2579,12 +2586,9 @@
         hazards: [...(shot.request?.user ? ['ASKED BY ' + shot.request.user.toUpperCase()] : []), ...fc.alerts.slice(0, 2)],
         crawl: periods.map((p) => p.name.toUpperCase() + ': ' + (p.shortForecast || '').toUpperCase() + (p.temperature != null ? ' ' + p.temperature + '°' : '')).join('   ◆   ')
       });
-      const opener = shot.request ? (shot.request.user || 'A viewer') + ' asked for the forecast in ' + cityWords(city) + '. Let’s take a look.' : pick([
-        'Let’s check the forecast for ' + cityWords(city) + '.',
-        'Time for a daily forecast. We’re heading to ' + cityWords(city) + '.',
-        'Let’s zoom into ' + cityWords(city) + ' and see what the forecast looks like.',
-        'Here’s your forecast for ' + cityWords(city) + '.'
-      ]);
+      const vars = { city: cityWords(city), name: shot.request?.user || 'A viewer' };
+      const opener = shot.request ? fillLine(brainLine('forecastRequest', '{name} asked for the forecast in {city}. Let’s take a look.'), vars)
+        : fillLine(pick(brainLines('forecast', ['Let’s check the forecast for {city}.', 'Here’s your forecast for {city}.'])), vars);
       const nowWords = current && current.temperatureF != null ? ' Right now it’s ' + Math.round(current.temperatureF) + ' degrees' + (current.textDescription ? ' and ' + skyWords(current.textDescription) : '') + '.' : '';
       const alertWords = fc.alerts.length ? ' There’s also ' + article(fc.alerts[0]) + ' ' + fc.alerts[0].toLowerCase() + ' in effect there.' : '';
       const words = opener + nowWords + ' ' + periods.slice(0, 3).map(periodWords).join(' ') + alertWords;
@@ -2663,12 +2667,9 @@
         ].join('   ◆   ')
       });
       const area = local.area === 'NUS' ? 'national' : (/^S/.test(local.area) ? local.areaName : 'the ' + local.areaName) + '';
-      const opener = shot.request ? (shot.request.user || 'A viewer') + ' asked about gas prices around ' + cityWords(city) + '.' : pick([
-        'Let’s check gas prices.',
-        'Time for a gas price check.',
-        'Let’s see what it costs to fill up this week.',
-        'Here’s your weekly gas price update.'
-      ]);
+      const vars = { city: cityWords(city), name: shot.request?.user || 'A viewer' };
+      const opener = shot.request ? fillLine(brainLine('gasRequest', '{name} asked about gas prices around {city}.'), vars)
+        : fillLine(pick(brainLines('gas', ['Let’s check gas prices.', 'Time for a gas price check.'])), vars);
       const localWords = ' Around ' + cityWords(city) + ', ' + area + ' average for regular is ' + money(p.EPMR.price) + ' a gallon' + (p.EPMR.change != null ? ', ' + changeWords(p.EPMR.change) : '') + '.';
       const usWords = ' Nationally, regular is averaging ' + money(national.EPMR.price) + (national.EPD2D ? ', and diesel is ' + money(national.EPD2D.price) : '') + '.';
       const regionWords = cheap && high && cheap !== high ? ' The cheapest gas is in the ' + cheap.name + ' at ' + money(cheap.regular) + ', and ' + (high.name === 'California' ? 'California' : 'the ' + high.name) + ' is the highest at ' + money(high.regular) + '.' : '';
@@ -3103,7 +3104,7 @@
       const cold = sf.fronts.features.filter((x) => x.properties.type === 'COLD')
         .map((x) => ({ x, pts: x.geometry.coordinates.filter(([lon, lat]) => inConus({ lon, lat })) }))
         .filter((c) => c.pts.length >= 2).sort((a, b) => b.pts.length - a.pts.length)[0];
-      let text = pick(['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.']);
+      let text = pick(brainLines('surface', ['Here’s the national radar with the latest surface map.']));
       if (high) text += ' High pressure near ' + placeNear(high.lon, high.lat) + ', at ' + high.mb + ' millibars, is keeping things calm there.';
       if (low) text += ' The strongest low over the lower 48 is near ' + placeNear(low.lon, low.lat) + ', at ' + low.mb + ' millibars.';
       if (cold) {
@@ -3222,6 +3223,7 @@
       puterGate();
       loadMusicFiles();
       if (prevCtl.headlines !== S.control.headlines) { buildHeadlines(); S.hlIndex = 0; }
+      if (S.control.brainAt && prevCtl.brainAt !== S.control.brainAt && B.at) loadBrainCfg();
       if (prevRev >= 0 && prevRev !== S.control.rev && (prevCtl.pin !== S.control.pin || prevCtl.mode !== S.control.mode || prevCtl.state !== S.control.state)) {
         S.recent = [];
         buildHeadlines();
@@ -3273,10 +3275,12 @@
     // WeBot reads a viewer's chat message (filtered on the server): top bar first, then out loud, with a
     // short reply now and then. Not under BRB, during breaking alerts, or with tornado warnings out.
     const chatReply = (text) => {
-      if (/\b(hi|hello|hey|howdy|yo|sup|good (morning|evening|night|afternoon))\b/i.test(text)) return pick(['Hey there, thanks for hanging out!', 'Welcome in!', 'Howdy! Glad you’re here.']);
-      if (/\b(love|awesome|cool|great|nice|amazing|best)\b/i.test(text)) return pick(['Thank you, that means a lot!', 'Appreciate you!', 'Thanks! I’m having fun up here too.']);
-      if (/\?/.test(text) && /\b(rain|storm|snow|weather|forecast|tornado|hot|cold|temp)/i.test(text)) return 'For your town’s forecast, type exclamation forecast and your city in the chat.';
-      if (/\b(webot|yallbot)\b/i.test(text)) return pick(['That’s me!', 'Yep, WeBot here.']);
+      const r = B.brain?.chat?.replies || {};
+      const one = (list, d) => pick(list?.length ? list : [d]);
+      if (/\b(hi|hello|hey|howdy|yo|sup|good (morning|evening|night|afternoon))\b/i.test(text)) return one(r.greeting, 'Welcome in!');
+      if (/\b(love|awesome|cool|great|nice|amazing|best)\b/i.test(text)) return one(r.compliment, 'Thank you, that means a lot!');
+      if (/\?/.test(text) && /\b(rain|storm|snow|weather|forecast|tornado|hot|cold|temp)/i.test(text)) return one(r.weatherQuestion, 'For your town’s forecast, type exclamation forecast and your city in the chat.');
+      if (/\b(webot|yallbot)\b/i.test(text)) return one(r.name, 'That’s me!');
       return '';
     };
     const readChatMessage = (cmd) => {
@@ -3289,11 +3293,31 @@
     const scheduleChatJump = () => {
       clearTimeout(S.chatJump);
       if (!S.chatQueue?.length || !isCalm() || S.control.pin || S.control.brb) return;
-      const wait = Math.max(0, 15000 - (Date.now() - (S.shotStart || 0)), 2 * 60 * 1000 - (Date.now() - (S.chatAt || 0)));
+      const wait = Math.max(0, 15000 - (Date.now() - (S.shotStart || 0)), chatGapMs() - (Date.now() - (S.chatAt || 0)));
       S.chatJump = setTimeout(() => {
         if (!S.chatQueue?.length || S.inBreaking || S.shot?.request) return scheduleChatJump();
         nextShot();
       }, wait + 500);
+    };
+    /* ---------------- WeBot's brain (edited in WeBot Studio) ---------------- */
+    const brainLines = (key, fallback) => (B.brain?.lines?.[key]?.length ? B.brain.lines[key] : fallback);
+    const brainLine = (key, fallback) => B.brain?.lines?.[key] || fallback;
+    const fillLine = (tpl, vars) => String(tpl).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : m));
+    const chatGapMs = () => (Number.isFinite(B.brain?.chat?.requestEveryMinutes) ? B.brain.chat.requestEveryMinutes : 2) * 60 * 1000;
+    const applyBrain = () => {
+      const b = B.brain;
+      if (!b) return;
+      const tag = bot.querySelector('.tag');
+      if (tag) { tag.querySelector('b').textContent = b.identity?.name || 'WeBot'; tag.querySelector('small').textContent = b.identity?.tagline || ''; }
+      const swap = (list, next) => { if (Array.isArray(next) && next.length) list.splice(0, list.length, ...next); };
+      swap(COUNTRY_NAMES, b.radio?.countryNames);
+      swap(RADIO_NAMES.calm, b.radio?.calmNames);
+      swap(RADIO_NAMES.chill, b.radio?.chillNames);
+      swap(RADIO_NAMES.tense, b.radio?.stormNames);
+      if (M.radio && Number.isFinite(b.radio?.countryShare)) M.radio.countryShare = b.radio.countryShare;
+    };
+    const loadBrainCfg = async () => {
+      try { B.brain = await getJson('/api/v3/live/brain'); B.at = Date.now(); applyBrain(); } catch {}
     };
     const poll = (fn, ms) => { const run = () => fn().catch((e) => console.warn(e.message)).finally(() => setTimeout(run, ms)); setTimeout(run, ms); };
 
@@ -3352,6 +3376,8 @@
         $('boot').classList.add('done');
         nextShot();
       });
+      loadBrainCfg();
+      poll(loadBrainCfg, 60000);
       poll(loadAlerts, 20000);
       poll(loadLive, 6000);
       poll(loadRadar, 120000);

@@ -1,0 +1,251 @@
+@font-face { font-family: "WP Display"; src: url("/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 200 700; }
+@font-face { font-family: "WP Sans"; src: url("/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "WP Mono"; src: url("/assets/fonts/ibm-plex-mono-500-latin.woff2") format("woff2"); font-weight: 500; }
+@font-face { font-family: "WP Mono"; src: url("/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 600; }
+@font-face { font-family: "WP Mono"; src: url("/assets/fonts/ibm-plex-mono-700-latin.woff2") format("woff2"); font-weight: 700; }
+
+:root {
+  --bg: #06090f;
+  --rail: #090d16;
+  --panel: #0c111c;
+  --panel-2: #101727;
+  --inset: #070b13;
+  --line: #1b2436;
+  --line-2: #26314a;
+  --text: #dce3f0;
+  --dim: #8a96b0;
+  --faint: #56627c;
+  --cyan: #33d4ff;
+  --cyan-dim: rgba(51, 212, 255, .14);
+  --amber: #ffb020;
+  --red: #ff3b4a;
+  --green: #3ee08f;
+  --violet: #8b6cff;
+  --cut: 14px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 13.5px/1.45 "WP Sans", system-ui, sans-serif; display: grid; grid-template-columns: 212px 1fr; overflow: hidden;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+::selection { background: rgba(51, 212, 255, .3); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #1d2740; border: 2px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- left rail ---------- */
+.rail { background: var(--rail); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 14px; border-bottom: 1px solid var(--line); }
+.brand img { width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 0 8px rgba(51, 212, 255, .35)); }
+.brand b { display: block; font: 700 21px/1 "WP Display"; letter-spacing: .06em; }
+.brand span { display: block; margin-top: 3px; font: 600 10px/1 "WP Mono"; letter-spacing: .32em; color: var(--cyan); }
+.nav { padding: 10px 0; display: flex; flex-direction: column; gap: 1px; }
+.nav button { all: unset; cursor: pointer; display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 11px; padding: 9px 16px 9px 14px; border-left: 2px solid transparent;
+  color: var(--dim); font: 600 12px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; }
+.nav button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.nav button:hover { color: var(--text); background: rgba(255, 255, 255, .025); }
+.nav button.on { color: #fff; border-left-color: var(--cyan); background: linear-gradient(90deg, var(--cyan-dim), transparent 85%); }
+.nav button.on svg { stroke: var(--cyan); }
+.nav .badge { font: 600 10px/1 "WP Mono"; padding: 3px 5px; background: var(--amber); color: #120c00; letter-spacing: .04em; }
+.rail-foot { margin-top: auto; padding: 12px 16px 14px; border-top: 1px solid var(--line); font: 500 11px/1.6 "WP Mono"; color: var(--faint); }
+.rail-foot .row { display: flex; justify-content: space-between; gap: 8px; }
+.rail-foot b { color: var(--dim); font-weight: 600; }
+
+/* ---------- top status strip ---------- */
+main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
+.strip { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: var(--rail); min-height: 54px; }
+.strip > div { display: flex; flex-direction: column; justify-content: center; padding: 0 18px; border-right: 1px solid var(--line); min-width: 0; }
+.strip small { font: 600 9.5px/1 "WP Mono"; letter-spacing: .18em; color: var(--faint); text-transform: uppercase; }
+.strip strong { margin-top: 5px; font: 600 16px/1.1 "WP Display"; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .grow { flex: 1; }
+.onair { flex-direction: row !important; align-items: center; gap: 10px; }
+.onair i { width: 10px; height: 10px; background: var(--faint); }
+.onair.live i { background: var(--red); box-shadow: 0 0 0 0 rgba(255, 59, 74, .7); animation: pulse 1.8s infinite; }
+.onair.brb i { background: var(--amber); }
+.onair strong { margin: 0; font-size: 18px; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(255, 59, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 74, 0); } }
+.links { flex-direction: row !important; align-items: center; gap: 4px; border-right: 0 !important; }
+.links a { font: 600 11px/1 "WP Mono"; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 7px 9px; border: 1px solid var(--line-2); }
+.links a:hover { color: #fff; border-color: var(--cyan); text-decoration: none; }
+
+/* ---------- pages ---------- */
+.pages { overflow: auto; min-height: 0; }
+.page { display: none; padding: 18px 20px 40px; }
+.page.on { display: block; }
+.page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 14px; }
+.page-head h1 { margin: 0; font: 700 26px/1 "WP Display"; letter-spacing: .04em; text-transform: uppercase; }
+.page-head p { margin: 0; color: var(--dim); max-width: 760px; }
+.page-head .spacer { flex: 1; }
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.numgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 16px; }
+.numgrid input[type=number] { width: 140px; }
+.s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; }
+.s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+@media (max-width: 1250px) { .s3, .s4, .s5, .s6, .s7, .s8 { grid-column: span 12; } }
+
+/* Panels: the stream's look (cyan bracket top-left, cut corner bottom-right). */
+.panel { position: relative; background: var(--panel); border: 1px solid var(--line); padding: 14px 16px 16px;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%); }
+.panel::before { content: ""; position: absolute; left: -1px; top: -1px; width: 14px; height: 14px; border-left: 2px solid var(--cyan); border-top: 2px solid var(--cyan); }
+.panel > h2, .panel-title { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 600 11px/1 "WP Mono"; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+.panel > h2 .r, .panel-title .r { margin-left: auto; letter-spacing: .06em; color: var(--faint); font-weight: 500; text-transform: none; }
+
+/* ---------- small parts ---------- */
+.k { font: 600 10px/1 "WP Mono"; letter-spacing: .16em; color: var(--faint); text-transform: uppercase; }
+.big { font: 700 34px/1 "WP Display"; letter-spacing: .02em; text-transform: uppercase; }
+.mid { font: 600 19px/1.15 "WP Display"; letter-spacing: .02em; text-transform: uppercase; }
+.mono { font-family: "WP Mono"; }
+.dim { color: var(--dim); } .faint { color: var(--faint); }
+.ok { color: var(--green); } .warn { color: var(--amber); } .bad { color: var(--red); }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.stack { display: grid; gap: 10px; }
+.sep { height: 1px; background: var(--line); margin: 12px 0; }
+.bar { height: 4px; background: #182033; position: relative; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--cyan); transition: width .8s linear; }
+.meter { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; }
+.meter .bar { grid-column: 1 / -1; height: 6px; }
+.meter b { font: 600 13px/1 "WP Mono"; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; align-items: baseline; }
+.kv dt { font: 600 10px/1.4 "WP Mono"; letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.kv dd { margin: 0; font: 500 12.5px/1.4 "WP Mono"; color: var(--text); overflow-wrap: anywhere; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line-2); font: 600 10.5px/1 "WP Mono"; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.chip.c { border-color: rgba(51, 212, 255, .5); color: var(--cyan); }
+.chip.a { border-color: rgba(255, 176, 32, .55); color: var(--amber); }
+.chip.r { border-color: rgba(255, 59, 74, .55); color: var(--red); }
+.chip.g { border-color: rgba(62, 224, 143, .5); color: var(--green); }
+.dot { width: 8px; height: 8px; display: inline-block; background: var(--faint); }
+.dot.ok { background: var(--green); } .dot.warn { background: var(--amber); } .dot.bad { background: var(--red); }
+.empty { color: var(--faint); font-style: italic; }
+.quote { padding: 9px 12px; background: var(--inset); border-left: 2px solid var(--violet); color: #c9d2e6; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.list time { font: 500 11.5px/1.5 "WP Mono"; color: var(--faint); }
+.tallies { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tallies div { padding: 8px 6px; background: var(--inset); border-top: 3px solid var(--c); text-align: center; }
+.tallies b { display: block; font: 700 24px/1 "WP Display"; }
+.tallies small { font: 600 9px/1 "WP Mono"; letter-spacing: .14em; color: var(--dim); }
+.warnings li { grid-template-columns: 4px 1fr auto; align-items: center; }
+.warnings li i { align-self: stretch; background: var(--c); }
+.snap { width: 100%; aspect-ratio: 16 / 9; background: var(--inset) center / contain no-repeat; border: 1px solid var(--line); display: grid; place-items: center; color: var(--faint); font: 500 12px "WP Mono"; }
+
+/* ---------- controls ---------- */
+.btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--line-2); background: var(--panel-2);
+  font: 600 11.5px/1 "WP Mono"; letter-spacing: .1em; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.btn:hover { border-color: var(--cyan); color: #fff; }
+.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.btn.primary { background: var(--cyan); border-color: var(--cyan); color: #04121a; }
+.btn.primary:hover { background: #6fe2ff; }
+.btn.danger { border-color: rgba(255, 59, 74, .55); color: #ff8b94; }
+.btn.danger:hover { background: rgba(255, 59, 74, .12); border-color: var(--red); color: #fff; }
+.btn.warn { border-color: rgba(255, 176, 32, .55); color: var(--amber); }
+.btn[disabled] { opacity: .45; pointer-events: none; }
+.btn.sm { padding: 5px 8px; font-size: 10.5px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); }
+.seg button { all: unset; cursor: pointer; padding: 7px 11px; font: 600 11px/1 "WP Mono"; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border-left: 1px solid var(--line-2); }
+.seg button:first-child { border-left: 0; }
+.seg button:hover { color: #fff; }
+.seg button[aria-pressed="true"] { background: var(--cyan-dim); color: var(--cyan); }
+.field { display: grid; gap: 5px; }
+.field > label, .field > .k { font: 600 10px/1.2 "WP Mono"; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.field .help { color: var(--faint); font-size: 12px; }
+input[type=text], input[type=number], input[type=password], select, textarea {
+  width: 100%; background: var(--inset); border: 1px solid var(--line-2); padding: 8px 10px; color: var(--text); outline: none; border-radius: 0; }
+input:focus, select:focus, textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset; }
+textarea { font: 500 12.5px/1.55 "WP Mono"; resize: vertical; min-height: 84px; }
+input[type=number] { font-family: "WP Mono"; }
+input[type=range] { width: 100%; accent-color: var(--cyan); }
+.toggle { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; font: 600 11.5px/1 "WP Mono"; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.toggle input { appearance: none; width: 32px; height: 16px; background: #1a2338; border: 1px solid var(--line-2); position: relative; cursor: pointer; margin: 0; }
+.toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; background: var(--faint); transition: left .15s; }
+.toggle input:checked { background: var(--cyan-dim); border-color: var(--cyan); }
+.toggle input:checked::after { left: 18px; background: var(--cyan); }
+
+/* ---------- brain editor ---------- */
+.brain { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
+.subnav { position: sticky; top: 0; display: grid; gap: 1px; }
+.subnav button { all: unset; cursor: pointer; padding: 9px 12px; font: 600 11.5px/1 "WP Mono"; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); border-left: 2px solid var(--line); }
+.subnav button:hover { color: #fff; }
+.subnav button.on { color: var(--cyan); border-left-color: var(--cyan); background: var(--cyan-dim); }
+.form-section { display: none; }
+.form-section.on { display: grid; gap: 12px; }
+.seg-table { width: 100%; border-collapse: collapse; }
+.seg-table th { text-align: left; font: 600 10px/1 "WP Mono"; letter-spacing: .14em; color: var(--faint); text-transform: uppercase; padding: 0 10px 8px 0; }
+.seg-table td { padding: 7px 10px 7px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+.seg-table td:first-child b { display: block; font: 600 15px/1.1 "WP Display"; text-transform: uppercase; letter-spacing: .03em; }
+.seg-table td:first-child small { color: var(--faint); font-size: 11.5px; }
+.seg-table .w { display: grid; grid-template-columns: 1fr 64px; gap: 10px; align-items: center; min-width: 220px; }
+.seg-table input[type=number] { width: 84px; }
+.savebar { position: sticky; bottom: -40px; margin: 14px -20px -40px; padding: 12px 20px; background: rgba(9, 13, 22, .96); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.savebar .state { font: 600 11px/1 "WP Mono"; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.savebar.dirty .state { color: var(--amber); }
+
+/* ---------- env table ---------- */
+.env { width: 100%; border-collapse: collapse; }
+.env td { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+.env td:first-child { font: 600 12px/1 "WP Mono"; color: var(--dim); width: 34%; white-space: nowrap; }
+.env input { padding: 6px 8px; }
+.env tr.changed td:first-child { color: var(--amber); }
+.presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.preset { all: unset; cursor: pointer; padding: 11px 12px; border: 1px solid var(--line-2); background: var(--panel-2); display: grid; gap: 4px; }
+.preset b { font: 600 16px/1 "WP Display"; text-transform: uppercase; letter-spacing: .03em; }
+.preset span { font: 500 11.5px/1.35 "WP Mono"; color: var(--dim); }
+.preset:hover { border-color: var(--cyan); }
+.preset.cur { border-color: var(--cyan); background: var(--cyan-dim); }
+.preset.risky b::after { content: "  · NEEDS 8 CORES"; font: 600 9.5px "WP Mono"; color: var(--amber); letter-spacing: .1em; }
+.banner { display: none; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border: 1px solid rgba(255, 176, 32, .5); background: rgba(255, 176, 32, .08); color: var(--amber); font: 600 12px/1.4 "WP Mono"; }
+.banner.on { display: flex; }
+.banner .btn { margin-left: auto; }
+
+/* ---------- code ---------- */
+.code { display: grid; grid-template-columns: 270px minmax(0, 1fr); height: calc(100vh - 54px - 18px - 58px); min-height: 420px; border: 1px solid var(--line); background: var(--panel); }
+.files { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.files .tools { padding: 8px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.tree { overflow: auto; flex: 1; padding: 4px 0 12px; }
+.tree .dir { padding: 9px 12px 4px; font: 600 10px/1 "WP Mono"; letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.tree button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 7px; width: calc(100% - 24px); padding: 4px 12px; font: 500 12px/1.45 "WP Mono"; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree button:hover { color: #fff; background: rgba(255, 255, 255, .03); }
+.tree button.on { color: #fff; background: var(--cyan-dim); box-shadow: inset 2px 0 var(--cyan); }
+.tree button em { margin-left: auto; font-style: normal; font-weight: 700; font-size: 10px; color: var(--amber); }
+.editor { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; min-height: 0; }
+.editor .tools { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.editor .tools .path { font: 600 12.5px/1 "WP Mono"; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editor .host { min-height: 0; position: relative; }
+.editor .note { padding: 7px 10px; border-top: 1px solid var(--line); font: 500 11.5px/1.4 "WP Mono"; color: var(--faint); white-space: pre-wrap; }
+.editor .note.bad { color: #ff8b94; }
+.CodeMirror { height: 100% !important; position: absolute !important; inset: 0; background: var(--inset) !important; color: #d7deeb !important; font: 500 13px/1.55 "WP Mono" !important; }
+.CodeMirror-gutters { background: var(--inset) !important; border-right: 1px solid var(--line) !important; }
+.CodeMirror-linenumber { color: #3b4763 !important; }
+.CodeMirror-cursor { border-left: 2px solid var(--cyan) !important; }
+.CodeMirror-selected, .CodeMirror-focused .CodeMirror-selected { background: rgba(51, 212, 255, .18) !important; }
+.CodeMirror-activeline-background { background: rgba(255, 255, 255, .025) !important; }
+.CodeMirror-matchingbracket { color: var(--amber) !important; text-decoration: underline; }
+.cm-keyword { color: #c792ff !important; } .cm-def { color: #6fe2ff !important; } .cm-variable-2 { color: #9fc3ff !important; }
+.cm-string, .cm-string-2 { color: #9be38a !important; } .cm-number { color: #ffb86b !important; } .cm-comment { color: #55617d !important; font-style: italic; }
+.cm-property { color: #8fb7ff !important; } .cm-atom { color: #ff9b8a !important; } .cm-tag { color: #ff7a8a !important; } .cm-attribute { color: #ffc35e !important; }
+.cm-operator { color: #8ca3c7 !important; } .cm-qualifier, .cm-builtin { color: #6fe2ff !important; }
+
+/* ---------- logs ---------- */
+.logbox { height: calc(100vh - 54px - 18px - 110px); min-height: 360px; overflow: auto; background: var(--inset); border: 1px solid var(--line); padding: 10px 0; font: 500 12px/1.55 "WP Mono"; }
+.logbox div { padding: 0 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.logbox div:hover { background: rgba(255, 255, 255, .025); }
+.logbox time { color: #3d4966; margin-right: 10px; }
+.logbox .err { color: #ff8b94; } .logbox .chat { color: #c3a8ff; } .logbox .str { color: var(--green); }
+
+/* ---------- modal + toast ---------- */
+.modal { position: fixed; inset: 0; background: rgba(2, 4, 8, .72); display: none; place-items: center; z-index: 50; }
+.modal.on { display: grid; }
+.modal .panel { width: min(720px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; }
+.modal pre { margin: 0; max-height: 46vh; overflow: auto; background: var(--inset); border: 1px solid var(--line); padding: 10px 12px; font: 500 12px/1.55 "WP Mono"; white-space: pre-wrap; }
+.toast { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: grid; gap: 8px; }
+.toast div { padding: 10px 14px; background: var(--panel-2); border: 1px solid var(--line-2); border-left: 3px solid var(--cyan); font: 600 12px/1.4 "WP Mono"; max-width: 420px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); animation: tin .2s ease-out; }
+.toast div.bad { border-left-color: var(--red); }
+.toast div.warn { border-left-color: var(--amber); }
+@keyframes tin { from { transform: translateY(8px); opacity: 0; } }
+.help-doc { max-width: 860px; }
+.help-doc h3 { margin: 18px 0 6px; font: 600 16px/1.2 "WP Display"; letter-spacing: .04em; text-transform: uppercase; }
+.help-doc p, .help-doc li { color: #c3cbdc; }
+.help-doc code { font: 600 12px "WP Mono"; background: var(--inset); padding: 1px 5px; color: var(--cyan); }

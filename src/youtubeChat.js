@@ -8,14 +8,14 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { STATE_NAMES } from './broadcast.js';
 import { applyLiveCommand, liveControl } from './live.js';
+import { loadBrain } from './brain.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const KEY = () => process.env.YOUTUBE_API_KEY || '';
 const DAILY_BUDGET = Number(process.env.YOUTUBE_DAILY_UNITS || 9000);
 const BASE_MS = 60 * 1000;
 const ACTIVE_MS = 30 * 1000;
-const USER_COOLDOWN_MS = 10 * 60 * 1000;
-const MAX_PER_20_MIN = 6;
+
 
 /* ---------------- places (U.S. Census Gazetteer, bundled) ---------------- */
 let gaz = null;
@@ -85,7 +85,7 @@ export const safeName = (name) => {
 
 // A chat message WeBot may read out loud, or '' when it shouldn't be (bad words, links, phone numbers,
 // emoji-only, spam, too long). YouTube's own chat filter runs first; this is a second, stricter one.
-export const readableChat = (raw) => {
+export const readableChat = (raw, extraBlocked = []) => {
   let t = String(raw || '')
     .replace(/:[a-z0-9_-]+:/gi, ' ')
     .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}‍️]/gu, ' ')
@@ -96,14 +96,15 @@ export const readableChat = (raw) => {
   if (/(https?:|www\.|\.(com|net|org|gg|io|ly|tv|xyz|me|co|us|info|live)\b|@[\w.-]+\.\w+)/i.test(t)) return '';
   if (/\d{3}[\s.()-]*\d{3}[\s.-]*\d{4}/.test(t) || /\d{6,}/.test(t)) return '';
   if (blockedText(t)) return '';
+  const lower = t.toLowerCase();
+  if (extraBlocked.some((w) => w && lower.includes(String(w).toLowerCase()))) return '';
   if (!/[a-z]{2,}/i.test(t)) return '';
   if (t.split(' ').length < 2 && t.length < 8) return '';
   // Shouting is fine to read, but not as a wall of capitals.
   if (t.length > 20 && t === t.toUpperCase()) t = t.charAt(0) + t.slice(1).toLowerCase();
   return t;
 };
-const READ_GAP_MS = Number(process.env.CHAT_READ_GAP_SEC || 75) * 1000;
-const READ_USER_GAP_MS = 5 * 60 * 1000;
+// Timing and limits come from WeBot's brain (WeBot Studio → Brain → Chat).
 
 /* ---------------- chat reader ---------------- */
 const state = {
@@ -175,13 +176,14 @@ const findLive = async () => {
 // each viewer at most every 5 minutes. Live Control can turn this off.
 const readOne = async (messages) => {
   const now = Date.now();
-  if (!messages.length || now - state.lastReadAt < READ_GAP_MS) return;
+  const { chat } = await loadBrain();
+  if (!messages.length || !chat.readAloud || now - state.lastReadAt < chat.readEverySeconds * 1000) return;
   for (const message of [...messages].reverse()) {
     if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) continue;
     const author = message.authorDetails || {};
     const userKey = author.channelId || author.displayName;
-    if (now - (state.readUsers.get(userKey) || 0) < READ_USER_GAP_MS) continue;
-    const text = readableChat(message.snippet?.displayMessage);
+    if (now - (state.readUsers.get(userKey) || 0) < chat.sameViewerMinutes * 60 * 1000) continue;
+    const text = readableChat(message.snippet?.displayMessage, chat.blockedWords);
     if (!text) continue;
     const control = await liveControl().catch(() => null);
     if (!control || control.chatRead === false) return;
@@ -204,12 +206,13 @@ const handle = async (message) => {
   const userKey = author.channelId || author.displayName;
   const now = Date.now();
   state.activeUntil = now + 5 * 60 * 1000;
-  if (!m[2]) return;
-  if (!(author.isChatOwner || author.isChatModerator) && now - (state.users.get(userKey) || 0) < USER_COOLDOWN_MS) return;
+  if (!m[2]) return true;
+  const { chat } = await loadBrain();
+  if (!(author.isChatOwner || author.isChatModerator) && now - (state.users.get(userKey) || 0) < chat.commandCooldownMinutes * 60 * 1000) return true;
   state.recent = state.recent.filter((t) => now - t < 20 * 60 * 1000);
-  if (state.recent.length >= MAX_PER_20_MIN) return;
+  if (state.recent.length >= chat.maxRequestsPer20Minutes) return true;
   const place = findPlace(m[2]);
-  if (!place) return;
+  if (!place) return true;
   state.users.set(userKey, now);
   state.recent.push(now);
   state.lastCommandAt = new Date().toISOString();
