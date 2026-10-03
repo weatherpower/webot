@@ -263,7 +263,7 @@ let tvBeat = null;
 export const noteStreamBeat = (query = {}) => {
   const clip = (value, max) => String(value || '').replace(/[\u0000-\u001f]/g, '').slice(0, max);
   if (query.tv) {
-    tvBeat = { at: new Date().toISOString(), screen: clip(query.scr, 500) };
+    tvBeat = { at: new Date().toISOString(), screen: clip(query.scr, 1200) };
     return;
   }
   if (!query.np && !query.tts) return;

@@ -211,6 +211,7 @@
     .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
     body.tv, body.tv * { cursor: none !important; }
+    body.tv .bot .rig img, body.tv .bot .eye { filter: none !important; }
     .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
     .boot.done { opacity: 0; pointer-events: none; }
   </style>
@@ -468,7 +469,11 @@
       return 'inner ' + innerWidth + 'x' + innerHeight + ' · client ' + de.clientWidth + 'x' + de.clientHeight
         + (vv ? ' · visual ' + r(vv.width) + 'x' + r(vv.height) + ' zoom ' + r(vv.scale) + ' at ' + r(vv.offsetLeft) + ',' + r(vv.offsetTop) : ' · no visualViewport')
         + ' · screen ' + screen.width + 'x' + screen.height + ' · dpr ' + r(devicePixelRatio) + ' · full ' + Boolean(document.fullscreenElement || document.webkitFullscreenElement)
-        + ' · fit ' + ($('stage').style.transform || '') + ' · ' + navigator.userAgent;
+        + ' · fit ' + ($('stage').style.transform || '') + ' · map px ' + r(S.map?.getPixelRatio?.() || 0)
+        + ' · audio ' + (actx ? actx.state + ' ' + actx.sampleRate + 'Hz' : 'none') + ' presses ' + audioLog.presses + (audioLog.events ? ' (' + audioLog.events + ')' : '')
+        + ' element ' + (audioLog.elOk ? 'ok' : 'no') + (audioLog.err ? ' err ' + audioLog.err : '')
+        + ' · music ' + (M.mode || 'off') + ' · voice ' + (voiceOn() ? ttsLabel() : 'off') + ' talk ' + talkMode() + ' spoke ' + (speech.played || 0)
+        + ' · ' + navigator.userAgent;
     };
     const fit = () => {
       const m = tvSafe() / 100;
@@ -478,6 +483,8 @@
       const s = Math.min(w / 1920, h / 1080);
       $('stage').style.transform = 'translate(' + Math.round(a.x + (a.w - 1920 * s) / 2) + 'px,' + Math.round(a.y + (a.h - 1080 * s) / 2) + 'px) scale(' + s + ')';
       S.fitKey = a.w + 'x' + a.h + '+' + a.x + ',' + a.y + '@' + tvSafe();
+      S.stageScale = s;
+      if (S.map && S.map.getPixelRatio && Math.abs(S.map.getPixelRatio() - mapPixelRatio()) > 0.01) S.map.setPixelRatio(mapPixelRatio());
       // The sound / sign-in reminders sit outside the stage; keep them centered in what's on screen.
       [['gate', 18], ['puter-gate', 72]].forEach(([id, top]) => {
         const el = $(id);
@@ -486,6 +493,12 @@
         el.style.top = Math.round(a.y + a.h * (tvSafe() / 100) + top) + 'px';
       });
     };
+    // The map is drawn at 1920x1080 and shrunk to fit. A TV box (960x540 at 2x) would otherwise draw it at
+    // 3840x2160; on a TV it is drawn only as sharp as the screen shows it, which is most of the lag.
+    const mapPixelRatio = () => {
+      const dpr = window.devicePixelRatio || 1;
+      return OPT.tv ? Math.min(1, Math.max(0.5, dpr * (S.stageScale || 1))) : dpr;
+    };
     const fitKeyNow = () => { const a = viewArea(); return a.w + 'x' + a.h + '+' + a.x + ',' + a.y + '@' + tvSafe(); };
     addEventListener('resize', fit);
     window.visualViewport?.addEventListener('resize', fit);
@@ -493,13 +506,16 @@
     fit();
     if (OPT.tv) {
       document.body.classList.add('tv');
-      // Fill the screen (hide the TV browser's address bar) on the first remote button press.
-      const full = () => {
-        const el = document.documentElement;
-        if (document.fullscreenElement || document.webkitFullscreenElement) return;
-        (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
-      };
-      ['pointerdown', 'keydown'].forEach((type) => addEventListener(type, full));
+      // Android TV only turns the OK button into a real click when a button has focus, and a WebView only
+      // lets sound start from a real click. So an invisible full-screen button holds focus until sound runs.
+      const tap = document.createElement('button');
+      tap.id = 'tvtap';
+      tap.setAttribute('aria-label', 'Start sound');
+      tap.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;opacity:0;border:0;padding:0;margin:0;background:none;z-index:99;outline:none';
+      document.body.appendChild(tap);
+      const keepFocus = () => { if (tap.isConnected && document.activeElement !== tap) tap.focus({ preventScroll: true }); };
+      keepFocus();
+      S.tvTap = { tap, keepFocus, timer: setInterval(keepFocus, 1500) };
     }
 
     const tickClock = () => {
@@ -792,6 +808,7 @@
           source.onended = done;
           bot.classList.add('talk');
           source.start();
+          speech.played = (speech.played || 0) + 1;
           speech.guard = setTimeout(done, buffer.duration * 1000 + 2000);
           return;
         } catch (error) {
@@ -837,11 +854,50 @@
     const checkAudio = () => {
       const blocked = actx && actx.state !== 'running';
       gate.hidden = !(blocked && (OPT.sound || OPT.voice));
+      // TV: the invisible OK-button target goes away once a real click has started the sound.
+      if (!blocked && S.tvTap && audioLog.clicks) {
+        clearInterval(S.tvTap.timer);
+        S.tvTap.tap.remove();
+        S.tvTap = null;
+      }
     };
     // Sound starts on its own: OBS lets it play right away, and a browser starts it the moment anything
     // is clicked or pressed (or straight away if the site is allowed to play sound). No announcement.
-    const startAudio = () => actx?.resume?.().then(checkAudio).catch(() => {});
-    ['pointerdown', 'keydown', 'touchstart'].forEach((type) => addEventListener(type, startAudio, { passive: true }));
+    // Android TV boxes run pages in a WebView that is strict about sound: besides resume(), a short silent
+    // sound has to start inside the remote press itself, for both Web Audio and a regular audio element.
+    const audioLog = { presses: 0, events: '', err: '' };
+    const SILENT_WAV = 'data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    const unlockAudio = (event) => {
+      if (event?.type) {
+        audioLog.presses += 1;
+        if (event.type === 'click') audioLog.clicks = (audioLog.clicks || 0) + 1;
+        if (!audioLog.events.includes(event.type)) audioLog.events = (audioLog.events + ' ' + event.type).trim();
+      }
+      if (!actx) return;
+      try {
+        const src = actx.createBufferSource();
+        src.buffer = actx.createBuffer(1, 1, 22050);
+        src.connect(actx.destination);
+        src.start(0);
+      } catch (error) { audioLog.err = 'buffer: ' + error.message; }
+      // Every press tries again until one counts (on a TV only the click from OK does).
+      if (event?.type && !audioLog.elOk) {
+        try {
+          new Audio(SILENT_WAV).play().then(() => { audioLog.elOk = true; audioLog.err = ''; }).catch((error) => { if (!audioLog.elOk) audioLog.err = 'element (' + event.type + '): ' + error.message; });
+        } catch {}
+      }
+      actx.resume?.().then(checkAudio).catch((error) => { audioLog.err = 'resume: ' + error.message; });
+      // TV: full screen (hides the TV browser's address bar) only AFTER the sound calls above, because
+      // asking for full screen uses up the remote press and the sound would be refused.
+      if (OPT.tv && event?.type && !['keyup', 'pointerup', 'touchend'].includes(event.type)) {
+        const el = document.documentElement;
+        if (!(document.fullscreenElement || document.webkitFullscreenElement)) {
+          try { (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {}); } catch {}
+        }
+      }
+    };
+    const startAudio = unlockAudio;
+    ['pointerdown', 'pointerup', 'keydown', 'keyup', 'click', 'touchstart', 'touchend'].forEach((type) => addEventListener(type, unlockAudio, { passive: true }));
     gate.addEventListener('click', startAudio);
     startAudio();
     const audioRetry = setInterval(() => { if (!actx || actx.state === 'running') { clearInterval(audioRetry); checkAudio(); } else startAudio(); }, 2000);
@@ -1319,7 +1375,7 @@
       clearLocal();
       S.localKey = site.id;
       let body;
-      try { body = await getJson('/api/v3/live/radar?site=' + encodeURIComponent(site.id)); } catch { body = null; }
+      try { body = lite(await getJson('/api/v3/live/radar?site=' + encodeURIComponent(site.id))); } catch { body = null; }
       if (S.localKey !== site.id || !body || !body.reflectivity.length) return;
       body.reflectivity.forEach((f, i) => {
         S.map.addSource('lr' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256, maxzoom: 11 });
@@ -1343,6 +1399,8 @@
       renderRadarPanel();
     };
 
+    // A TV box keeps the last 6 radar frames instead of 12: each frame is a whole map layer with its own tiles.
+    const lite = (r) => (r && OPT.tv && Array.isArray(r.reflectivity) ? { ...r, reflectivity: r.reflectivity.slice(-6) } : r);
     /* radar loop: both the national composite and the local site loop step together */
     const HOLD = 4;
     const frameAt = (n) => (n ? Math.min(n - 1, S.step % (n + HOLD)) : 0);
@@ -1975,7 +2033,7 @@
       S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : 3600, maxZoom: 9.4, essential: true, ...opts });
       const shot = S.shot;
       S.map.once('moveend', () => {
-        if (S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
+        if (OPT.tv || S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
         S.map.easeTo({ zoom: S.map.getZoom() + 0.3, duration: Math.max(2000, S.shotDur - (Date.now() - S.shotStart) - 600), easing: (t) => t, essential: true });
       });
     };
@@ -2735,8 +2793,8 @@
       const radar = await getJson('/api/v3/radar');
       if (S.radar && S.radar.validAt === radar.validAt) return;
       const first = !S.radar;
-      S.radar = radar;
-      if (!first && S.styleReady) radar.reflectivity.forEach((f, i) => S.map.getSource('rf' + i)?.setTiles?.([f.tiles]));
+      S.radar = lite(radar);
+      if (!first && S.styleReady) S.radar.reflectivity.forEach((f, i) => S.map.getSource('rf' + i)?.setTiles?.([f.tiles]));
     };
     const poll = (fn, ms) => { const run = () => fn().catch((e) => console.warn(e.message)).finally(() => setTimeout(run, ms)); setTimeout(run, ms); };
 
@@ -2776,7 +2834,7 @@
         getJson('/api/v3/radar').catch(() => null),
         getJson('/api/v3/nexrad').catch(() => ({ sites: [] }))
       ]);
-      S.radar = radar;
+      S.radar = lite(radar);
       S.sites = sites.sites || [];
       S.home = config.home || null;
       S.soundings = Boolean(config.soundings);
@@ -2784,7 +2842,7 @@
       await Promise.all([loadAlerts(), loadLive()]).catch((e) => console.warn(e.message));
       S.map = new maplibregl.Map({
         container: 'map', style: config.darkStyleUrl, center: [-96, 38.6], zoom: 4.1,
-        interactive: false, attributionControl: false, fadeDuration: 0
+        interactive: false, attributionControl: false, fadeDuration: 0, pixelRatio: mapPixelRatio()
       });
       S.map.once('style.load', () => {
         installLayers();
