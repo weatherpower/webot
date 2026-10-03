@@ -193,7 +193,7 @@
 
       <section class="box">
         <h2>Look</h2>
-        <p class="note" style="margin-top:0">Colors of the top and bottom bars. <b>Auto</b> matches the weather: red for tornadoes, storm red for severe storms, green for flooding, teal for hurricanes, icy blue for winter, orange for heat, violet when it's quiet.</p>
+        <p class="note" style="margin-top:0">Colors of the top and bottom bars. <b>Auto</b> matches the weather: red for tornadoes, storm red for severe storms, green for flooding, teal for hurricanes, icy blue for winter, orange for heat, violet when it's quiet, and starry After Dark on quiet nights (8 PM to 6 AM).</p>
         <div class="themes" id="themes"></div>
         <p class="status" id="theme-line" style="margin:10px 0 0"></p>
         <h3 style="margin:18px 0 6px;font-size:15px">TV</h3>
@@ -206,7 +206,7 @@
         <h2>Top bar headlines</h2>
         <p class="note" style="margin-top:0">What scrolls through the bar at the top of the stream. Tornado, severe thunderstorm and flash flood warnings always break in.</p>
         <div class="row"><div class="seg" id="hl-mode">
-          <button data-v="mix">Weather + news</button><button data-v="weather">Weather news</button><button data-v="alerts">Warnings</button>
+          <button data-v="alertsweather">Warnings + weather news</button><button data-v="mix">Weather + news</button><button data-v="weather">Weather news</button><button data-v="alerts">Warnings</button>
         </div></div>
       </section>
 
@@ -392,7 +392,7 @@
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
         : 'The stream page hasn’t checked in for a minute. Open it in OBS or click "Open stream".';
-      document.querySelectorAll('#hl-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.headlines || 'mix'))));
+      document.querySelectorAll('#hl-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.headlines || 'alertsweather'))));
       $('brb-line').innerHTML = control.brb ? '<b style="color:#ffd34d">BRB IS ON AIR</b> since ' + esc(new Date(control.brb.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + (control.brb.message ? ': ' + esc(control.brb.message) : '') : 'Off: the show is running.';
       $('banner-line').innerHTML = control.banner ? 'SHOWING UNTIL <b>' + esc(new Date(control.banner.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '</b>: ' + esc(control.banner.text) : 'No banner message.';
       renderAlerts();
@@ -442,6 +442,7 @@
       ['heat', 'Heat', 'linear-gradient(#ff8a2a, #e0631a)'],
       ['tropical', 'Tropical', 'linear-gradient(#14b8a6, #0e8f82)'],
       ['night', 'Night', 'linear-gradient(#2a3550, #1d2740)'],
+      ['afterdark', 'After Dark', 'radial-gradient(circle at 30% 30%, #fff 0 1px, transparent 2px), radial-gradient(circle at 70% 62%, #fff 0 1px, transparent 2px), linear-gradient(#151c42, #0a0f2a)'],
       ['fall', 'Halloween', 'linear-gradient(135deg, #ff7a1a 50%, #4a2378 50%)']
     ];
     $('themes').innerHTML = THEME_LIST.map(([key, label, sw]) => '<button data-theme="' + key + '" style="--sw:' + sw + '"><i></i>' + esc(label) + '</button>').join('');
@@ -632,7 +633,7 @@
     $('sound').addEventListener('click', () => act({ action: 'sound', on: control?.sound === false }));
     $('hl-mode').addEventListener('click', (e) => {
       const v = e.target.closest('button')?.dataset.v;
-      if (v) act({ action: 'headlines', mode: v }, v === 'mix' ? 'Top bar: weather + news headlines' : v === 'weather' ? 'Top bar: weather news only' : 'Top bar: warnings');
+      if (v) act({ action: 'headlines', mode: v }, v === 'alertsweather' ? 'Top bar: warnings + weather news' : v === 'mix' ? 'Top bar: weather + news headlines' : v === 'weather' ? 'Top bar: weather news only' : 'Top bar: warnings');
     });
     $('brb-on').addEventListener('click', () => act({ action: 'brb', on: true, message: $('brb-msg').value }, 'BRB card is up'));
     $('brb-off').addEventListener('click', () => act({ action: 'brb', on: false }, 'BRB ended, back to the show'));

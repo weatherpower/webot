@@ -40,11 +40,27 @@
     .hl .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); font-family: "WP Display"; font-weight: 700; font-size: 40px; letter-spacing: .01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; transition: transform .45s ease, opacity .3s; }
     .hl .txt.enter { transform: translateY(30%); opacity: 0; }
     .hl .txt.leave { transform: translateY(-130%); opacity: 0; }
-    .wpi { flex: none; width: 360px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--violet-deep); border-left: 2px solid rgba(255,255,255,.12); transition: background-color 1.2s; }
+    .wpi { flex: none; width: 214px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--violet-deep); border-left: 2px solid rgba(255,255,255,.12); transition: background-color 1.2s; }
     .wpi .meta { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: #9fb3e6; display: flex; gap: 8px; }
-    .wpi .v { font-family: "WP Display"; font-size: 38px; font-weight: 700; line-height: 1; color: var(--wc, #4fb4ff); }
+    .wpi .v { font-family: "WP Display"; font-size: 34px; font-weight: 700; line-height: 1; color: var(--wc, #4fb4ff); }
     .wpi .lab { font-family: "WP Mono"; font-size: 11px; letter-spacing: .3em; color: var(--wc, #4fb4ff); }
-    .wpi canvas { width: 176px; height: 56px; margin-left: auto; }
+    .wpi canvas { width: 88px; height: 46px; margin-left: auto; }
+    /* After dark: a starry night look for the bars (Live Control theme, or Auto at night when it's quiet). */
+    .top > *, .bottom > * { position: relative; z-index: 1; }
+    .top::before, .bottom::before, .top::after, .bottom::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1.5s; }
+    .top::before, .bottom::before { background-image:
+        radial-gradient(1.4px 1.4px at 23px 17px, #fff 60%, transparent 65%), radial-gradient(1px 1px at 87px 52px, #dfe8ff 60%, transparent 65%),
+        radial-gradient(1.6px 1.6px at 151px 29px, #fff 60%, transparent 65%), radial-gradient(1px 1px at 213px 66px, #cfe0ff 60%, transparent 65%),
+        radial-gradient(1.2px 1.2px at 268px 12px, #fff 60%, transparent 65%);
+      background-size: 311px 80px; }
+    .top::after, .bottom::after { background-image:
+        radial-gradient(1.8px 1.8px at 41px 61px, #fff8d8 60%, transparent 65%), radial-gradient(1.1px 1.1px at 122px 23px, #fff 60%, transparent 65%),
+        radial-gradient(1.3px 1.3px at 179px 47px, #e6eeff 60%, transparent 65%);
+      background-size: 197px 80px; }
+    body.stars .top::before, body.stars .bottom::before { opacity: .85; }
+    body.stars .top::after, body.stars .bottom::after { opacity: .9; animation: twinkle 6s steps(6) infinite alternate; }
+    body.stars.lite .top::after, body.stars.lite .bottom::after { animation: none; opacity: .7; }
+    @keyframes twinkle { 0% { opacity: .9; } 50% { opacity: .25; } 100% { opacity: .75; } }
 
     /* ---------- panels: dark navy, thin edge, cyan bracket top-left, cut corner bottom-right ---------- */
     .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); z-index: 10;
@@ -248,7 +264,7 @@
           <div class="v" id="wpi-v">—</div>
           <div class="lab" id="wpi-l">LOADING</div>
         </div>
-        <canvas id="spark" width="352" height="116"></canvas>
+        <canvas id="spark" width="176" height="92"></canvas>
       </div>
     </header>
 
@@ -1579,7 +1595,7 @@
       ctx.beginPath();
       pts.forEach((p, i) => (i ? ctx.lineTo(x(i), y(p[1])) : ctx.moveTo(x(i), y(p[1]))));
       ctx.strokeStyle = color;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3;
       ctx.lineJoin = 'round';
       ctx.stroke();
       ctx.lineTo(x(pts.length - 1), canvas.height);
@@ -1590,7 +1606,7 @@
       ctx.fillStyle = grad;
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(x(pts.length - 1), y(pts[pts.length - 1][1]), 6, 0, Math.PI * 2);
+      ctx.arc(x(pts.length - 1), y(pts[pts.length - 1][1]), 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#fff';
       ctx.fill();
     };
@@ -1605,6 +1621,7 @@
       heat: { a: '#ff8a2a', b: '#e0631a', dark: '#9e3f10', deep: '#4f2008' },
       tropical: { a: '#14b8a6', b: '#0e8f82', dark: '#0a5f57', deep: '#06332f' },
       night: { a: '#2a3550', b: '#1d2740', dark: '#121a2c', deep: '#0b1120' },
+      afterdark: { a: '#151c42', b: '#0a0f2a', dark: '#070b1f', deep: '#04071a', stars: true },
       fall: { a: '#ff7a1a', b: '#d9520b', dark: '#4a2378', deep: '#261040' }
     };
     // Auto: the bars follow what's happening, most dangerous first. Quiet days keep the WeatherPower violet.
@@ -1617,6 +1634,9 @@
       if (count(/^(hurricane|tropical storm|storm surge) (warning|watch)$/i)) return 'tropical';
       if ((t.svr || 0) >= 3 || level === 'active') return 'storm';
       if ((t.ffw || 0) >= 3 || count(/flash flood emergency/i)) return 'flood';
+      // Nights (8 PM to 6 AM on the stream's clock) go after dark unless something dangerous is going on.
+      const hour = Number(new Date().toLocaleString('en-US', { timeZone: OPT.tz, hour: 'numeric', hour12: false })) % 24;
+      if (hour >= 20 || hour < 6) return 'afterdark';
       if (count(/winter storm|blizzard|ice storm|winter weather|lake effect snow/i) >= 5) return 'winter';
       if (count(/heat/i) >= 5) return 'heat';
       return 'violet';
@@ -1631,6 +1651,7 @@
       root.setProperty('--violet', 'linear-gradient(180deg, ' + th.a + ' 0%, ' + th.b + ' 100%)');
       root.setProperty('--violet-dark', th.dark);
       root.setProperty('--violet-deep', th.deep);
+      document.body.classList.toggle('stars', Boolean(th.stars));
     };
 
     // Be-right-back card on/off (Live Control). The bottom bar says so; the show resumes when it comes down.
@@ -1682,7 +1703,7 @@
     };
     const buildHeadlines = () => {
       const st = focusState();
-      const mode = S.control.headlines || 'mix';
+      const mode = S.control.headlines || 'alertsweather';
       const fresh = (a) => Date.now() - Date.parse(a.issuedAt || 0) < 30 * 60 * 1000;
       const alertItem = (a) => ({ tag: fresh(a) && a.status === 'NEW' ? 'NEW' : a.rank <= 3 ? 'ALERT' : 'LATEST', text: headlineFor(a), color: a.color });
       const alerts = S.alerts
@@ -1690,7 +1711,16 @@
         .sort((x, y) => (x.rank - y.rank) || (Date.parse(y.issuedAt || 0) - Date.parse(x.issuedAt || 0)));
       const fallback = alerts.slice(0, 8).map(alertItem);
       let list = fallback;
-      if (mode !== 'alerts') {
+      if (mode === 'alertsweather') {
+        // Warnings and weather news, taking turns.
+        const weather = (S.news?.weather || []).map((h) => ({ tag: 'WEATHER NEWS', text: h.title + (h.source ? ' · ' + h.source : ''), color: null }));
+        const mixed = [];
+        for (let i = 0; i < Math.max(fallback.length, weather.length); i++) {
+          if (fallback[i]) mixed.push(fallback[i]);
+          if (weather[i]) mixed.push(weather[i]);
+        }
+        if (mixed.length) list = mixed;
+      } else if (mode !== 'alerts') {
         const story = (tag) => (h) => ({ tag, text: h.title + (h.source ? ' · ' + h.source : ''), color: null });
         const weather = (S.news?.weather || []).map(story('WEATHER NEWS'));
         const news = mode === 'mix' ? (S.news?.news || []).map(story('NEWS')) : [];

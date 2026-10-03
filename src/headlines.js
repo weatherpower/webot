@@ -2,7 +2,11 @@
 // (Google News by default; HEADLINES_WEATHER_FEEDS / HEADLINES_NEWS_FEEDS take comma-separated RSS URLs).
 // Only the headline and its source are shown, never the article.
 const GN = 'https://news.google.com/rss';
-const DEFAULT_WEATHER = `${GN}/search?q=${encodeURIComponent('weather OR storm OR hurricane OR tornado OR flooding OR "national weather service" when:1d')}&hl=en-US&gl=US&ceid=US:en`;
+const DEFAULT_WEATHER = `${GN}/search?q=${encodeURIComponent('"weather forecast" OR "severe weather" OR "severe storms" OR hurricane OR tornado OR "tropical storm" OR "flash flooding" OR "flood warning" OR "winter storm" OR "heat wave" OR "National Weather Service" OR blizzard -football -basketball -baseball -hockey -soccer when:1d')}&hl=en-US&gl=US&ceid=US:en`;
+// Weather feed: keep real weather stories (sports teams named Storm, "storm back to win", etc. are out).
+const WEATHERISH = /weather|forecast|storm|hurricane|tornado|flood|rain|snow|heat|cold|freeze|frost|wind|tropical|thunder|hail|drought|wildfire|smoke|fog|ice|blizzard|NWS|temperature|chill|humid|cyclone|monsoon|lightning|radar/i;
+const SPORTSY = /\b(beat|beats|win|wins|won|defeat|playoffs?|game|games|season|coach|score|scores|vs\.?|huskies|NFL|NBA|NHL|MLB|NCAA|WNBA|tournament|match)\b/i;
+const weatherOnly = (h) => WEATHERISH.test(h.title) && !SPORTSY.test(h.title);
 const DEFAULT_NEWS = `${GN}?hl=en-US&gl=US&ceid=US:en`;
 const TTL = 10 * 60 * 1000;
 const HEADERS = { 'User-Agent': 'weatherpower.app warning-card-service (headlines)', Accept: 'application/rss+xml, application/xml, text/xml' };
@@ -30,14 +34,14 @@ export const parseRss = (xml) => [...String(xml).matchAll(/<item>([\s\S]*?)<\/it
   return { title, source, at };
 }).filter((h) => h.title.length >= 12 && h.title.length <= 160);
 
-const load = async (urls, maxAgeH, limit) => {
+const load = async (urls, maxAgeH, limit, keep = () => true) => {
   const seen = new Set();
   const lists = await Promise.all(urls.map((url) => fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(15000) })
     .then((r) => (r.ok ? r.text() : ''))
     .then(parseRss)
     .catch(() => [])));
   return lists.flat()
-    .filter((h) => !h.at || Date.now() - h.at < maxAgeH * 3600 * 1000)
+    .filter((h) => (!h.at || Date.now() - h.at < maxAgeH * 3600 * 1000) && keep(h))
     .sort((a, b) => b.at - a.at)
     .filter((h) => {
       const key = h.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 60);
@@ -52,7 +56,7 @@ const load = async (urls, maxAgeH, limit) => {
 export const getHeadlines = async () => {
   if (cache.body && Date.now() - cache.at < TTL) return cache.body;
   const [weather, news] = await Promise.all([
-    load(feeds('HEADLINES_WEATHER_FEEDS', DEFAULT_WEATHER), 24, 14),
+    load(feeds('HEADLINES_WEATHER_FEEDS', DEFAULT_WEATHER), 24, 14, weatherOnly),
     load(feeds('HEADLINES_NEWS_FEEDS', DEFAULT_NEWS), 12, 14)
   ]);
   // Keep the last good set if a refresh comes back empty (feed down, network blip).
