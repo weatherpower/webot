@@ -9,6 +9,7 @@ services:
       TTS_CACHE_DIR: /app/data/tts-cache
     volumes:
       - ./data:/app/data
+      - ./cards:/app/cards
     # Live Control is only reachable from the server itself; use Tailscale or an SSH tunnel to open it
     # (CLOUD_STREAM.md). Don't publish it on the open internet: it's plain http.
     # LIVE_CONTROL_BIND in .env: 127.0.0.1 (default, SSH tunnel) or the server's Tailscale IP (100.x.y.z).
