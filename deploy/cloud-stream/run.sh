@@ -14,7 +14,8 @@ AUDIO_BITRATE="${STREAM_AUDIO_BITRATE:-160k}"
 RTMP_URL="${STREAM_RTMP_URL:-rtmp://a.rtmp.youtube.com/live2}"
 PORT="${PORT:-8899}"
 # lite=1: the page's speed savings for a server without a graphics card.
-PAGE="http://127.0.0.1:${PORT}/warningcenter/live?${STREAM_PAGE_QUERY:-lite=1}"
+# STREAM_TZ: the on-screen clock's time zone (servers run on UTC).
+PAGE="http://127.0.0.1:${PORT}/warningcenter/live?${STREAM_PAGE_QUERY:-lite=1}&tz=${STREAM_TZ:-America/Chicago}"
 # STREAM_OUTPUT overrides the destination (a file such as /app/data/test.flv for a dry run).
 if [ -n "${STREAM_OUTPUT:-}" ]; then
   OUTPUT="$STREAM_OUTPUT"
@@ -53,13 +54,16 @@ log "server is up"
 
 # 3. Chrome, full screen on the virtual screen. Software WebGL (SwiftShader) draws the map without a GPU.
 CHROME="${CHROME_BIN:-$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)}"
+# The map needs WebGL (SwiftShader). Compositing stays on the CPU, which only redraws what changed
+# (the crawl, WeBot) instead of the whole picture 60 times a second.
+CHROME_GL_FLAGS="${CHROME_GL_FLAGS:---disable-gpu-compositing --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist}"
 (while true; do
   rm -rf /tmp/stream-chrome
   "$CHROME" --kiosk --start-fullscreen --window-position=0,0 --window-size="${WIDTH},${HEIGHT}" \
     --no-first-run --no-default-browser-check --disable-infobars --disable-session-crashed-bubble \
     --disable-features=Translate,MediaRouter --noerrdialogs --no-sandbox --disable-dev-shm-usage \
     --autoplay-policy=no-user-gesture-required \
-    --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist \
+    $CHROME_GL_FLAGS \
     --user-data-dir=/tmp/stream-chrome "$PAGE" >/dev/null 2>&1
   log "chrome stopped (exit $?), restarting in 3 s"; sleep 3
 done) &
