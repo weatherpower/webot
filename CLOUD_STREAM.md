@@ -12,6 +12,8 @@ Live Control the same way.
     ~2 TB/month a 6 Mbps stream sends adds about $10. The cheaper option to try after the dry run is
     the shared-CPU **Linode 16 GB** at $96/month, which includes 8 TB of transfer.
   - Hetzner Cloud **CCX33**: roughly $50/month.
+  - Spaceship **CPU-optimized 3** (8 cores, 8 GB): $30.90/month. **CPU-optimized 2** (4 cores, 4 GB)
+    has a free 7-day trial, then $15.89/month. It's enough for **720p**; see "Small servers" below.
   Shared-CPU plans are cheaper but can stutter when neighbors get busy. Test them with a dry run first.
 - **Image:** Ubuntu 24.04.
 - **Location:** a US one (Ashburn or Hillsboro on Hetzner), close to YouTube's servers and the NWS.
@@ -110,6 +112,27 @@ Live Control isn't open to the internet (it's plain http). Two ways in:
 
 To relink Puter, use Live Control → WeBot → Puter → Sign in & link. The stream picks it up in a few
 seconds.
+
+## Small servers (4 cores, 4 GB): stream 720p
+
+Add to `.env`:
+
+```
+STREAM_WIDTH=1280
+STREAM_HEIGHT=720
+STREAM_BITRATE=4000k
+LOCAL_VOICE=off
+```
+
+`LOCAL_VOICE=off` skips WeBot's free backup voice (about 1 GB of RAM). Alloy through Puter still works;
+if Puter runs out, WeBot goes quiet until you link another Puter account.
+
+Also give the server a 4 GB swap file, so a memory spike slows things down instead of crashing:
+
+```bash
+fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
 
 ## If the picture stutters
 

@@ -413,7 +413,8 @@ export const apiV3Router = () => {
   router.get('/live/voice', (req, res) => {
     res.set('Cache-Control', 'no-store');
     // Only screens on the home network (or with the private stream key) may use this PC's free voice.
-    const local = fromHomeNetwork(req) || streamKeyOk(req.query.key);
+    // LOCAL_VOICE=off skips the free voice model (~1 GB of RAM) on small servers; Puter's Alloy still works.
+    const local = process.env.LOCAL_VOICE !== 'off' && (fromHomeNetwork(req) || streamKeyOk(req.query.key));
     if (local) warmLocalVoice();
     res.json({ neural: NEURAL_VOICES, openai: { ...openaiTtsStatus(), voices: OPENAI_VOICES }, local: local ? { ...localVoiceStatus(), voices: NEURAL_VOICES } : { available: false } });
   });
@@ -421,6 +422,7 @@ export const apiV3Router = () => {
   // WeBot's free voice, made on this PC (Kokoro). Home network or the private stream key only.
   router.get('/live/tts-local', async (req, res, next) => {
     try {
+      if (process.env.LOCAL_VOICE === 'off') throw Object.assign(new Error('Free voice is turned off on this server'), { status: 503 });
       if (!fromHomeNetwork(req) && !streamKeyOk(req.query.key)) throw Object.assign(new Error('Free voice is only for the stream screens'), { status: 403 });
       const audio = await localSpeech({ text: req.query.text, voice: req.query.voice, speed: req.query.speed });
       res.set('Cache-Control', 'private, max-age=86400');
