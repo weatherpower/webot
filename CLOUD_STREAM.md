@@ -6,9 +6,13 @@ Live Control the same way.
 
 ## 1. Rent the server
 
-- **Type:** a *dedicated-CPU* Linux server with **8 vCPUs and 16-32 GB RAM**. Example: Hetzner Cloud
-  **CCX33** (check the current price; roughly $50/month, billed by the hour).
-  Shared-CPU plans are cheaper but can stutter when neighbors get busy.
+- **Type:** a *dedicated-CPU* Linux server with **8 vCPUs and 16-32 GB RAM**. Examples (Oct 2026 prices;
+  both billed by the hour):
+  - Akamai Cloud **G8 Dedicated 16x8**: $0.27/hr (about $197/month). It includes no transfer, so the
+    ~2 TB/month a 6 Mbps stream sends adds about $10. The cheaper option to try after the dry run is
+    the shared-CPU **Linode 16 GB** at $96/month, which includes 8 TB of transfer.
+  - Hetzner Cloud **CCX33**: roughly $50/month.
+  Shared-CPU plans are cheaper but can stutter when neighbors get busy. Test them with a dry run first.
 - **Image:** Ubuntu 24.04.
 - **Location:** a US one (Ashburn or Hillsboro on Hetzner), close to YouTube's servers and the NWS.
 - **Login:** add your SSH key when you create it.
