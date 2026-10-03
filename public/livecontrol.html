@@ -159,7 +159,7 @@
         <div class="row">
           <span class="status">PUTER</span>
           <span class="status grow" id="puter-line">Not linked</span>
-          <button class="btn" id="puter-link">Sign in &amp; link for OBS</button>
+          <button class="btn" id="puter-link">Sign in &amp; link (all screens)</button>
           <button class="btn" id="puter-unlink" hidden>Unlink</button>
         </div>
         <div class="row">
@@ -195,6 +195,9 @@
         <p class="note" style="margin-top:0">Colors of the top and bottom bars. <b>Auto</b> matches the weather: red for tornadoes, storm red for severe storms, green for flooding, teal for hurricanes, icy blue for winter, orange for heat, violet when it's quiet.</p>
         <div class="themes" id="themes"></div>
         <p class="status" id="theme-line" style="margin:10px 0 0"></p>
+        <h3 style="margin:18px 0 6px;font-size:15px">TV</h3>
+        <p class="note" style="margin-top:0">Open <a id="tv-url" target="_blank" rel="noopener"></a> on the TV. The first press of OK on the remote turns on sound and full screen. If the top or bottom bar is cut off, raise <b>TV fit</b> until both bars show. OBS isn't affected.</p>
+        <div class="row"><label for="tv-safe">TV fit</label><select id="tv-safe"><option value="0">0% (edge to edge)</option><option value="1">1%</option><option value="2">2%</option><option value="3">3% (most TVs)</option><option value="4">4%</option><option value="5">5%</option><option value="6">6%</option><option value="8">8%</option><option value="10">10%</option></select></div>
       </section>
 
       <section class="box">
@@ -288,6 +291,8 @@
     const streamUrl = location.origin + BASE + '/live';
     $('open-stream').href = streamUrl;
     $('obs-url').textContent = streamUrl;
+    $('tv-url').href = streamUrl + '?tv=1';
+    $('tv-url').textContent = streamUrl + '?tv=1';
     $('token').value = token;
     Object.entries(STATES).forEach(([code, name]) => $('state').insertAdjacentHTML('beforeend', '<option value="' + code + '">' + esc(name) + '</option>'));
     QUICK.forEach((q) => $('quick').insertAdjacentHTML('beforeend', '<button class="btn" data-q="' + esc(q) + '">' + esc(q.length > 34 ? q.slice(0, 32) + '…' : q) + '</button>'));
@@ -348,11 +353,12 @@
       document.querySelectorAll('#music-src button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.source || 'auto'))));
       document.querySelectorAll('#music-mood button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.mood || 'auto'))));
       const pu = control.puter || {};
-      $('puter-line').innerHTML = pu.linked ? '<b style="color:var(--ok)">LINKED</b>' + (pu.user ? ' · ' + esc(pu.user) : '') + ' · used by OBS' : 'Not linked';
-      $('puter-link').textContent = pu.linked ? 'Re-link' : 'Sign in & link for OBS';
+      $('puter-line').innerHTML = pu.linked ? '<b style="color:var(--ok)">LINKED</b>' + (pu.user ? ' · ' + esc(pu.user) : '') + ' · used by every stream screen' : 'Not linked';
+      $('puter-link').textContent = pu.linked ? 'Re-link' : 'Sign in & link (all screens)';
       $('puter-unlink').hidden = !pu.linked;
       renderCamControl();
       renderThemes();
+      if (document.activeElement !== $('tv-safe')) $('tv-safe').value = String(control?.tvSafe ?? 3);
       const talk = control.talk || 'auto';
       document.querySelectorAll('#talk-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === talk)));
       $('talk-line').innerHTML = (talk === 'on' ? 'WeBot talks about everything on screen.' : talk === 'off' ? 'WeBot stays quiet (typed "Say it" lines still play).' : 'WeBot stays quiet on calm days and starts talking once the WIS reaches 100.')
@@ -429,6 +435,10 @@
     $('talk-mode').addEventListener('click', (e) => {
       const v = e.target.closest('button')?.dataset.v;
       if (v) act({ action: 'talk', mode: v }, v === 'on' ? 'WeBot is talking' : v === 'off' ? 'WeBot is quiet' : 'WeBot talks at WIS 100+');
+    });
+    $('tv-safe').addEventListener('change', () => {
+      const safe = Number($('tv-safe').value);
+      act({ action: 'tv', safe }, 'TV fit: ' + safe + '% from each edge');
     });
     $('themes').addEventListener('click', (e) => {
       const key = e.target.closest('button')?.dataset.theme;

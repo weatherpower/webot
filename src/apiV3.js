@@ -10,7 +10,7 @@ import {
   SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 import {
-  applyLiveCommand, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
+  applyLiveCommand, fromHomeNetwork, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
   recentReports, requireLiveToken, siteRadar, talliesFor
 } from './live.js';
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
@@ -356,7 +356,7 @@ export const apiV3Router = () => {
   router.get('/live/puter', async (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store');
-      res.json(await puterTokenFor(req.query.key));
+      res.json(await puterTokenFor(req.query.key, { homeNetwork: fromHomeNetwork(req) }));
     } catch (error) {
       next(error);
     }

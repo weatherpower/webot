@@ -240,7 +240,7 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, commands: [] };
 const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
@@ -329,10 +329,21 @@ export const streamKey = () => (config.controllerToken
   ? crypto.createHmac('sha256', config.controllerToken).update('weatherpower-live-stream').digest('base64url').slice(0, 24)
   : '');
 
-export const puterTokenFor = async (key) => {
+// A stream page opened straight from the home network (this PC, the TV, the main PC) is trusted: it
+// gets the Puter sign-in without the private key, so Alloy only needs one sign-in in Live Control.
+// Anything that came through a proxy or tunnel (the public site) still needs the key.
+const PRIVATE_IP = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|f[cd][0-9a-f]{2}:|fe80:)/i;
+export const fromHomeNetwork = (req) => {
+  const ip = String(req.socket?.remoteAddress || '').replace(/^::ffff:/i, '');
+  const proxied = ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'forwarded'].some((h) => req.headers[h]);
+  return !proxied && PRIVATE_IP.test(ip);
+};
+
+export const puterTokenFor = async (key, { homeNetwork = false } = {}) => {
   const expected = streamKey();
   const given = String(key || '');
-  if (!expected || given.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {
+  const keyOk = Boolean(expected) && given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  if (!keyOk && !homeNetwork) {
     throw Object.assign(new Error('Wrong stream key'), { status: 403 });
   }
   const s = await loadSecrets();
@@ -435,6 +446,11 @@ export const applyLiveCommand = async (body = {}) => {
       break;
     case 'theme':
       current.theme = THEMES.includes(body.theme) ? body.theme : 'auto';
+      break;
+    case 'tv':
+      // TV fit: percent of the screen edge left empty for TVs that crop the picture (overscan). Only
+      // stream pages opened with ?tv=1 use it, so OBS stays full frame.
+      current.tvSafe = Math.min(10, Math.max(0, Math.round(Number(body.safe) || 0)));
       break;
     case 'camera': {
       const camera = { ...current.camera };

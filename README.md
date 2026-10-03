@@ -365,6 +365,13 @@ in `data/wis-history.json`. `GET /api/v3/wis` (also inside `GET /api/v3/live`).
   conditions plus the next four forecast periods with the local radar, and reads the next three.
   Cities don't repeat for a dozen visits, and a focused stream stays inside its state. They come up
   more on calm days. Control panel: **Forecasts** mode stays on forecasts.
+- **TV mode** (`/warningcenter/live?tv=1`): fits the picture inside the TV's visible area (Live Control →
+  Look → **TV fit**, 0-10% per edge, default 3%; `?safe=N` overrides), goes full screen and turns on
+  sound on the first remote press, and hides the cursor. Pages without `?tv=1` (OBS) stay full frame.
+  If the browser has no WebGL 2 the page says so instead of staying blank.
+- **One Puter sign-in for every screen:** a stream page opened straight from the home network
+  (private IP, no proxy headers) gets the sign-in linked in Live Control without the `?key=`. Requests
+  through a proxy or tunnel (the public site) still need the key.
 
 ### WeBot talks on every shot, national radar map, live cameras
 

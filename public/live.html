@@ -210,6 +210,7 @@
 
     .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
+    body.tv, body.tv * { cursor: none !important; }
     .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
     .boot.done { opacity: 0; pointer-events: none; }
   </style>
@@ -269,7 +270,7 @@
     <div class="boot" id="boot">WEATHERPOWER LIVE</div>
   </div>
   <button class="gate" id="gate" hidden>🔊 Sound is blocked by this browser · click anywhere</button>
-  <button class="gate" id="puter-gate" style="top:72px" hidden>🔑 Sign in to Puter for WeBot's Alloy voice (in OBS: use Live Control → Puter)</button>
+  <button class="gate" id="puter-gate" style="top:72px" hidden>🔑 WeBot's Alloy voice needs Puter: sign in once in Live Control → WeBot → Puter</button>
 
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
   <script>
@@ -289,6 +290,10 @@
       tts: ['puter', 'neural', 'openai', 'browser'].includes(P.get('tts')) ? P.get('tts') : '',
       key: P.get('key') || '',
       speed: Math.min(3, Math.max(0.4, Number(P.get('speed')) || 1)),
+      // ?tv=1: TV mode (fit inside the TV's safe area, full screen on the first remote press, no cursor).
+      // ?safe=N overrides the TV fit from Live Control (percent of each edge left empty).
+      tv: P.has('tv') && P.get('tv') !== '0',
+      safe: P.has('safe') ? Math.min(10, Math.max(0, Number(P.get('safe')) || 0)) : null,
       tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone
     };
     const STATE_NAMES = {
@@ -439,12 +444,28 @@
     };
 
     /* ---------------- stage scaling + clocks ---------------- */
+    // TVs often crop the edges of the picture (overscan); TV mode keeps the bars inside the visible area.
+    const tvSafe = () => (OPT.safe != null ? OPT.safe : OPT.tv ? (S.control?.tvSafe ?? 3) : 0);
     const fit = () => {
-      const s = Math.min(innerWidth / 1920, innerHeight / 1080);
-      $('stage').style.transform = 'translate(' + (innerWidth - 1920 * s) / 2 + 'px,' + (innerHeight - 1080 * s) / 2 + 'px) scale(' + s + ')';
+      const m = tvSafe() / 100;
+      const w = innerWidth * (1 - 2 * m);
+      const h = innerHeight * (1 - 2 * m);
+      const s = Math.min(w / 1920, h / 1080);
+      $('stage').style.transform = 'translate(' + Math.round((innerWidth - 1920 * s) / 2) + 'px,' + Math.round((innerHeight - 1080 * s) / 2) + 'px) scale(' + s + ')';
+      S.fitKey = innerWidth + 'x' + innerHeight + '@' + tvSafe();
     };
     addEventListener('resize', fit);
     fit();
+    if (OPT.tv) {
+      document.body.classList.add('tv');
+      // Fill the screen (hide the TV browser's address bar) on the first remote button press.
+      const full = () => {
+        const el = document.documentElement;
+        if (document.fullscreenElement || document.webkitFullscreenElement) return;
+        (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+      };
+      ['pointerdown', 'keydown'].forEach((type) => addEventListener(type, full));
+    }
 
     const tickClock = () => {
       $('clk').textContent = tzClock(OPT.tz, { second: '2-digit' }) + ' ' + tzAbbr(OPT.tz);
@@ -549,11 +570,12 @@
     const PUTER_JS = 'https://js.puter.com/v2/';
     const VOICE_STYLE = 'You are WeBot, a friendly robot weather broadcaster on a 24/7 live stream. Speak clearly at a steady broadcast pace, warm and upbeat, but serious and urgent about dangerous weather.';
     const pt = { state: 'off', cache: new Map() };
-    // Takes the Puter sign-in that Live Control linked (needs the private ?key= from the OBS link).
+    // Takes the Puter sign-in that Live Control linked: any stream page on the home network gets it,
+    // and from outside it needs the private ?key= from the OBS link. One sign-in covers every screen.
     const linkPuter = async () => {
-      if (!OPT.key || !window.puter) return;
+      if (!window.puter) return;
       try {
-        const body = await getJson('/api/v3/live/puter?key=' + encodeURIComponent(OPT.key));
+        const body = await getJson('/api/v3/live/puter' + (OPT.key ? '?key=' + encodeURIComponent(OPT.key) : ''));
         if (body.token) { puter.setAuthToken(body.token); pt.state = 'ready'; pt.linked = true; }
         else if (pt.linked) { puter.setAuthToken(null); pt.state = 'signed-out'; pt.linked = false; }
       } catch (error) {
@@ -576,7 +598,7 @@
       script.src = PUTER_JS;
       script.onload = async () => {
         pt.state = window.puter?.auth?.isSignedIn() ? 'ready' : 'signed-out';
-        if (pt.state !== 'ready' && OPT.key) await linkPuter();
+        if (pt.state !== 'ready') await linkPuter();
         puterGate();
       };
       script.onerror = () => { pt.state = 'failed'; console.warn('Puter.js did not load'); };
@@ -776,6 +798,7 @@
     };
 
     const gate = $('gate');
+    if (OPT.tv) gate.textContent = '🔊 Press OK on your remote for sound and full screen';
     const checkAudio = () => {
       const blocked = actx && actx.state !== 'running';
       gate.hidden = !(blocked && (OPT.sound || OPT.voice));
@@ -2637,6 +2660,7 @@
       const prevCtl = S.control;
       S.live = body;
       S.control = body.control || S.control;
+      if (S.fitKey !== innerWidth + 'x' + innerHeight + '@' + tvSafe()) fit();
       renderTop();
       if (S.styleReady) S.map.getSource('reports')?.setData(reportFC());
       const st = focusState();
@@ -2707,6 +2731,11 @@
 
     /* ---------------- boot ---------------- */
     const boot = async () => {
+      // MapLibre needs WebGL 2. Some smart-TV browsers don't have it; say so instead of a blank screen.
+      if (!document.createElement('canvas').getContext('webgl2')) {
+        $('boot').innerHTML = 'WEATHERPOWER LIVE<br><small style="display:block;margin-top:18px;font-size:26px;letter-spacing:.04em">This browser can’t draw the radar map (it has no WebGL 2).<br>On a TV, use a PC, Fire TV/Chromecast with Chrome, or watch the YouTube stream.</small>';
+        return;
+      }
       const [config, radar, sites] = await Promise.all([
         getJson('/api/v3/config'),
         getJson('/api/v3/radar').catch(() => null),
