@@ -1,6 +1,10 @@
 // Child process for WeBot's free voice: Kokoro (82M, full precision, CPU). It runs below normal priority
 // (set by the parent) so OBS and the server always come first. One line at a time, WAV out.
+import { env } from '@huggingface/transformers';
 import { KokoroTTS } from 'kokoro-js';
+
+// Keep the downloaded voice model (~300 MB) outside the app folder when asked (a Docker volume).
+if (process.env.TTS_CACHE_DIR) env.cacheDir = process.env.TTS_CACHE_DIR;
 
 const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 // Full precision is about twice real time on a 4-core i5; the 8-bit model is slower on CPUs like that.

@@ -447,3 +447,9 @@ them. Live Control can still search and preview cameras privately and shows an O
   mentions fronts crossing the state, the outlook gives the highest risk in the state, storm reports and the
   report counter are the state's own, tropics only show with tropical alerts there, and WeBot's updates count
   that state's warnings. `GET /api/v3/models/segment` accepts `points=lat,lon,label;…&region=Name`.
+
+### Cloud stream (no OBS)
+
+`docker compose up -d --build` runs the server, a hidden Chrome showing the stream page and ffmpeg
+streaming to YouTube, all in one container that restarts itself. Step-by-step setup (server size, copying
+data, the stream key, Live Control over Tailscale or an SSH tunnel): [CLOUD_STREAM.md](CLOUD_STREAM.md).

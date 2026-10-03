@@ -339,10 +339,12 @@ export const streamKey = () => (config.controllerToken
 // gets the Puter sign-in without the private key, so Alloy only needs one sign-in in Live Control.
 // Anything that came through a proxy or tunnel (the public site) still needs the key.
 const PRIVATE_IP = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|f[cd][0-9a-f]{2}:|fe80:)/i;
+// LIVE_TRUST_LAN=false (the cloud server): only this machine itself counts, never Docker's internal network.
+const LOOPBACK_IP = /^(127\.|::1$)/;
 export const fromHomeNetwork = (req) => {
   const ip = String(req.socket?.remoteAddress || '').replace(/^::ffff:/i, '');
   const proxied = ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'forwarded'].some((h) => req.headers[h]);
-  return !proxied && PRIVATE_IP.test(ip);
+  return !proxied && (process.env.LIVE_TRUST_LAN === 'false' ? LOOPBACK_IP : PRIVATE_IP).test(ip);
 };
 
 // The private stream key from the OBS link (constant-time compare).

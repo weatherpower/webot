@@ -1,0 +1,20 @@
+# WeatherPower Live on a cloud server: `docker compose up -d --build` (see CLOUD_STREAM.md).
+services:
+  stream:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Keeps WeBot's free voice model (~300 MB) between rebuilds.
+      TTS_CACHE_DIR: /app/data/tts-cache
+    volumes:
+      - ./data:/app/data
+    # Live Control is only reachable from the server itself; use Tailscale or an SSH tunnel to open it
+    # (CLOUD_STREAM.md). Don't publish it on the open internet: it's plain http.
+    # LIVE_CONTROL_BIND in .env: 127.0.0.1 (default, SSH tunnel) or the server's Tailscale IP (100.x.y.z).
+    ports:
+      - "${LIVE_CONTROL_BIND:-127.0.0.1}:8899:8899"
+    shm_size: 2gb
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
