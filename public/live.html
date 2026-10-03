@@ -211,7 +211,7 @@
     .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
     body.tv, body.tv * { cursor: none !important; }
-    body.tv .bot .rig img, body.tv .bot .eye { filter: none !important; }
+    body.lite .bot .rig img, body.lite .bot .eye { filter: none !important; }
     .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
     .boot.done { opacity: 0; pointer-events: none; }
   </style>
@@ -294,6 +294,9 @@
       // ?tv=1: TV mode (fit inside the TV's safe area, full screen on the first remote press, no cursor).
       // ?safe=N overrides the TV fit from Live Control (percent of each edge left empty).
       tv: P.has('tv') && P.get('tv') !== '0',
+      // ?lite=1 (and TV mode): the speed savings alone, for weak hardware such as a cloud server without a
+      // graphics card: map drawn at the output size, no slow drift, 6 radar frames, lighter music.
+      lite: (P.has('tv') && P.get('tv') !== '0') || (P.has('lite') && P.get('lite') !== '0'),
       safe: P.has('safe') ? Math.min(10, Math.max(0, Number(P.get('safe')) || 0)) : null,
       tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone
     };
@@ -497,13 +500,14 @@
     // 3840x2160; on a TV it is drawn only as sharp as the screen shows it, which is most of the lag.
     const mapPixelRatio = () => {
       const dpr = window.devicePixelRatio || 1;
-      return OPT.tv ? Math.min(1, Math.max(0.5, dpr * (S.stageScale || 1))) : dpr;
+      return OPT.lite ? Math.min(1, Math.max(0.5, dpr * (S.stageScale || 1))) : dpr;
     };
     const fitKeyNow = () => { const a = viewArea(); return a.w + 'x' + a.h + '+' + a.x + ',' + a.y + '@' + tvSafe(); };
     addEventListener('resize', fit);
     window.visualViewport?.addEventListener('resize', fit);
     window.visualViewport?.addEventListener('scroll', fit);
     fit();
+    if (OPT.lite) document.body.classList.add('lite');
     if (OPT.tv) {
       document.body.classList.add('tv');
       // Android TV only turns the OK button into a real click when a button has focus, and a WebView only
@@ -553,8 +557,8 @@
     let actx = null;
     // TV boxes: bigger audio buffers (no dropouts while the map draws) and 24 kHz, which halves the work
     // of the music generator; WeBot's voice is 24 kHz to begin with.
-    try { actx = new (window.AudioContext || window.webkitAudioContext)(OPT.tv ? { latencyHint: 'playback', sampleRate: 24000 } : undefined); } catch {}
-    if (!actx && OPT.tv) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(OPT.lite ? { latencyHint: 'playback', sampleRate: 24000 } : undefined); } catch {}
+    if (!actx && OPT.lite) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
     const tone = (freq, at, dur, type = 'triangle', peak = 0.16) => {
       const osc = actx.createOscillator();
       const gain = actx.createGain();
@@ -1242,11 +1246,11 @@
     };
     const startRadio = () => {
       if (M.radio) return;
-      M.radio = makeRadio(actx, M.bus, { mood: M.mood, lite: OPT.tv });
+      M.radio = makeRadio(actx, M.bus, { mood: M.mood, lite: OPT.lite });
       M.radio.onTrack = (track) => { M.playing = track.name + ' · WeBot Radio'; renderNp(); };
-      const ahead = OPT.tv ? 2.5 : 0.4;
+      const ahead = OPT.lite ? 2.5 : 0.4;
       M.radio.schedule(actx.currentTime + ahead);
-      M.timer = setInterval(() => M.radio?.schedule(actx.currentTime + ahead), OPT.tv ? 250 : 100);
+      M.timer = setInterval(() => M.radio?.schedule(actx.currentTime + ahead), OPT.lite ? 250 : 100);
     };
     const stopMusic = () => {
       clearInterval(M.timer);
@@ -1427,7 +1431,7 @@
     };
 
     // A TV box keeps the last 6 radar frames instead of 12: each frame is a whole map layer with its own tiles.
-    const lite = (r) => (r && OPT.tv && Array.isArray(r.reflectivity) ? { ...r, reflectivity: r.reflectivity.slice(-6) } : r);
+    const lite = (r) => (r && OPT.lite && Array.isArray(r.reflectivity) ? { ...r, reflectivity: r.reflectivity.slice(-6) } : r);
     /* radar loop: both the national composite and the local site loop step together */
     const HOLD = 4;
     const frameAt = (n) => (n ? Math.min(n - 1, S.step % (n + HOLD)) : 0);
@@ -2060,7 +2064,7 @@
       S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : 3600, maxZoom: 9.4, essential: true, ...opts });
       const shot = S.shot;
       S.map.once('moveend', () => {
-        if (OPT.tv || S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
+        if (OPT.lite || S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
         S.map.easeTo({ zoom: S.map.getZoom() + 0.3, duration: Math.max(2000, S.shotDur - (Date.now() - S.shotStart) - 600), easing: (t) => t, essential: true });
       });
     };

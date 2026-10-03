@@ -13,7 +13,8 @@ PRESET="${STREAM_PRESET:-veryfast}"
 AUDIO_BITRATE="${STREAM_AUDIO_BITRATE:-160k}"
 RTMP_URL="${STREAM_RTMP_URL:-rtmp://a.rtmp.youtube.com/live2}"
 PORT="${PORT:-8899}"
-PAGE="http://127.0.0.1:${PORT}/warningcenter/live${STREAM_PAGE_QUERY:+?${STREAM_PAGE_QUERY}}"
+# lite=1: the page's speed savings for a server without a graphics card.
+PAGE="http://127.0.0.1:${PORT}/warningcenter/live?${STREAM_PAGE_QUERY:-lite=1}"
 # STREAM_OUTPUT overrides the destination (a file such as /app/data/test.flv for a dry run).
 if [ -n "${STREAM_OUTPUT:-}" ]; then
   OUTPUT="$STREAM_OUTPUT"
