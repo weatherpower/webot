@@ -1,13 +1,17 @@
 // Measure how smooth the map moves on the cloud stream: frames drawn per second while the camera flies.
+// It skips through a few segments on air; "old" turns the smooth-flight changes off for comparison.
 // docker compose cp deploy/cloud-stream/fly-check.cjs stream:/tmp/ && docker compose exec stream node /tmp/fly-check.cjs
 const { chromium } = require('/app/node_modules/playwright');
 (async () => {
   const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
   const page = browser.contexts()[0].pages().find((p) => p.url().includes('/live'));
   const result = {};
-  for (const smooth of [false, true]) result[smooth ? 'new' : 'old'] = await page.evaluate(async (smooth) => {
+  const modes = (process.argv[2] || 'old,new').split(',');
+  for (const mode of modes) result[mode] = await page.evaluate(async (mode) => {
     const { S, FLY, nextShot } = window.WPLive;
+    const smooth = mode !== 'old';
     FLY.smooth = smooth;
+    // Never change the map's pixel ratio on the live page here: it blanks the map until a reload.
     const frames = [];
     let moving = false, run = true;
     const tick = (t) => { frames.push([t, moving]); if (run) requestAnimationFrame(tick); };
@@ -34,7 +38,10 @@ const { chromium } = require('/app/node_modules/playwright');
     S.map.off('moveend', onEnd);
     FLY.smooth = true;
     return flights;
-  }, smooth);
-  console.log(JSON.stringify(result, null, 1));
+  }, mode);
+  for (const [mode, flights] of Object.entries(result)) {
+    const ok = flights.filter((x) => x.fps);
+    console.log(mode.padEnd(10), 'avg fps', ok.length ? (ok.reduce((a, x) => a + x.fps, 0) / ok.length).toFixed(1) : '-', '| worst gap ms', ok.length ? Math.max(...ok.map((x) => x.worstGapMs)) : '-', '|', flights.map((x) => x.shot + ' ' + (x.fps ?? x.note) + (x.secs ? 'fps/' + x.secs + 's' : '')).join(', '));
+  }
   await browser.close().catch(() => {});
 })().catch((e) => { console.error('fly check failed:', e.message); process.exit(1); });
