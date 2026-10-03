@@ -1490,7 +1490,20 @@
     /* radar loop: both the national composite and the local site loop step together */
     const HOLD = 4;
     const frameAt = (n) => (n ? Math.min(n - 1, S.step % (n + HOLD)) : 0);
+    // Smooth flights: while the camera moves, the radar loop holds still and only the frame on screen stays
+    // loaded, so the map isn't loading and drawing every radar frame at every zoom level on the way in.
+    const FLY = { smooth: true };
+    const radarFlight = (on) => {
+      if (!S.styleReady) return;
+      const n = S.radar?.reflectivity.length || 0, localN = S.local?.reflectivity.length || 0;
+      const fi = frameAt(n), li = frameAt(localN);
+      const vis = (id, show) => { if (S.map.getLayer(id) && S.map.getLayoutProperty(id, 'visibility') !== (show ? 'visible' : 'none')) S.map.setLayoutProperty(id, 'visibility', show ? 'visible' : 'none'); };
+      for (let k = 0; k < n; k += 1) vis('rf' + k, !on || k === fi);
+      for (let k = 0; k < localN; k += 1) vis('lr' + k, !on || k === li);
+    };
     const animate = () => {
+      // Hold the loop during a flight, and for a moment after so the other frames can load at the new spot.
+      if (FLY.smooth && S.styleReady && (S.flying || Date.now() < (S.flyRestUntil || 0))) return;
       S.step += 1;
       if (!S.styleReady) return;
       const n = S.radar?.reflectivity.length || 0;
@@ -2196,9 +2209,13 @@
       // Cross-ocean jumps (Guam, Hawaii) cut instead of flying, so tiles are not loading mid-air.
       const from = S.map.getCenter();
       const far = Math.abs(from.lng - (bounds[0][0] + bounds[1][0]) / 2) > 45 || Math.abs(from.lat - (bounds[0][1] + bounds[1][1]) / 2) > 25;
-      S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : OPT.lite ? 1800 : 3600, maxZoom: 9.4, essential: true, ...opts });
+      if (FLY.smooth && !far) { S.flying = true; radarFlight(true); }
+      // Ease in and out (a slow start and a soft landing) instead of the default quick start.
+      const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+      S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : OPT.lite ? (FLY.smooth ? 2600 : 1800) : 3600, maxZoom: 9.4, essential: true, ...(FLY.smooth ? { easing: easeInOut } : {}), ...opts });
       const shot = S.shot;
       S.map.once('moveend', () => {
+        if (S.flying) { S.flying = false; S.flyRestUntil = Date.now() + 1500; radarFlight(false); }
         if (OPT.lite || S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
         S.map.easeTo({ zoom: S.map.getZoom() + 0.3, duration: Math.max(2000, S.shotDur - (Date.now() - S.shotStart) - 600), easing: (t) => t, essential: true });
       });
@@ -3090,6 +3107,8 @@
       if (fresh.length) { out.said = JSON.stringify(fresh); S.saidSent = fresh[fresh.length - 1].id; }
       return out;
     };
+    // Diagnostics (deploy/cloud-stream/fly-check.cjs).
+    window.WPLive = { S, FLY, nextShot: (force) => nextShot(force) };
     const poll = (fn, ms) => { const run = () => fn().catch((e) => console.warn(e.message)).finally(() => setTimeout(run, ms)); setTimeout(run, ms); };
 
     const roundup = () => {
