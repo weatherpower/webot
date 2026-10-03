@@ -82,7 +82,7 @@ export const safeName = (name) => {
 /* ---------------- chat reader ---------------- */
 const state = {
   enabled: false, videoId: '', chatId: '', pageToken: '', primed: false, viewers: null, viewersAt: 0,
-  lastFind: 0, lastSearch: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: []
+  lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: []
 };
 const ptDay = () => new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
 const spend = (units) => {
@@ -101,7 +101,7 @@ const api = async (path, params, units) => {
 };
 
 // The channel's live video: the one already found, the public /live page (no quota; YouTube sometimes
-// leaves the link out for servers), or an API search (100 units, so at most once an hour). Each candidate
+// leaves the link out for servers), or the channel's uploads list (2 units). Each candidate
 // must be live and on this channel. Then its chat id and viewer count.
 const liveVideo = async (videoId, channel) => {
   if (!videoId) return null;
@@ -120,10 +120,15 @@ const findLive = async () => {
     }).then((r) => r.text()).catch(() => '');
     found = await liveVideo(html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1], channel);
   }
-  if (!found && channel && Date.now() - state.lastSearch > 60 * 60 * 1000) {
-    state.lastSearch = Date.now();
-    const body = await api('search', { part: 'id', channelId: channel, eventType: 'live', type: 'video', maxResults: '1' }, 100);
-    found = await liveVideo(body.items?.[0]?.id?.videoId, channel);
+  // The channel's newest uploads (live streams are listed there too): 1 unit, plus 1 to check them all.
+  if (!found && /^UC[\w-]{22}$/.test(channel)) {
+    const list = await api('playlistItems', { part: 'contentDetails', playlistId: 'UU' + channel.slice(2), maxResults: '5' }, 1);
+    const ids = (list.items || []).map((i) => i.contentDetails?.videoId).filter(Boolean);
+    if (ids.length) {
+      const body = await api('videos', { part: 'snippet,liveStreamingDetails', id: ids.join(',') }, 1);
+      const v = (body.items || []).find((x) => x.snippet?.liveBroadcastContent === 'live' && x.snippet?.channelId === channel);
+      if (v) found = { videoId: v.id, live: v.liveStreamingDetails || {} };
+    }
   }
   if (!found) { state.videoId = ''; state.chatId = ''; return; }
   const { videoId, live } = found;
