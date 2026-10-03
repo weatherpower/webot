@@ -116,6 +116,10 @@
           <button class="btn" id="gas-now">Gas prices now ⛽</button>
           <div class="seg" id="gas-auto"><button data-v="on">Gas in rotation</button><button data-v="off">Off</button></div>
         </div>
+        <div class="row">
+          <span class="status">CHAT</span>
+          <div class="seg" id="chat-read"><button data-v="on">WeBot reads chat</button><button data-v="off">Commands only</button></div>
+        </div>
         <p class="status" id="state-line"></p>
       </section>
 
@@ -192,7 +196,10 @@
         <div class="row"><span class="status">MOOD</span><div class="seg" id="music-mood">
           <button data-v="auto">Auto</button><button data-v="calm">Calm</button><button data-v="chill">Chill</button><button data-v="tense">Storm</button>
         </div></div>
-        <p class="note">WeBot Radio is lo-fi made live by the stream page, so it's free and safe from copyright claims. On <b>Auto</b> the mood follows the weather: calm when it's quiet, darker when tornado warnings are out. To use your own songs, put MP3s in <code>public/music</code> (name them <code>Artist - Title.mp3</code>) and pick <b>My tracks</b> (Auto also prefers them). Only use songs you have the rights to stream.</p>
+        <div class="row"><span class="status">STYLE</span><div class="seg" id="music-genre">
+          <button data-v="mix">Mix</button><button data-v="lofi">Lo-fi</button><button data-v="country">Country</button>
+        </div></div>
+        <p class="note">WeBot Radio is lo-fi and country made live by the stream page (<b>Mix</b> plays some of each; storms always get the darker lo-fi), so it's free and safe from copyright claims. On <b>Auto</b> the mood follows the weather: calm when it's quiet, darker when tornado warnings are out. To use your own songs, put MP3s in <code>public/music</code> (name them <code>Artist - Title.mp3</code>) and pick <b>My tracks</b> (Auto also prefers them). Only use songs you have the rights to stream.</p>
       </section>
 
       <section class="box">
@@ -377,6 +384,7 @@
       if (document.activeElement !== $('music-vol')) { $('music-vol').value = music.volume ?? 35; $('music-vol-n').textContent = music.volume ?? 35; }
       document.querySelectorAll('#music-src button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.source || 'auto'))));
       document.querySelectorAll('#music-mood button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.mood || 'auto'))));
+      document.querySelectorAll('#music-genre button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (music.genre || 'mix'))));
       const pu = control.puter || {};
       $('puter-line').innerHTML = pu.linked ? '<b style="color:var(--ok)">LINKED</b>' + (pu.user ? ' · ' + esc(pu.user) : '') + ' · used by every stream screen' : 'Not linked';
       $('puter-link').textContent = pu.linked ? 'Re-link' : 'Sign in & link (all screens)';
@@ -396,6 +404,7 @@
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
         : 'The stream page hasn’t checked in for a minute. Open it in OBS or click "Open stream".';
+      document.querySelectorAll('#chat-read button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.chatRead === false ? 'off' : 'on'))));
       document.querySelectorAll('#gas-auto button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.gas === false ? 'off' : 'on'))));
       document.querySelectorAll('#hl-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.headlines || 'alertsweather'))));
       $('brb-line').innerHTML = control.brb ? '<b style="color:#ffd34d">BRB IS ON AIR</b> since ' + esc(new Date(control.brb.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + (control.brb.message ? ': ' + esc(control.brb.message) : '') : 'Off: the show is running.';
@@ -631,6 +640,7 @@
     $('next').addEventListener('click', () => act({ action: 'next' }, 'Skipping'));
     $('unpin').addEventListener('click', () => act({ action: 'unpin' }, 'Unpinned'));
     $('reload').addEventListener('click', () => act({ action: 'reload' }, 'Stream will reload'));
+    $('chat-read').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'chat-read', on: v === 'on' }, v === 'on' ? 'WeBot reads chat out loud' : 'Chat: only !forecast and !gas'); });
     $('gas-now').addEventListener('click', () => act({ action: 'gas-now' }, 'WeBot is checking gas prices'));
     $('gas-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'gas', on: v === 'on' }, v === 'on' ? 'Gas prices: in the calm-day rotation' : 'Gas prices: only when you press the button'); });
     $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });
@@ -666,6 +676,7 @@
     $('music-vol').addEventListener('change', () => act({ action: 'music', volume: Number($('music-vol').value) }));
     $('music-src').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act({ action: 'music', source: b.dataset.v }, 'Music: ' + b.textContent); });
     $('music-mood').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act({ action: 'music', mood: b.dataset.v }, 'Mood: ' + b.textContent); });
+    $('music-genre').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) act({ action: 'music', genre: b.dataset.v }, 'Radio style: ' + b.textContent); });
     $('filter').addEventListener('input', renderAlerts);
     $('alerts').addEventListener('click', (e) => {
       const pin = e.target.closest('[data-pin]')?.dataset.pin;

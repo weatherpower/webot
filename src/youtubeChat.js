@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { STATE_NAMES } from './broadcast.js';
-import { applyLiveCommand } from './live.js';
+import { applyLiveCommand, liveControl } from './live.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const KEY = () => process.env.YOUTUBE_API_KEY || '';
@@ -73,16 +73,43 @@ export const findPlace = (text) => {
 };
 
 /* ---------------- who can show up on the stream ---------------- */
-const BLOCK = /(nigg|fag|retard|rape|nazi|hitler|kkk|fuck|shit|bitch|cunt|whore|slut|porn|sex|dick|cock|pussy|penis|vagina|kill ?your|suicide)/i;
+// Slurs and profanity are caught even inside other letters ("f.u.c.k", "xXshitXx"); other risky words only
+// as whole words, so weather talk like "cumulus" or "analysis" still gets read.
+const HARD = /(nigg|faggot|retard|fuck|fuk|fck|shit|bitch|cunt|whore|slut|porn|pussy|kike|chink|tranny|onlyfans|kkk|hitler)/i;
+const WORDS = /\b(fag|fags|rape|raped|rapist|nazi|nazis|sex|sexy|dick|cock|penis|vagina|boob|boobs|tits|anal|cum|jizz|kys|suicide|die|dead|murder|shoot|gun|guns|bomb|terror|isis|jew|jews|muslim|spic|wetback|dyke|homo|gay|lesbian|crypto|bitcoin|giveaway|telegram|whatsapp|discord|sub4sub)\b|\bkill (yo)?u|\bkill your|hang yourself|check out my|my channel|subscribe to/i;
+export const blockedText = (t) => HARD.test(t) || HARD.test(String(t).replace(/[^a-z]/gi, '')) || WORDS.test(t);
 export const safeName = (name) => {
   const n = String(name || '').replace(/^@/, '').trim();
-  return n.length >= 2 && n.length <= 24 && /^[\p{L}\p{N} ._'-]+$/u.test(n) && !BLOCK.test(n.replace(/[\s._'-]/g, '')) ? n : '';
+  return n.length >= 2 && n.length <= 24 && /^[\p{L}\p{N} ._'-]+$/u.test(n) && !blockedText(n) ? n : '';
 };
+
+// A chat message WeBot may read out loud, or '' when it shouldn't be (bad words, links, phone numbers,
+// emoji-only, spam, too long). YouTube's own chat filter runs first; this is a second, stricter one.
+export const readableChat = (raw) => {
+  let t = String(raw || '')
+    .replace(/:[a-z0-9_-]+:/gi, ' ')
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}‍️]/gu, ' ')
+    .replace(/(.)\1{3,}/g, '$1$1$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (t.length < 3 || t.length > 160 || t.split(' ').length > 30) return '';
+  if (/(https?:|www\.|\.(com|net|org|gg|io|ly|tv|xyz|me|co|us|info|live)\b|@[\w.-]+\.\w+)/i.test(t)) return '';
+  if (/\d{3}[\s.()-]*\d{3}[\s.-]*\d{4}/.test(t) || /\d{6,}/.test(t)) return '';
+  if (blockedText(t)) return '';
+  if (!/[a-z]{2,}/i.test(t)) return '';
+  if (t.split(' ').length < 2 && t.length < 8) return '';
+  // Shouting is fine to read, but not as a wall of capitals.
+  if (t.length > 20 && t === t.toUpperCase()) t = t.charAt(0) + t.slice(1).toLowerCase();
+  return t;
+};
+const READ_GAP_MS = Number(process.env.CHAT_READ_GAP_SEC || 75) * 1000;
+const READ_USER_GAP_MS = 5 * 60 * 1000;
 
 /* ---------------- chat reader ---------------- */
 const state = {
   enabled: false, videoId: '', chatId: '', pageToken: '', primed: false, viewers: null, viewersAt: 0,
-  lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: []
+  lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: [],
+  lastReadAt: 0, readUsers: new Map()
 };
 const ptDay = () => new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
 const spend = (units) => {
@@ -144,10 +171,34 @@ const findLive = async () => {
   }
 };
 
+// Read one regular chat message out loud (the newest that passes the filter), at most every 75 s and
+// each viewer at most every 5 minutes. Live Control can turn this off.
+const readOne = async (messages) => {
+  const now = Date.now();
+  if (!messages.length || now - state.lastReadAt < READ_GAP_MS) return;
+  for (const message of [...messages].reverse()) {
+    if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) continue;
+    const author = message.authorDetails || {};
+    const userKey = author.channelId || author.displayName;
+    if (now - (state.readUsers.get(userKey) || 0) < READ_USER_GAP_MS) continue;
+    const text = readableChat(message.snippet?.displayMessage);
+    if (!text) continue;
+    const control = await liveControl().catch(() => null);
+    if (!control || control.chatRead === false) return;
+    state.lastReadAt = now;
+    state.readUsers.set(userKey, now);
+    if (state.readUsers.size > 500) state.readUsers.delete(state.readUsers.keys().next().value);
+    await applyLiveCommand({ action: 'chat-say', user: safeName(author.displayName), text });
+    console.log('[chat] reading a viewer message');
+    return;
+  }
+};
+
+// Returns true when the message was a ! command (handled or not).
 const handle = async (message) => {
   const text = String(message.snippet?.displayMessage || '').trim();
   const m = text.match(/^!(forecast|fc|weather|wx|gas)\b\s*(.*)$/i);
-  if (!m) return;
+  if (!m) return /^!/.test(text);
   const kind = /^gas$/i.test(m[1]) ? 'gas' : 'forecast';
   const author = message.authorDetails || {};
   const userKey = author.channelId || author.displayName;
@@ -164,6 +215,7 @@ const handle = async (message) => {
   state.lastCommandAt = new Date().toISOString();
   await applyLiveCommand({ action: 'chat-request', kind, place, user: safeName(author.displayName) });
   console.log(`[chat] ${kind} request: ${place.name}, ${place.state}`);
+  return true;
 };
 
 const readChat = async () => {
@@ -172,7 +224,14 @@ const readChat = async () => {
   const body = await api('liveChat/messages', params, 5);
   state.pageToken = body.nextPageToken || state.pageToken;
   // The first read returns recent history: skip it so old commands don't replay after a restart.
-  if (state.primed) for (const message of body.items || []) await handle(message).catch((e) => console.warn('[chat]', e.message));
+  if (state.primed) {
+    const regular = [];
+    for (const message of body.items || []) {
+      const command = await handle(message).catch((e) => { console.warn('[chat]', e.message); return true; });
+      if (!command) regular.push(message);
+    }
+    await readOne(regular).catch((e) => console.warn('[chat]', e.message));
+  }
   state.primed = true;
   return Number(body.pollingIntervalMillis) || 0;
 };

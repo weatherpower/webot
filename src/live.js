@@ -233,14 +233,14 @@ export const NEURAL_VOICES = [
 ];
 export const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse'];
 
-const DEFAULT_MUSIC = { on: true, volume: 35, source: 'auto', mood: 'auto', duck: true };
+const DEFAULT_MUSIC = { on: true, volume: 35, source: 'auto', mood: 'auto', genre: 'mix', duck: true };
 // OpenAI Alloy through Puter.js by default (billed to the Puter account signed in on the stream page).
 const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', speed: 1 };
 // Cameras on stream: auto = nearest camera to the alert on screen, pinned = one chosen camera all the time, off.
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'afterdark', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, chatRead: true, commands: [] };
 const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
@@ -477,6 +477,16 @@ export const applyLiveCommand = async (body = {}) => {
       pushCommand({ type: 'chat-request', kind: body.kind, place: { name: cleanText(p.name, 60), state: cleanText(p.state, 2).toUpperCase(), lat, lon }, user: cleanText(body.user, 24) });
       break;
     }
+    case 'chat-say': {
+      // A viewer's chat message (already filtered in src/youtubeChat.js) for WeBot to read out loud.
+      const text = cleanText(body.text, 160);
+      if (!text) throw Object.assign(new Error('Nothing to read'), { status: 400 });
+      pushCommand({ type: 'chat-say', text, user: cleanText(body.user, 24) });
+      break;
+    }
+    case 'chat-read':
+      current.chatRead = body.on !== false;
+      break;
     case 'gas-now':
       pushCommand({ type: 'segment', kind: 'gas' });
       break;
@@ -505,6 +515,8 @@ export const applyLiveCommand = async (body = {}) => {
       if ('volume' in body) music.volume = Math.round(Math.min(100, Math.max(0, Number(body.volume) || 0)));
       if (MUSIC_SOURCES.includes(body.source)) music.source = body.source;
       if (MUSIC_MOODS.includes(body.mood)) music.mood = body.mood;
+      // WeBot Radio style: mix (lo-fi with some country), lofi, or country (storms stay lo-fi).
+      if (['mix', 'lofi', 'country'].includes(body.genre)) music.genre = body.genre;
       if ('duck' in body) music.duck = Boolean(body.duck);
       current.music = music;
       break;

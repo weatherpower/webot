@@ -997,6 +997,15 @@
       chill: ['Night Shift', 'Overnight Radar', 'Low Clouds', 'Outflow', 'Mesoscale', 'Watch Box', 'Chaser Coffee', 'Data Feed'],
       tense: ['Supercell Season', 'Hook Echo', 'Wall Cloud', 'Dryline', 'Rear Flank', 'Couplet', 'Inflow', 'Bounded Weak Echo']
     };
+    // Country songs (calm and chill moods only; storms keep the darker lo-fi).
+    const COUNTRY_NAMES = ['Red Dirt Radar', 'Front Porch Forecast', 'Dryline Drive', 'Kiamichi Morning', 'County Road Rain', 'Heat Lightning',
+      'Barometer Blues', 'Prairie Thunder', 'Gravel Road Gust Front', 'Tornado Alley Two-Step', 'Cotton Field Clouds', 'Red River Rain',
+      'Thunderhead Highway', 'Pickup Truck Partly Cloudy', 'Small Town Sunrise', 'Wheat Field Wind'];
+    const COUNTRY_PROGS = [
+      [[0, 'M'], [5, 'M'], [7, 'M'], [0, 'M']], [[0, 'M'], [7, 'M'], [9, 'm'], [5, 'M']], [[0, 'M'], [0, 'M'], [5, 'M'], [7, 'M']],
+      [[0, 'M'], [5, 'M'], [0, 'M'], [7, 'M']], [[9, 'm'], [5, 'M'], [0, 'M'], [7, 'M']], [[0, 'M'], [4, 'm'], [5, 'M'], [7, 'M']]
+    ];
+    const COUNTRY = { bpm: [84, 108], keys: [55, 57, 50, 52, 48], tone: 9000, pad: 0 };
     const CHORDS = { maj7: [0, 4, 7, 11], maj9: [0, 4, 7, 11, 14], m7: [0, 3, 7, 10], m9: [0, 3, 7, 10, 14], m11: [0, 3, 7, 10, 14, 17], dom9: [0, 4, 7, 10, 14], sus: [0, 5, 7, 10, 14] };
     const PROGS = {
       calm: [[[0, 'maj9'], [9, 'm9'], [2, 'm9'], [7, 'sus']], [[5, 'maj9'], [4, 'm7'], [2, 'm9'], [0, 'maj9']], [[0, 'maj7'], [5, 'maj9'], [9, 'm9'], [5, 'maj9']]],
@@ -1169,10 +1178,129 @@
       };
       const hat = (t, vel, open) => hit(t, 7200, 'highpass', 0.5, 0.05 * vel, open ? 0.22 : 0.04);
 
+      // Steel-string guitar: Karplus-Strong plucks, made once per note and cached (cheap to play back).
+      const pluckCache = new Map();
+      const pluckBuf = (m) => {
+        if (pluckCache.has(m)) return pluckCache.get(m);
+        const f = mtof(m);
+        const n = Math.max(2, Math.round(rate / f));
+        const len = Math.floor(rate * (lite ? 1.2 : 1.8));
+        const buf = ctx.createBuffer(1, len, rate);
+        const d = buf.getChannelData(0);
+        let prev = 0;
+        for (let i = 0; i < n; i++) { d[i] = 0.55 * (Math.random() * 2 - 1) + 0.45 * prev; prev = d[i]; }
+        const keep = m > 64 ? 0.9955 : 0.9975;
+        for (let i = n; i < len; i++) d[i] = keep * 0.5 * (d[i - n] + d[i - n + 1 < i ? i - n + 1 : i - n]);
+        const item = { buf, rate: f / (rate / (n + 0.5)) };   // the loop delay is n + 0.5 samples: retune so strings stay in tune
+        pluckCache.set(m, item);
+        return item;
+      };
+      const body = ctx.createBiquadFilter();
+      body.type = 'peaking'; body.frequency.value = 210; body.Q.value = 0.9; body.gain.value = 4;
+      const guitarBus = ctx.createGain();
+      guitarBus.gain.value = 1.55;
+      guitarBus.connect(body);
+      body.connect(master);
+      const verbSend = ctx.createGain();
+      verbSend.gain.value = 0.35;
+      body.connect(verbSend).connect(verbIn);
+      const pluck = (m, t, vel, dur) => {
+        const { buf, rate: pr } = pluckBuf(m);
+        const src = ctx.createBufferSource();
+        src.buffer = buf; src.playbackRate.value = pr;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.16 * vel, t);
+        g.gain.setTargetAtTime(0.0001, t + dur, 0.08);
+        src.connect(g).connect(guitarBus);
+        src.start(t); src.stop(t + dur + 0.5);
+      };
+      // Down strums ring low to high, up strums catch the top strings.
+      const strum = (notes, t, vel, dur, up) => {
+        const list = up ? notes.slice(-3).reverse() : notes;
+        list.forEach((m, i) => pluck(m, t + i * (up ? 0.007 : 0.011), vel * (up ? 0.7 : 1) * rnd(0.85, 1), dur));
+      };
+      // Pedal steel: slides up into the note, then a slow vibrato.
+      const steel = (m, t, dur, vel) => {
+        const f = mtof(m);
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(mtof(m - 2), t);
+        o.frequency.exponentialRampToValueAtTime(f, t + 0.26);
+        const vib = ctx.createOscillator();
+        vib.frequency.value = 5.2;
+        const vibAmt = ctx.createGain();
+        vibAmt.gain.setValueAtTime(0, t);
+        vibAmt.gain.linearRampToValueAtTime(f * 0.007, t + 0.6);
+        vib.connect(vibAmt).connect(o.frequency);
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass'; filter.frequency.value = 1900; filter.Q.value = 1.2;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.046 * vel, t + 0.18);
+        g.gain.setValueAtTime(0.046 * vel, t + Math.max(0.2, dur - 0.3));
+        g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.5);
+        o.connect(filter).connect(g);
+        g.connect(master); g.connect(verbIn); g.connect(echo);
+        o.start(t); vib.start(t);
+        o.stop(t + dur + 0.6); vib.stop(t + dur + 0.6);
+      };
+      const brush = (t, vel) => hit(t, 2600, 'bandpass', 0.6, 0.15 * vel, 0.13);
+      const shaker = (t, vel) => hit(t, 8200, 'highpass', 0.6, 0.03 * vel, 0.05);
+      // Strum pattern for one bar of sixteenths: [down/up, strength].
+      const STRUM = { 0: ['d', 1], 4: ['d', 0.45], 6: ['u', 0.5], 8: ['d', 0.85], 10: ['u', 0.5], 12: ['d', 0.6], 14: ['u', 0.45] };
+      let steelIdx = 2;
+      const playCountry = (t) => {
+        const s16 = step % 16;
+        const bar = Math.floor(step / 16);
+        const sec16 = 60 / track.bpm / 4;
+        const chordAt = (b) => track.prog[Math.floor(b / track.cbars) % track.prog.length];
+        const [deg, q] = chordAt(bar);
+        const third = q === 'm' ? 3 : 4;
+        let base = track.key + deg;
+        while (base > 54) base -= 12;
+        while (base < 43) base += 12;
+        const notes = [base, base + 7, base + 12, base + 12 + third, base + 19];
+        let low = base - 12;
+        while (low < 33) low += 12;
+        const intro = bar < 2;
+        const outro = bar >= track.bars - 3;
+        const fade = outro ? 1 - (bar - (track.bars - 3) + s16 / 16) / 4 : 1;
+        const s = STRUM[s16];
+        if (s && (!intro || s16 % 8 === 0)) strum(notes, t, s[1] * fade, sec16 * (s[0] === 'd' ? 3.5 : 2), s[0] === 'u');
+        // Boom-chick: root on 1, the fifth on 3, and a walk up into a new chord.
+        if (!intro) {
+          if (s16 === 0) bass(low, t, sec16 * 3.5, 0.9 * fade);
+          if (s16 === 8) bass(low + 7 > 45 ? low - 5 : low + 7, t, sec16 * 3.5, 0.8 * fade);
+          const next = chordAt(bar + 1);
+          if (s16 === 12 && next[0] !== deg && Math.random() < 0.6) {
+            let target = track.key + next[0];
+            while (target > low + 6) target -= 12;
+            while (target < low - 6) target += 12;
+            const dir = target >= low ? 1 : -1;
+            bass(target - 2 * dir, t, sec16 * 1.6, 0.6 * fade);
+            bass(target - dir, t + sec16 * 2, sec16 * 1.6, 0.6 * fade);
+          }
+          if (s16 === 4 || s16 === 12) brush(t, rnd(0.8, 1) * fade);
+          if (s16 % 2 === 0) shaker(t, (s16 % 4 === 0 ? 0.9 : 0.6) * fade);
+          if ((s16 === 0 || s16 === 8) && bar % 2 === 0) kick(t, 0.45 * fade);
+        }
+        // The steel answers the melody now and then, on the beat.
+        if (!intro && s16 % 8 === 0 && Math.random() < 0.32 * fade) {
+          steelIdx = Math.max(0, Math.min(8, steelIdx + pick([-2, -1, 1, 1, 2])));
+          let k = track.key;
+          while (k < 60) k += 12;
+          while (k > 71) k -= 12;
+          const pent = [0, 2, 4, 7, 9];
+          steel(k + pent[steelIdx % 5] + 12 * Math.floor(steelIdx / 5), t, sec16 * rnd(5, 9), rnd(0.7, 1) * fade);
+        }
+      };
+
       let track = null;
       let step = 0;
       let nextAt = ctx.currentTime + 0.1;
       let wantMood = opts.mood || 'calm';
+      let genre = opts.genre || 'mix';
+      let lastCountry = false;
       let melIdx = 2;
       const voicing = (root, quality) => {
         let base = root;
@@ -1181,6 +1309,19 @@
         return CHORDS[quality].map((iv) => base + iv);
       };
       const newTrack = (mood) => {
+        // Mix: about 4 in 10 calm/chill songs are country, never two in a row... unless it's set to Country.
+        const country = mood !== 'tense' && (genre === 'country' || (genre === 'mix' && !lastCountry && Math.random() < 0.45));
+        lastCountry = country;
+        if (country) {
+          let name = pick(COUNTRY_NAMES);
+          if (track && name === track.name) name = pick(COUNTRY_NAMES);
+          track = { mood, style: COUNTRY, country: true, name, key: pick(COUNTRY.keys), bpm: Math.round(rnd(COUNTRY.bpm[0], COUNTRY.bpm[1])), prog: pick(COUNTRY_PROGS), cbars: pick([1, 2, 2]), bars: 40 };
+          step = 0;
+          api.started = true;
+          tone.frequency.setTargetAtTime(COUNTRY.tone, Math.max(ctx.currentTime, nextAt), 1.5);
+          api.onTrack?.(track);
+          return;
+        }
         const style = STYLES[mood];
         let name = pick(RADIO_NAMES[mood]);
         if (track && name === track.name) name = pick(RADIO_NAMES[mood]);
@@ -1191,6 +1332,7 @@
         api.onTrack?.(track);
       };
       const playStep = (t) => {
+        if (track.country) return playCountry(t);
         const st = track.style;
         const s16 = step % 16;
         const bar = Math.floor(step / 16);
@@ -1233,6 +1375,7 @@
         onTrack: null,
         get track() { return track; },
         setMood(mood) { if (STYLES[mood]) wantMood = mood; },
+        setGenre(g) { if (['mix', 'lofi', 'country'].includes(g)) genre = g; },
         next() { nextAt = Math.max(nextAt, ctx.currentTime + 0.05); newTrack(wantMood); },
         // Schedule every note up to time `until` (seconds on the audio clock).
         schedule(until) {
@@ -1242,7 +1385,7 @@
             // Storms take over right away (at the next bar); calmer moods wait for the song to end.
             if (step % 16 === 0 && track.mood !== wantMood && (wantMood === 'tense' || track.mood === 'tense')) newTrack(wantMood);
             const sec16 = 60 / track.bpm / 4;
-            playStep(nextAt + (step % 2 ? sec16 * 0.22 : 0));
+            playStep(nextAt + (step % 2 ? sec16 * (track.country ? 0.12 : 0.22) : 0));
             nextAt += sec16;
             step += 1;
             if (step >= track.bars * 16) newTrack(wantMood);
@@ -1259,7 +1402,7 @@
     };
     window.WeBotRadio = { makeRadio };
 
-    const musicCfg = () => ({ on: true, volume: 35, source: 'auto', mood: 'auto', duck: true, ...(S.control.music || {}) });
+    const musicCfg = () => ({ on: true, volume: 35, source: 'auto', mood: 'auto', genre: 'mix', duck: true, ...(S.control.music || {}) });
     const M = { bus: null, duck: null, radio: null, timer: null, el: null, files: [], filesAt: 0, order: [], idx: -1, playing: '', mode: '', mood: '', fading: false, fails: 0 };
     const autoMood = () => {
       const t = S.live?.tallies || {};
@@ -1302,7 +1445,7 @@
     };
     const startRadio = () => {
       if (M.radio) return;
-      M.radio = makeRadio(actx, M.bus, { mood: M.mood, lite: OPT.lite });
+      M.radio = makeRadio(actx, M.bus, { mood: M.mood, genre: musicCfg().genre, lite: OPT.lite });
       M.radio.onTrack = (track) => { M.playing = track.name + ' · WeBot Radio'; renderNp(); };
       const ahead = OPT.lite ? 2.5 : 0.4;
       M.radio.schedule(actx.currentTime + ahead);
@@ -1335,6 +1478,7 @@
       const mode = !on ? '' : (cfg.source === 'files' || cfg.source === 'auto') && M.files.length ? 'files' : 'radio';
       M.mood = cfg.mood === 'auto' ? autoMood() : cfg.mood;
       M.radio?.setMood(M.mood);
+      M.radio?.setGenre(cfg.genre);
       const now = actx.currentTime;
       if (mode !== M.mode) {
         if (M.fading) return;
@@ -3060,6 +3204,7 @@
           else if (cmd.type === 'music-next') musicNext();
           else if (cmd.type === 'segment' && cmd.kind === 'gas') { S.forceShot = { type: 'gas' }; nextShot(true); }
           else if (cmd.type === 'chat-request' && cmd.place) queueChatRequest(cmd);
+          else if (cmd.type === 'chat-say' && cmd.text) readChatMessage(cmd);
           else if (cmd.type === 'test-breaking') {
             const a = (cmd.key && byKey(cmd.key)) || candidates()[0];
             if (a) { S.breaking.unshift({ key: a.key, alert: a, test: true }); if (!S.inBreaking) nextShot(); }
@@ -3124,6 +3269,22 @@
       if (ack) setTimeout(headlineNow, 0);
       if (ack) S.chatAck = 'GOT IT' + (cmd.user ? ', ' + cmd.user : '') + '! ' + (cmd.kind === 'gas' ? 'GAS PRICES' : 'THE FORECAST') + ' FOR ' + where + (S.chatQueue.length > 1 ? ' IS COMING UP' : ' IS UP NEXT');
       scheduleChatJump();
+    };
+    // WeBot reads a viewer's chat message (filtered on the server): top bar first, then out loud, with a
+    // short reply now and then. Not under BRB, during breaking alerts, or with tornado warnings out.
+    const chatReply = (text) => {
+      if (/\b(hi|hello|hey|howdy|yo|sup|good (morning|evening|night|afternoon))\b/i.test(text)) return pick(['Hey there, thanks for hanging out!', 'Welcome in!', 'Howdy! Glad you’re here.']);
+      if (/\b(love|awesome|cool|great|nice|amazing|best)\b/i.test(text)) return pick(['Thank you, that means a lot!', 'Appreciate you!', 'Thanks! I’m having fun up here too.']);
+      if (/\?/.test(text) && /\b(rain|storm|snow|weather|forecast|tornado|hot|cold|temp)/i.test(text)) return 'For your town’s forecast, type exclamation forecast and your city in the chat.';
+      if (/\b(webot|yallbot)\b/i.test(text)) return pick(['That’s me!', 'Yep, WeBot here.']);
+      return '';
+    };
+    const readChatMessage = (cmd) => {
+      if (S.control.brb || S.inBreaking || !isCalm()) return;
+      S.chatAck = (cmd.user ? cmd.user + ': ' : 'CHAT: ') + cmd.text;
+      setTimeout(headlineNow, 0);
+      const reply = chatReply(cmd.text);
+      say((cmd.user || 'A viewer') + ' says: ' + cmd.text + (reply ? ' ... ' + reply : ''), { chat: true });
     };
     const scheduleChatJump = () => {
       clearTimeout(S.chatJump);
