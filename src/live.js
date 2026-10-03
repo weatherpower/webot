@@ -240,7 +240,7 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'afterdark', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, commands: [] };
 const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
@@ -399,7 +399,7 @@ export const applyLiveCommand = async (body = {}) => {
       current.state = /^[A-Z]{2}$/.test(String(body.state || '').toUpperCase()) ? String(body.state).toUpperCase() : '';
       break;
     case 'mode':
-      current.mode = ['auto', 'national', 'outlook', 'reports', 'models', 'tropics', 'surface', 'forecast'].includes(body.mode) ? body.mode : 'auto';
+      current.mode = ['auto', 'national', 'outlook', 'reports', 'models', 'tropics', 'surface', 'forecast', 'gas'].includes(body.mode) ? body.mode : 'auto';
       break;
     case 'voice':
       current.voice = Boolean(body.on);
@@ -417,6 +417,13 @@ export const applyLiveCommand = async (body = {}) => {
       // Top bar: alertsweather = warnings + weather news (default), mix = weather + top news,
       // weather = weather news only, alerts = warnings only.
       current.headlines = ['alertsweather', 'mix', 'weather', 'alerts'].includes(body.mode) ? body.mode : 'alertsweather';
+      break;
+    case 'gas':
+      // Gas prices segment in the calm-day rotation (on by default).
+      current.gas = body.on !== false;
+      break;
+    case 'gas-now':
+      pushCommand({ type: 'segment', kind: 'gas' });
       break;
     case 'brb':
       // Be-right-back card over the stream (host switches, maintenance). WeBot and the show pause under it.

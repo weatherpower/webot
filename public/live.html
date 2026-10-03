@@ -122,6 +122,17 @@
     .fc-now div { display: grid; gap: 4px; min-width: 0; }
     .fc-now span { font: 500 22px "WP Display"; text-transform: uppercase; color: #e3e8f1; line-height: 1.1; }
     .fc-now small { font: 600 12px "WP Mono"; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+    .gas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 4px 26px 12px; }
+    .gas-cell { padding: 9px 12px; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.08); }
+    .gas-cell small { display: block; font: 600 12px "WP Mono"; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+    .gas-cell b { display: block; margin-top: 4px; font: 700 34px "WP Display"; line-height: 1; color: #ffb020; }
+    .gas-cell.big b { font-size: 46px; }
+    .gas-cell em, .gas-row em { font: 700 13px "WP Mono"; font-style: normal; letter-spacing: .04em; }
+    .gas-up { color: #ff6a5a; } .gas-down { color: #6dff9a; } .gas-flat { color: var(--muted); }
+    .gas-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline; padding: 8px 26px; border-top: 1px solid rgba(255,255,255,.07); }
+    .gas-row span { font: 500 19px "WP Display"; text-transform: uppercase; }
+    .gas-row b { font: 700 22px "WP Display"; color: #fff; }
+    .gas-foot { padding: 8px 26px 18px; font: 600 11px "WP Mono"; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
     .fcr { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.07); }
     .fcr small { font: 600 12px "WP Mono"; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
     .fcr b { grid-column: 1; font: 500 19px "WP Display"; text-transform: uppercase; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1892,7 +1903,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, think: 13 };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, think: 13 };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -1905,6 +1916,7 @@
       else if (shot.type === 'tropics') s = 26;
       else if (shot.type === 'surface') s = 22;
       else if (shot.type === 'forecast') s = 22;
+      else if (shot.type === 'gas') s = 22;
       else s = 14;
       return s * OPT.speed * 1000;
     };
@@ -2083,6 +2095,7 @@
         S.pendingModel = null;
       }
       if (!shot && S.control.pin && byKey(S.control.pin)) shot = { type: 'alert', alert: byKey(S.control.pin), pinned: true };
+      if (!shot && S.forceShot) { shot = S.forceShot; S.forceShot = null; }
       if (!shot && S.control.mode === 'models') shot = { type: 'think' };
       else if (!shot && S.control.mode && S.control.mode !== 'auto') shot = { type: S.control.mode };
       if (!shot) {
@@ -2121,10 +2134,12 @@
         // The national radar + surface map is the quiet-day staple (like Ryan's).
         surface: S.surface ? (busy ? 0.8 : 2) : 0,
         // Daily forecasts only on calm days: never with tornado, severe thunderstorm or flash flood warnings out.
-        forecast: 0
+        forecast: 0,
+        gas: 0
       };
       const calm = isCalm();
-      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: forecastWeather() ? 2.5 : 0 });
+      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: forecastWeather() ? 2.5 : 0,
+        gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > 40 * 60 * 1000 ? 0.9 : 0 });
       const recent = S.kinds || [];
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
@@ -2176,7 +2191,8 @@
       if (shot.type !== 'models') hideModels();
       if (shot.type !== 'tropics') hideTropics();
       if (shot.type !== 'surface') hideSurface();
-      if (shot.type !== 'forecast') hideCity();
+      if (shot.type !== 'forecast' && shot.type !== 'gas') hideCity();
+      if (shot.type !== 'gas') hideGas();
       hideCam();
       // A pinned camera gets a mention every few segments, after WeBot's line for the segment.
       if (S.camPinnedId && S.camPinned && shot.type !== 'think' && !shot.breaking && ++S.pinTalk % 4 === 0) {
@@ -2210,6 +2226,15 @@
       }
       if (shot.type === 'models') {
         modelsShot(shot.seg);
+        $('rp').classList.add('show');
+        return;
+      }
+      if (shot.type === 'gas') {
+        setSelected('');
+        setOutlookVisible(false);
+        setMood('calm');
+        gasShot(shot);
+        renderRadarPanel();
         $('rp').classList.add('show');
         return;
       }
@@ -2375,6 +2400,90 @@
       const nowWords = current && current.temperatureF != null ? ' Right now it’s ' + Math.round(current.temperatureF) + ' degrees' + (current.textDescription ? ' and ' + skyWords(current.textDescription) : '') + '.' : '';
       const alertWords = fc.alerts.length ? ' There’s also ' + article(fc.alerts[0]) + ' ' + fc.alerts[0].toLowerCase() + ' in effect there.' : '';
       chatter(opener + nowWords + ' ' + periods.slice(0, 3).map(periodWords).join(' ') + alertWords);
+    };
+
+    /* ---------------- gas prices (U.S. EIA weekly survey + WeatherPower gas station map) ---------------- */
+    const GAS_GRADES = [['EPMR', 'Regular'], ['EPMM', 'Midgrade'], ['EPMP', 'Premium'], ['EPD2D', 'Diesel']];
+    const money = (v) => '$' + Number(v).toFixed(2);
+    // Weekly change as a chip: ▲ 4.7¢ (up is red, down is green, like the pump).
+    const gasChange = (c) => {
+      if (c == null) return '';
+      const cents = Math.abs(c * 100);
+      if (cents < 0.5) return '<em class="gas-flat">— FLAT</em>';
+      return '<em class="' + (c > 0 ? 'gas-up">▲ ' : 'gas-down">▼ ') + cents.toFixed(1) + '¢</em>';
+    };
+    const changeWords = (c) => {
+      if (c == null) return '';
+      const cents = Math.round(Math.abs(c * 100));
+      return cents < 1 ? 'about the same as last week' : (c > 0 ? 'up ' : 'down ') + cents + (cents === 1 ? ' cent' : ' cents') + ' from last week';
+    };
+    const ensureGasLayer = () => {
+      if (S.map.getSource('gas')) return;
+      S.map.addSource('gas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      S.map.addLayer({ id: 'gas', type: 'circle', source: 'gas', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 9, 5.5], 'circle-color': '#ffb020', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#10131a' } }, 'a-case');
+    };
+    const hideGas = () => {
+      if (S.styleReady && S.map.getLayer('gas')) S.map.setLayoutProperty('gas', 'visibility', 'none');
+    };
+    const gasShot = async (shot) => {
+      let g;
+      try { g = await getJson('/api/v3/gas' + (focusState() ? '?state=' + focusState() : '')); } catch { g = null; }
+      if (S.shot !== shot) return;
+      if (!g?.national?.EPMR) {
+        clearLocal();
+        nationalShot();
+        return;
+      }
+      S.gasAt = Date.now();
+      const { city, local, national, regions, stations } = g;
+      const label = city.name + ', ' + city.state;
+      const week = new Date(g.period + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).toUpperCase();
+      hideCity();
+      const el = document.createElement('div');
+      el.className = 'citymk';
+      el.innerHTML = '<i style="background:#ffb020"></i><span style="border-left-color:#ffb020">' + esc(city.name) + '</span>';
+      S.cityMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([city.lon, city.lat]).addTo(S.map);
+      if (S.styleReady) {
+        ensureGasLayer();
+        S.map.getSource('gas').setData({ type: 'FeatureCollection', features: stations.points.map((c) => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })) });
+        S.map.setLayoutProperty('gas', 'visibility', 'visible');
+      }
+      fly([[city.lon - 0.5, city.lat - 0.34], [city.lon + 0.5, city.lat + 0.34]], { maxZoom: 9.6 });
+      loadLocal(nearestSite([city.lon, city.lat]));
+      const p = local.products;
+      const cells = GAS_GRADES.filter(([k]) => p[k]).map(([k, name], i) => '<div class="gas-cell' + (i === 0 ? ' big' : '') + '"><small>' + name + '</small><b>' + money(p[k].price) + '</b>' + gasChange(p[k].change) + '</div>').join('');
+      const cheap = regions[0], high = regions[regions.length - 1];
+      const rows = [
+        ['U.S. average', national.EPMR],
+        cheap && ['Lowest · ' + cheap.name, { price: cheap.regular, change: cheap.change }],
+        high && high !== cheap && ['Highest · ' + high.name, { price: high.regular, change: high.change }]
+      ].filter(Boolean).map(([name, v]) => '<div class="gas-row"><span>' + esc(name) + '</span><b>' + money(v.price) + '</b>' + gasChange(v.change) + '</div>').join('');
+      const brands = stations.brands.slice(0, 3).map((b) => b[0]);
+      const foot = (stations.count ? stations.count + ' station' + (stations.count === 1 ? '' : 's') + ' within ' + stations.radius + ' mi' + (brands.length ? ' · ' + brands.join(', ') : '') + '<br>' : '')
+        + local.areaName + ' average · EIA weekly survey';
+      setCard('<div class="head"><div><h2>' + esc(label) + '</h2><div class="sub">GAS PRICES · WEEK OF ' + esc(week) + '</div></div></div><div class="gas-grid">' + cells + '</div>' + rows + '<div class="gas-foot">' + esc(foot).replace('&lt;br&gt;', '<br>') + '</div>', '#ffb020');
+      setNow({
+        k: 'GAS PRICES',
+        title: label + ' · Regular ' + money(p.EPMR.price) + ' · U.S. ' + money(national.EPMR.price),
+        color: '#ffb020',
+        hazards: [local.areaName.toUpperCase() + ' AVERAGE'],
+        crawl: [
+          ...GAS_GRADES.filter(([k]) => national[k]).map(([k, name]) => 'U.S. ' + name.toUpperCase() + ' ' + money(national[k].price)),
+          ...regions.map((r) => r.name.toUpperCase() + ' ' + money(r.regular))
+        ].join('   ◆   ')
+      });
+      const area = local.area === 'NUS' ? 'national' : (/^S/.test(local.area) ? local.areaName : 'the ' + local.areaName) + '';
+      const opener = pick([
+        'Let’s check gas prices.',
+        'Time for a gas price check.',
+        'Let’s see what it costs to fill up this week.',
+        'Here’s your weekly gas price update.'
+      ]);
+      const localWords = ' Around ' + cityWords(city) + ', ' + area + ' average for regular is ' + money(p.EPMR.price) + ' a gallon' + (p.EPMR.change != null ? ', ' + changeWords(p.EPMR.change) : '') + '.';
+      const usWords = ' Nationally, regular is averaging ' + money(national.EPMR.price) + (national.EPD2D ? ', and diesel is ' + money(national.EPD2D.price) : '') + '.';
+      const regionWords = cheap && high && cheap !== high ? ' The cheapest gas is in the ' + cheap.name + ' at ' + money(cheap.regular) + ', and ' + (high.name === 'California' ? 'California' : 'the ' + high.name) + ' is the highest at ' + money(high.regular) + '.' : '';
+      const stationWords = stations.count >= 3 ? ' There are ' + stations.count + ' gas stations within ' + stations.radius + ' miles of ' + city.name.replace(/^St\. /, 'Saint ') + (brands[0] ? ', and ' + brands[0] + ' has the most.' : '.') : '';
+      chatter(opener + localWords + usWords + regionWords + stationWords);
     };
 
     /* ---------------- tropics (NOAA National Hurricane Center) ---------------- */
@@ -2900,6 +3009,7 @@
           else if (cmd.type === 'next') nextShot(true);
           else if (cmd.type === 'reload') location.reload();
           else if (cmd.type === 'music-next') musicNext();
+          else if (cmd.type === 'segment' && cmd.kind === 'gas') { S.forceShot = { type: 'gas' }; nextShot(true); }
           else if (cmd.type === 'test-breaking') {
             const a = (cmd.key && byKey(cmd.key)) || candidates()[0];
             if (a) { S.breaking.unshift({ key: a.key, alert: a, test: true }); if (!S.inBreaking) nextShot(); }

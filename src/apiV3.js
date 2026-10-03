@@ -20,6 +20,7 @@ import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
 import { randomCityForecast } from './cityForecast.js';
 import { getHeadlines } from './headlines.js';
+import { gasSegment } from './gasPrices.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
@@ -340,6 +341,16 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'no-store');
       res.json(await randomCityForecast({ state: String(req.query.state || '').toUpperCase() }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Gas prices segment: EIA weekly averages + stations near a random city (inside ?state= when focused).
+  router.get('/gas', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json(await gasSegment({ state: String(req.query.state || '').toUpperCase() }));
     } catch (error) {
       next(error);
     }

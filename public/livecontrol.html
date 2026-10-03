@@ -101,7 +101,7 @@
       <section class="box">
         <h2>Show</h2>
         <div class="row"><div class="seg" id="mode">
-          <button data-mode="auto">Auto</button><button data-mode="national">National</button><button data-mode="outlook">Outlook</button><button data-mode="reports">Reports</button><button data-mode="models">Models</button><button data-mode="tropics">Tropics</button><button data-mode="surface">Radar map</button><button data-mode="forecast">Forecasts</button>
+          <button data-mode="auto">Auto</button><button data-mode="national">National</button><button data-mode="outlook">Outlook</button><button data-mode="reports">Reports</button><button data-mode="models">Models</button><button data-mode="tropics">Tropics</button><button data-mode="surface">Radar map</button><button data-mode="forecast">Forecasts</button><button data-mode="gas">Gas prices</button>
         </div></div>
         <div class="row">
           <label for="state" class="status">FOCUS</label>
@@ -111,6 +111,10 @@
           <button class="btn" id="next">Skip to next ⏭</button>
           <button class="btn" id="unpin">Unpin</button>
           <button class="btn" id="reload">Reload stream</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="gas-now">Gas prices now ⛽</button>
+          <div class="seg" id="gas-auto"><button data-v="on">Gas in rotation</button><button data-v="off">Off</button></div>
         </div>
         <p class="status" id="state-line"></p>
       </section>
@@ -392,6 +396,7 @@
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
         : 'The stream page hasn’t checked in for a minute. Open it in OBS or click "Open stream".';
+      document.querySelectorAll('#gas-auto button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.gas === false ? 'off' : 'on'))));
       document.querySelectorAll('#hl-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.headlines || 'alertsweather'))));
       $('brb-line').innerHTML = control.brb ? '<b style="color:#ffd34d">BRB IS ON AIR</b> since ' + esc(new Date(control.brb.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + (control.brb.message ? ': ' + esc(control.brb.message) : '') : 'Off: the show is running.';
       $('banner-line').innerHTML = control.banner ? 'SHOWING UNTIL <b>' + esc(new Date(control.banner.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '</b>: ' + esc(control.banner.text) : 'No banner message.';
@@ -626,6 +631,8 @@
     $('next').addEventListener('click', () => act({ action: 'next' }, 'Skipping'));
     $('unpin').addEventListener('click', () => act({ action: 'unpin' }, 'Unpinned'));
     $('reload').addEventListener('click', () => act({ action: 'reload' }, 'Stream will reload'));
+    $('gas-now').addEventListener('click', () => act({ action: 'gas-now' }, 'WeBot is checking gas prices'));
+    $('gas-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'gas', on: v === 'on' }, v === 'on' ? 'Gas prices: in the calm-day rotation' : 'Gas prices: only when you press the button'); });
     $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });
     $('say-btn').addEventListener('click', () => { const text = $('say').value.trim(); if (text) act({ action: 'say', text }, 'Sent to WeBot').then(() => { $('say').value = ''; $('say-count').textContent = '0 / 300'; }); });
     $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to WeBot'); });
