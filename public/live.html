@@ -397,6 +397,12 @@
     const talkAllowed = () => talkMode() === 'on' || (talkMode() === 'auto' && wisScore() >= 100);
     // Calm day: below WIS 100 and no tornado warnings. The show slows down and stays mellow.
     const isCalm = () => wisScore() < 100 && !(S.live?.tallies?.tor);
+    // Weather quiet enough for daily forecasts (in the focused state when there is one).
+    const forecastWeather = () => {
+      const st = focusState();
+      const t = st && S.alerts.length ? stateTallies(st) : S.live?.tallies || {};
+      return isCalm() && !t.tor && !t.svr && !t.ffw;
+    };
     // Talk timer: ordinary lines are spaced out (Live Control → Talk → "At most every"), to save voice usage.
     const talkGapMs = () => Math.max(0, Number(S.control.talkGap ?? 2)) * 60 * 1000;
     // Characters actually sent to a paid voice in the last hour (cached repeats don't count).
@@ -446,15 +452,44 @@
     /* ---------------- stage scaling + clocks ---------------- */
     // TVs often crop the edges of the picture (overscan); TV mode keeps the bars inside the visible area.
     const tvSafe = () => (OPT.safe != null ? OPT.safe : OPT.tv ? (S.control?.tvSafe ?? 3) : 0);
+    // Some TV browsers report a page wider than what they actually show (they zoom the page in), so
+    // size to the smallest of the reported viewports, and line up with the part that is on screen.
+    const viewArea = () => {
+      const vv = window.visualViewport;
+      const de = document.documentElement;
+      const ws = [innerWidth, de.clientWidth, vv && vv.width].filter((n) => n > 0);
+      const hs = [innerHeight, de.clientHeight, vv && vv.height].filter((n) => n > 0);
+      return { w: Math.min(...ws), h: Math.min(...hs), x: (vv && vv.offsetLeft) || 0, y: (vv && vv.offsetTop) || 0 };
+    };
+    const screenReport = () => {
+      const vv = window.visualViewport;
+      const de = document.documentElement;
+      const r = (n) => Math.round(n * 10) / 10;
+      return 'inner ' + innerWidth + 'x' + innerHeight + ' · client ' + de.clientWidth + 'x' + de.clientHeight
+        + (vv ? ' · visual ' + r(vv.width) + 'x' + r(vv.height) + ' zoom ' + r(vv.scale) + ' at ' + r(vv.offsetLeft) + ',' + r(vv.offsetTop) : ' · no visualViewport')
+        + ' · screen ' + screen.width + 'x' + screen.height + ' · dpr ' + r(devicePixelRatio) + ' · full ' + Boolean(document.fullscreenElement || document.webkitFullscreenElement)
+        + ' · fit ' + ($('stage').style.transform || '') + ' · ' + navigator.userAgent;
+    };
     const fit = () => {
       const m = tvSafe() / 100;
-      const w = innerWidth * (1 - 2 * m);
-      const h = innerHeight * (1 - 2 * m);
+      const a = viewArea();
+      const w = a.w * (1 - 2 * m);
+      const h = a.h * (1 - 2 * m);
       const s = Math.min(w / 1920, h / 1080);
-      $('stage').style.transform = 'translate(' + Math.round((innerWidth - 1920 * s) / 2) + 'px,' + Math.round((innerHeight - 1080 * s) / 2) + 'px) scale(' + s + ')';
-      S.fitKey = innerWidth + 'x' + innerHeight + '@' + tvSafe();
+      $('stage').style.transform = 'translate(' + Math.round(a.x + (a.w - 1920 * s) / 2) + 'px,' + Math.round(a.y + (a.h - 1080 * s) / 2) + 'px) scale(' + s + ')';
+      S.fitKey = a.w + 'x' + a.h + '+' + a.x + ',' + a.y + '@' + tvSafe();
+      // The sound / sign-in reminders sit outside the stage; keep them centered in what's on screen.
+      [['gate', 18], ['puter-gate', 72]].forEach(([id, top]) => {
+        const el = $(id);
+        if (!el) return;
+        el.style.left = Math.round(a.x + a.w / 2) + 'px';
+        el.style.top = Math.round(a.y + a.h * (tvSafe() / 100) + top) + 'px';
+      });
     };
+    const fitKeyNow = () => { const a = viewArea(); return a.w + 'x' + a.h + '+' + a.x + ',' + a.y + '@' + tvSafe(); };
     addEventListener('resize', fit);
+    window.visualViewport?.addEventListener('resize', fit);
+    window.visualViewport?.addEventListener('scroll', fit);
     fit();
     if (OPT.tv) {
       document.body.classList.add('tv');
@@ -1896,11 +1931,11 @@
         tropics: tropicsActive() && tropicsHere() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
         // The national radar + surface map is the quiet-day staple (like Ryan's).
         surface: S.surface ? (busy ? 0.8 : 2) : 0,
-        // Daily forecast for a random city.
-        forecast: busy >= 10 ? 0.4 : 1.4
+        // Daily forecasts only on calm days: never with tornado, severe thunderstorm or flash flood warnings out.
+        forecast: 0
       };
       const calm = isCalm();
-      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: 2.5 });
+      if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: forecastWeather() ? 2.5 : 0 });
       const recent = S.kinds || [];
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
@@ -2655,12 +2690,12 @@
     };
     const loadLive = async () => {
       // The query is a heartbeat for the control panel: what is playing and which voice is on.
-      const body = await getJson('/api/v3/live?' + new URLSearchParams({ np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '', chars: ttsCharsHour() }));
+      const body = await getJson('/api/v3/live?' + new URLSearchParams(OPT.tv ? { tv: '1', scr: screenReport() } : { np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '', chars: ttsCharsHour() }));
       const prevRev = S.control.rev;
       const prevCtl = S.control;
       S.live = body;
       S.control = body.control || S.control;
-      if (S.fitKey !== innerWidth + 'x' + innerHeight + '@' + tvSafe()) fit();
+      if (S.fitKey !== fitKeyNow()) fit();
       renderTop();
       if (S.styleReady) S.map.getSource('reports')?.setData(reportFC());
       const st = focusState();

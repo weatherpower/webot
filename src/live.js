@@ -258,9 +258,15 @@ const loadControl = async () => {
 // The stream page reports what it is playing on every poll so the control panel can show it.
 // Memory only: it is just a display hint, and anyone can load the stream page.
 let streamBeat = null;
+// TV pages (?tv=1) report their screen size instead, so a TV never overwrites what OBS is playing.
+let tvBeat = null;
 export const noteStreamBeat = (query = {}) => {
-  if (!query.np && !query.tts) return;
   const clip = (value, max) => String(value || '').replace(/[\u0000-\u001f]/g, '').slice(0, max);
+  if (query.tv) {
+    tvBeat = { at: new Date().toISOString(), screen: clip(query.scr, 500) };
+    return;
+  }
+  if (!query.np && !query.tts) return;
   streamBeat = {
     at: new Date().toISOString(),
     playing: clip(query.np, 90),
@@ -359,7 +365,8 @@ export const liveControl = async () => {
     puter: { linked: Boolean(s.puterToken), user: s.puterUser || '', linkedAt: s.puterLinkedAt || null },
     banner: current.banner && Date.parse(current.banner.until) > now ? current.banner : null,
     commands: current.commands.filter((command) => now - Date.parse(command.at) < 5 * 60 * 1000),
-    stream: streamBeat && now - Date.parse(streamBeat.at) < 60 * 1000 ? streamBeat : null
+    stream: streamBeat && now - Date.parse(streamBeat.at) < 60 * 1000 ? streamBeat : null,
+    tv: tvBeat && now - Date.parse(tvBeat.at) < 60 * 1000 ? tvBeat : null
   };
 };
 

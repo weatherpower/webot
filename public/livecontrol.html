@@ -198,6 +198,7 @@
         <h3 style="margin:18px 0 6px;font-size:15px">TV</h3>
         <p class="note" style="margin-top:0">Open <a id="tv-url" target="_blank" rel="noopener"></a> on the TV. The first press of OK on the remote turns on sound and full screen. If the top or bottom bar is cut off, raise <b>TV fit</b> until both bars show. OBS isn't affected.</p>
         <div class="row"><label for="tv-safe">TV fit</label><select id="tv-safe"><option value="0">0% (edge to edge)</option><option value="1">1%</option><option value="2">2%</option><option value="3">3% (most TVs)</option><option value="4">4%</option><option value="5">5%</option><option value="6">6%</option><option value="8">8%</option><option value="10">10%</option></select></div>
+        <p class="status" id="tv-line" style="margin:8px 0 0"></p>
       </section>
 
       <section class="box">
@@ -359,6 +360,7 @@
       renderCamControl();
       renderThemes();
       if (document.activeElement !== $('tv-safe')) $('tv-safe').value = String(control?.tvSafe ?? 3);
+      $('tv-line').textContent = control?.tv ? 'TV CONNECTED · ' + control.tv.screen.split(' · ').slice(0, 3).join(' · ') : 'No TV connected (open the TV link on the TV).';
       const talk = control.talk || 'auto';
       document.querySelectorAll('#talk-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === talk)));
       $('talk-line').innerHTML = (talk === 'on' ? 'WeBot talks about everything on screen.' : talk === 'off' ? 'WeBot stays quiet (typed "Say it" lines still play).' : 'WeBot stays quiet on calm days and starts talking once the WIS reaches 100.')
