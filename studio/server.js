@@ -14,14 +14,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
 const CONFIG_FILE = path.join(here, 'studio.config.json');
 const DEFAULTS = { port: 7777, host: '104.207.81.143', sshPort: 22022, sshUser: 'root', remoteDir: '/opt/weatherpower', controlPort: 8899, statusPort: 80 };
-const config = { ...DEFAULTS, ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.readFile(CONFIG_FILE, 'utf8')) : {}) };
+const config = { ...DEFAULTS, ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.readFile(CONFIG_FILE, 'utf8')) : {}), ...(process.env.STUDIO_PORT ? { port: Number(process.env.STUDIO_PORT) } : {}) };
 // For testing against a local server: STUDIO_CONTROL_BASE=http://localhost:8898 STUDIO_TOKEN=...
 const CONTROL_BASE = process.env.STUDIO_CONTROL_BASE || `http://${config.host}:${config.controlPort}`;
 const STATUS_BASE = process.env.STUDIO_STATUS_BASE || `http://${config.host}${config.statusPort === 80 ? '' : ':' + config.statusPort}`;
 
 /* ---------------- shell helpers ---------------- */
 const run = (cmd, args, { input, timeout = 60000, cwd = projectRoot } = {}) => new Promise((resolve) => {
-  const child = spawn(cmd, args, { cwd, windowsHide: true });
+  // ELECTRON_RUN_AS_NODE: inside the desktop program, process.execPath is the program itself; this makes it act as Node.
+  const child = spawn(cmd, args, { cwd, windowsHide: true, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
   let out = '', err = '';
   const timer = setTimeout(() => { child.kill(); err += '\n(timed out)'; }, timeout);
   child.stdout.on('data', (d) => { out += d; });

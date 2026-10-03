@@ -250,30 +250,115 @@ input[type=range] { width: 100%; accent-color: var(--cyan); }
 .help-doc p, .help-doc li { color: #c3cbdc; }
 .help-doc code { font: 600 12px "WP Mono"; background: var(--inset); padding: 1px 5px; color: var(--cyan); }
 
-/* ---------- Stream House additions ---------- */
+/* ---------- Stream House: map workspace ---------- */
 body.house { grid-template-columns: 1fr; }
-.house main { grid-template-rows: auto 1fr; }
+.house main { grid-template-rows: auto 1fr; height: 100vh; }
 .house .brand { border: 0; padding: 0 18px 0 16px; }
 .house .strip .brand { flex-direction: row; }
-.console { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr); gap: 12px; padding: 14px 16px 40px; align-items: start; }
-@media (max-width: 1200px) { .console { grid-template-columns: 1fr; } }
-.preview { position: relative; width: 100%; aspect-ratio: 16 / 9; background: repeating-conic-gradient(#141a26 0 25%, #10151f 0 50%) 0 0 / 28px 28px; border: 1px solid var(--line); overflow: hidden; }
-.preview iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; }
-.scenes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.scenebtn { all: unset; cursor: pointer; padding: 14px 12px; border: 1px solid var(--line-2); background: var(--panel-2); display: grid; gap: 5px; }
-.scenebtn b { font: 700 20px/1 "WP Display"; letter-spacing: .03em; text-transform: uppercase; }
-.scenebtn span { font: 600 10px/1 "WP Mono"; letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.strip strong.warn { color: var(--amber); }
+.strip strong.bad { color: var(--red); }
+.links a { cursor: pointer; }
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 410px; min-height: 0; }
+.mapwrap { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #0b1220; }
+#map { position: absolute; inset: 0; }
+.maplibregl-canvas:focus { outline: none; }
+
+/* the part of your map that's on stream */
+.frame { position: absolute; pointer-events: none; border: 2px solid rgba(51, 212, 255, .85); box-shadow: 0 0 0 9999px rgba(3, 5, 10, .5); z-index: 2; }
+.frame.held { border-color: var(--amber); }
+.frame .band { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(135deg, rgba(139, 108, 255, .16) 0 8px, rgba(139, 108, 255, .07) 8px 16px); border-color: rgba(139, 108, 255, .45); border-style: dashed; border-width: 0; }
+.frame .band.top { top: 0; border-bottom-width: 1px; }
+.frame .band.bottom { bottom: 0; border-top-width: 1px; }
+.frame .ghost-card { position: absolute; border: 1px dashed rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .04); }
+.flabel { position: absolute; left: -2px; bottom: 100%; padding: 4px 8px 3px; background: rgba(51, 212, 255, .9); color: #04121a; font: 700 10px/1 "WP Mono"; letter-spacing: .16em; white-space: nowrap; }
+.frame.held .flabel { background: var(--amber); color: #170f00; }
+
+/* floating map tools */
+.mtools { position: absolute; top: 10px; z-index: 4; display: flex; flex-direction: column; gap: 6px; }
+.mtools.left { left: 10px; align-items: flex-start; }
+.mtools.right { right: 10px; align-items: flex-end; }
+.tgroup { display: flex; align-items: center; gap: 0; background: rgba(9, 13, 22, .9); border: 1px solid var(--line-2); backdrop-filter: blur(6px); }
+.tgroup > button { all: unset; cursor: pointer; padding: 7px 10px; font: 600 10.5px/1 "WP Mono"; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); border-left: 1px solid var(--line-2); }
+.tgroup > button:first-child { border-left: 0; }
+.tgroup > button:hover { color: #fff; }
+.tgroup > button.on { color: var(--cyan); background: var(--cyan-dim); }
+.tgroup > button:disabled { opacity: .35; cursor: default; }
+.tgroup .seg { border: 0; }
+.tgroup select { width: 230px; padding: 5px 8px; border: 0; border-left: 1px solid var(--line-2); font: 500 11.5px "WP Mono"; }
+.tgroup.loop { padding-right: 10px; gap: 10px; }
+.tgroup.loop #play { width: 14px; text-align: center; }
+.tgroup.loop input { width: 90px; }
+#rtime { font: 600 11px/1 "WP Mono"; letter-spacing: .08em; color: var(--dim); min-width: 92px; }
+#rtime.latest { color: var(--green); }
+.take { padding: 7px 14px !important; color: #fff !important; }
+.take.hot { background: var(--amber) !important; color: #170f00 !important; animation: hot 1.2s ease-in-out infinite; }
+@keyframes hot { 50% { background: #ffcd6b; } }
+.mhint { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 3; font: 500 10.5px/1 "WP Mono"; letter-spacing: .08em; color: rgba(220, 227, 240, .55); text-shadow: 0 1px 3px #000; white-space: nowrap; pointer-events: none; }
+.tip { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; display: grid; gap: 3px; padding: 8px 11px; max-width: 290px; background: rgba(9, 13, 22, .95); border: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+.tip b { font: 600 15px/1.1 "WP Display"; letter-spacing: .03em; border-left: 3px solid var(--c); padding-left: 7px; }
+.tip small { color: var(--dim); font-size: 11.5px; }
+.rpop .maplibregl-popup-content { background: rgba(9, 13, 22, .96); color: var(--text); border: 1px solid var(--line-2); border-radius: 0; padding: 9px 12px; font: 400 12.5px/1.4 "WP Sans"; }
+.rpop .maplibregl-popup-tip { border-top-color: rgba(9, 13, 22, .96) !important; border-bottom-color: rgba(9, 13, 22, .96) !important; }
+.rpop b { display: block; font: 600 16px/1.1 "WP Display"; text-transform: uppercase; letter-spacing: .03em; }
+.rpop small { display: block; color: var(--dim); margin-top: 2px; }
+.rpop p { margin: 6px 0 0; }
+
+/* side panel */
+.side { display: flex; flex-direction: column; min-height: 0; background: var(--rail); border-left: 1px solid var(--line); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); flex: none; }
+.tabs button { all: unset; cursor: pointer; text-align: center; white-space: nowrap; padding: 13px 4px 11px; font: 600 11px/1 "WP Mono"; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border-bottom: 2px solid transparent; }
+.tabs button:hover { color: #fff; }
+.tabs button.on { color: #fff; border-bottom-color: var(--cyan); background: linear-gradient(0deg, var(--cyan-dim), transparent); }
+.tabs em { font-style: normal; margin-left: 4px; padding: 2px 5px; background: var(--red); color: #fff; font-size: 10px; }
+.tabs em:empty { display: none; }
+.tab { display: none; overflow: auto; min-height: 0; flex: 1; }
+.tab.on { display: flex; flex-direction: column; }
+.tab .pad { padding: 12px; }
+.tab[data-tab="warn"] { overflow: hidden; }
+
+.sel { flex: none; margin: 12px 12px 0; padding: 12px 14px 14px; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--c); }
+.sel.air { box-shadow: inset 0 0 0 1px rgba(255, 59, 74, .55); }
+.sel-head { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+.sel-head > i { display: none; }
+.sel-head b { display: block; font: 700 23px/1.05 "WP Display"; letter-spacing: .02em; text-transform: uppercase; }
+.sel-head small { display: block; margin-top: 5px; color: var(--dim); font-size: 12.5px; max-height: 54px; overflow: auto; }
+.sel-head .x { all: unset; cursor: pointer; color: var(--faint); font-size: 14px; padding: 2px 4px; }
+.sel-head .x:hover { color: #fff; }
+.sel-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.sel-meta .chip { padding: 3px 6px; font-size: 10px; }
+.sel-hz { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.sel-hz span { padding: 3px 7px; background: var(--inset); border-left: 2px solid var(--c); font: 600 11px/1.3 "WP Mono"; color: #e6ecf8; }
+.sel-hz:empty { display: none; }
+.sel-sum { margin: 9px 0 0; color: #c3cbdc; font-size: 12.5px; max-height: 92px; overflow: auto; }
+.sel-sum:empty { display: none; }
+.sel-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+
+.alerts { flex: 1; overflow: auto; border-top: 1px solid var(--line); }
+.arow { display: grid; grid-template-columns: 4px 1fr auto; gap: 11px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.arow:hover { background: rgba(255, 255, 255, .025); }
+.arow.sel { background: var(--cyan-dim); box-shadow: inset 2px 0 var(--cyan); }
+.arow i { align-self: stretch; background: var(--c); }
+.arow b { display: block; font: 600 14.5px/1.15 "WP Display"; text-transform: uppercase; letter-spacing: .02em; }
+.arow small { display: block; margin-top: 3px; color: var(--dim); font-size: 11.5px; }
+.arow .acts { display: flex; gap: 3px; }
+.arow .acts .btn { padding: 5px 6px; font-size: 10px; }
+.arow.feat b::after { content: "  · ON AIR"; font: 600 10px "WP Mono"; color: var(--red); letter-spacing: .12em; }
+.new { font-style: normal; font: 700 9.5px/1 "WP Mono"; letter-spacing: .1em; padding: 2px 4px; margin-right: 6px; background: var(--amber); color: #170f00; vertical-align: 2px; }
+
+.scenes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.scenebtn { all: unset; cursor: pointer; padding: 11px 9px; border: 1px solid var(--line-2); background: var(--panel-2); display: grid; gap: 5px; }
+.scenebtn b { font: 700 18px/1 "WP Display"; letter-spacing: .03em; text-transform: uppercase; }
+.scenebtn span { font: 600 9px/1 "WP Mono"; letter-spacing: .1em; color: var(--faint); text-transform: uppercase; }
 .scenebtn:hover { border-color: var(--cyan); }
 .scenebtn.on { border-color: var(--red); background: rgba(255, 59, 74, .12); }
 .scenebtn.on span { color: var(--red); }
-.alerts { max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
-.arow { display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.arow i { align-self: stretch; background: var(--c); }
-.arow b { display: block; font: 600 15px/1.15 "WP Display"; text-transform: uppercase; letter-spacing: .02em; }
-.arow small { display: block; margin-top: 3px; color: var(--dim); font-size: 12px; }
-.arow .acts { display: flex; gap: 4px; }
-.arow.feat b::after { content: "  · ON AIR"; font: 600 10px "WP Mono"; color: var(--red); letter-spacing: .12em; }
-.toggles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; }
+.seg.wrap { flex-wrap: wrap; }
+.seg.wrap button { border-bottom: 1px solid var(--line-2); }
+.toggles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; }
+.toggles.one { grid-template-columns: 1fr; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.urls code { display: block; margin-top: 4px; font: 600 12.5px "WP Mono"; color: var(--cyan); background: var(--inset); padding: 7px 9px; border: 1px solid var(--line); user-select: all; overflow-wrap: anywhere; }
+.urls code { display: block; margin-top: 4px; font: 600 12px "WP Mono"; color: var(--cyan); background: var(--inset); padding: 6px 8px; border: 1px solid var(--line); user-select: all; overflow-wrap: anywhere; }
 .kbd { display: inline-block; min-width: 20px; padding: 2px 6px; border: 1px solid var(--line-2); font: 600 11px "WP Mono"; color: var(--dim); text-align: center; }
+.toast div { display: flex; align-items: center; gap: 12px; }
+.toast div .btn { margin-left: auto; }
+@media (max-width: 1100px) { .work { grid-template-columns: minmax(0, 1fr) 340px; } .mhint { display: none; } }

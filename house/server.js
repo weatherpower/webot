@@ -1,6 +1,10 @@
-// WeatherPower Stream House: WeBot's on-air look (bars, alert cards, breaking alerts, scenes) for YOUR
-// live streams. Add http://localhost:7788/overlay as an OBS Browser Source (1920x1080) on top of your
-// camera / screen, and run the show from http://localhost:7788. Start it with "Stream House.cmd".
+// WeatherPower Stream House: a warning map you run your own live streams from, plus WeBot's on-air look
+// (bars, alert cards, breaking alerts, scenes) as a separate overlay.
+//   Map you work on:      http://localhost:7788
+//   Stream map (output):  http://localhost:7788/map       follows your map, clean, 1920x1080
+//   Overlay (output):     http://localhost:7788/overlay   transparent, 1920x1080, goes on top
+//   Program (output):     http://localhost:7788/program   stream map + overlay in one
+// The "WeatherPower Stream House" program (desktop/) runs this server inside its own window.
 //
 // Weather data comes from your WeatherPower server (the same alerts, WIS and headlines WeBot uses),
 // fetched here once and pushed to every overlay instantly. Only this computer can reach it.
@@ -13,13 +17,14 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
 const CONFIG_FILE = path.join(here, 'house.config.json');
-const STATE_FILE = path.join(here, 'house.state.json');
+const STATE_FILE = process.env.HOUSE_STATE_FILE || path.join(here, 'house.state.json');
 const config = {
   port: 7788,
   // Where the weather comes from: your cloud server (Live Control port, home internet only), then the
   // WeatherPower server on this PC if you run one.
   dataSources: ['http://104.207.81.143:8899/warningcenter', 'http://localhost:8899/warningcenter'],
-  ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.readFile(CONFIG_FILE, 'utf8')) : {})
+  ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.readFile(CONFIG_FILE, 'utf8')) : {}),
+  ...(process.env.HOUSE_PORT ? { port: Number(process.env.HOUSE_PORT) } : {})
 };
 
 /* ---------------- show state (what the overlay shows), saved between runs ---------------- */
@@ -38,6 +43,17 @@ const DEFAULT_STATE = {
   brb: { message: 'Hang tight, live weather coverage is coming right back.' },
   ending: { title: 'Thanks for watching', message: 'WeBot keeps the 24/7 stream going on WeatherPower Live.' },
   brandText: 'WEATHERPOWER.APP',
+  // The stream map: which layers it draws, which radar, and the warning you picked (it pulses on stream).
+  map: {
+    layers: { radar: true, warnings: true, watches: true, reports: true, velocity: false },
+    radar: 'auto',               // national | site | auto (nearest radar site once you zoom in)
+    site: '',
+    opacity: 0.85,
+    selected: '',
+    showSelected: true,
+    follow: 'smooth'             // mirror (moves with you) | smooth (flies there when you stop) | hold (only on Take)
+  },
+  view: { center: [-96, 38.6], zoom: 4.3, bearing: 0, pitch: 0 },
   rev: 0
 };
 const merge = (def, val) => {
@@ -63,7 +79,9 @@ const applyPatch = (target, patch) => {
 };
 
 /* ---------------- weather data from the WeatherPower server ---------------- */
-const data = { alerts: [], tallies: {}, wis: null, headlines: { weather: [], news: [] }, source: '', updatedAt: null, error: null };
+const data = { alerts: [], tallies: {}, wis: null, reports: [], headlines: { weather: [], news: [] }, source: '', updatedAt: null, error: null };
+// Shapes for the maps (kept out of the live pushes; the maps fetch them when updatedAt changes).
+let shapes = { type: 'FeatureCollection', features: [] };
 let sourceIdx = 0;
 const fetchJson = async (p) => {
   let lastErr;
@@ -96,14 +114,24 @@ const BREAK_RULES = [
 const loadAlerts = async () => {
   try {
     const body = await fetchJson('/api/v3/alerts');
-    data.alerts = (body.alerts || []).filter((a) => ['warnings', 'watches', 'statements', 'discussions'].includes(a.group)).map(slim);
+    const full = (body.alerts || []).filter((a) => ['warnings', 'watches', 'statements', 'discussions'].includes(a.group));
+    data.alerts = full.map(slim);
+    shapes = {
+      type: 'FeatureCollection',
+      features: full.filter((a) => a.geometry).map((a) => ({
+        type: 'Feature', geometry: a.geometry,
+        properties: { key: a.key, color: a.accent || a.color || '#888', rank: a.rank ?? 9, group: a.group }
+      })).sort((x, y) => y.properties.rank - x.properties.rank)
+    };
     data.updatedAt = new Date().toISOString();
     data.error = null;
-    // Breaking: new alerts only (nothing fires for what was already out when Stream House started).
+    // New alerts only (nothing fires for what was already out when Stream House started).
     for (const a of data.alerts) {
       if (seen.has(a.key)) continue;
       seen.add(a.key);
-      if (!primed || !state.breaking.auto || (state.focus && !a.states.includes(state.focus))) continue;
+      if (!primed) continue;
+      if (a.group === 'warnings' || a.group === 'watches') broadcast('new', a);
+      if (!state.breaking.auto || (state.focus && !a.states.includes(state.focus))) continue;
       if (BREAK_RULES.some(([k, test]) => state.breaking[k] && test(a))) broadcast('breaking', { alert: a, test: false });
     }
     primed = true;
@@ -117,6 +145,7 @@ const loadLive = async () => {
   try {
     const body = await fetchJson('/api/v3/live');
     data.tallies = body.tallies || {};
+    data.reports = (body.reports || []).slice(0, 400).map((r) => ({ type: r.type, magnitude: r.magnitude, city: r.city, state: r.state, time: r.time, remark: r.remark, lon: r.lon, lat: r.lat }));
     data.wis = body.wis?.loaded ? { score: body.wis.score, label: body.wis.label, level: body.wis.level, ago30: body.wis.ago30, history: (body.wis.history || []).slice(-60) } : null;
     broadcast('data', data);
   } catch {}
@@ -149,12 +178,58 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(here, 'public'), { index: 'index.html' }));
 app.use('/assets', express.static(path.join(projectRoot, 'public', 'assets'), { maxAge: '1d' }));
 app.get('/overlay', (req, res) => res.sendFile(path.join(here, 'public', 'overlay.html')));
+app.get('/map', (req, res) => res.sendFile(path.join(here, 'public', 'map.html')));
+app.get('/program', (req, res) => res.sendFile(path.join(here, 'public', 'program.html')));
+
+/* ---------------- map data: shapes, radar, radar sites, base map ---------------- */
+const cached = (ms, load) => {
+  const memo = new Map();
+  return async (key = '') => {
+    const hit = memo.get(key);
+    if (hit && Date.now() - hit.at < ms) return hit.body;
+    const body = await load(key);
+    memo.set(key, { at: Date.now(), body });
+    return body;
+  };
+};
+const radarNational = cached(110000, () => fetchJson('/api/v3/radar'));
+const radarSite = cached(110000, (site) => fetchJson('/api/v3/live/radar?site=' + encodeURIComponent(site)));
+const radarSites = cached(24 * 3600 * 1000, () => fetchJson('/api/v3/nexrad'));
+const mapConfig = cached(3600 * 1000, () => fetchJson('/api/v3/config'));
+const sendJson = (load) => async (req, res) => {
+  try { res.json(await load(req)); } catch (e) { res.status(502).json({ error: e.message }); }
+};
+app.get('/api/map/shapes', (req, res) => res.json(shapes));
+app.get('/api/map/radar', sendJson(() => radarNational()));
+app.get('/api/map/radar/site', sendJson((req) => {
+  const site = String(req.query.site || '').toUpperCase();
+  if (!/^[A-Z0-9]{3,4}$/.test(site)) throw new Error('Bad radar site');
+  return radarSite(site);
+}));
+app.get('/api/map/sites', sendJson(() => radarSites()));
+app.get('/api/map/style', sendJson(async () => {
+  const c = await mapConfig().catch(() => ({}));
+  return { styleUrl: c.darkStyleUrl || 'https://tiles.openfreemap.org/styles/dark' };
+}));
+// Where the stream map looks. Your map sends it; every stream map moves (how = jump, ease or fly).
+app.post('/api/view', (req, res) => {
+  const v = req.body || {};
+  const num = (x, lo, hi, d) => (Number.isFinite(Number(x)) ? Math.min(hi, Math.max(lo, Number(x))) : d);
+  const center = Array.isArray(v.center) ? [num(v.center[0], -180, 180, -96), num(v.center[1], -85, 85, 38.6)] : state.view.center;
+  state.view = { center, zoom: num(v.zoom, 0, 20, 4.3), bearing: num(v.bearing, -180, 180, 0), pitch: num(v.pitch, 0, 70, 0) };
+  saveState();
+  broadcast('view', { ...state.view, how: ['jump', 'ease', 'fly'].includes(v.how) ? v.how : 'fly', src: String(v.src || '').slice(0, 40) });
+  res.json({ ok: true });
+});
 
 app.get('/api/events', (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
   res.flushHeaders();
   res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`);
   res.write(`event: data\ndata: ${JSON.stringify(data)}\n\n`);
+  res.write(`event: view\ndata: ${JSON.stringify({ ...state.view, how: 'jump' })}\n\n`);
+  // Who's listening (the overlay, the stream map, the program view or the map you work on).
+  res.who = ['overlay', 'map', 'program', 'panel'].includes(req.query.who) ? req.query.who : 'other';
   clients.add(res);
   const ping = setInterval(() => res.write(': ping\n\n'), 25000);
   req.on('close', () => { clearInterval(ping); clients.delete(res); });
@@ -174,7 +249,11 @@ app.post('/api/breaking', (req, res) => {
   res.json({ ok: true, alert: a.eventLabel });
 });
 app.post('/api/refresh', async (req, res) => { await Promise.all([loadAlerts(), loadLive(), loadHeadlines()]); res.json({ ok: true, alerts: data.alerts.length, error: data.error }); });
-app.get('/api/info', (req, res) => res.json({ port: config.port, dataSources: config.dataSources, source: data.source, clients: clients.size }));
+app.get('/api/info', (req, res) => {
+  const who = {};
+  for (const c of clients) who[c.who] = (who[c.who] || 0) + 1;
+  res.json({ port: config.port, dataSources: config.dataSources, source: data.source, clients: clients.size, who });
+});
 
 // One-tap actions for a Stream Deck ("Website" action, open in background) or hotkey tools.
 const ACTIONS = {
@@ -187,6 +266,8 @@ const ACTIONS = {
   'lower/toggle': () => { state.layout.lower = !state.layout.lower; state.lower.shownAt = new Date().toISOString(); },
   'card/hide': () => { state.layout.card = false; },
   'bottom/auto': () => { state.bottom.mode = 'auto'; },
+  'map/home': () => { state.view = { center: [-96, 38.6], zoom: 4.3, bearing: 0, pitch: 0 }; broadcast('view', { ...state.view, how: 'fly' }); },
+  'map/clear': () => { state.map.selected = ''; },
   'breaking/test': () => { const a = data.alerts.find((x) => /tornado warning/i.test(x.event)) || data.alerts[0]; if (a) broadcast('breaking', { alert: a, test: true }); }
 };
 app.get('/do/:group/:action', (req, res) => {
@@ -199,8 +280,9 @@ app.get('/do/:group/:action', (req, res) => {
 
 app.listen(config.port, '127.0.0.1', async () => {
   console.log(`WeatherPower Stream House is running.`);
-  console.log(`  Control panel:  http://localhost:${config.port}`);
-  console.log(`  OBS overlay:    http://localhost:${config.port}/overlay   (Browser Source, 1920 x 1080)`);
+  console.log(`  Your map:       http://localhost:${config.port}`);
+  console.log(`  Stream map:     http://localhost:${config.port}/map       (Browser Source, 1920 x 1080)`);
+  console.log(`  Overlay:        http://localhost:${config.port}/overlay   (Browser Source, 1920 x 1080, on top)`);
   await Promise.all([loadAlerts(), loadLive(), loadHeadlines()]);
   console.log(data.error ? `  Weather data: NOT CONNECTED (${data.error})` : `  Weather data: ${data.alerts.length} alerts from ${data.source}`);
 });

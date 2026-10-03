@@ -190,6 +190,8 @@
     const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
     const params = new URLSearchParams(location.search);
     if (params.has('preview')) document.body.classList.add('preview');
+    // ?bg=green for a chroma-key window capture, ?bg=black for a plain monitor.
+    if (params.get('bg')) document.body.style.background = params.get('bg') === 'green' ? '#00b140' : '#000';
     const S = { state: null, data: { alerts: [], tallies: {}, wis: null, headlines: {} }, hlIndex: 0, list: [], cardKey: null, nowKey: '' };
 
     // Fit the 1920x1080 stage to whatever size the source is.
@@ -442,7 +444,7 @@
 
     /* ---------- live connection to Stream House ---------- */
     const connect = () => {
-      const es = new EventSource('/api/events');
+      const es = new EventSource('/api/events?who=' + encodeURIComponent(params.get('who') || 'overlay'));
       es.addEventListener('state', (e) => {
         const prev = S.state;
         S.state = JSON.parse(e.data);

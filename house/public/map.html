@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stream Map · WeatherPower Stream House</title>
+  <link rel="icon" href="/assets/wp-logo.png">
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    @font-face { font-family: "WP Display"; src: url("/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 200 700; }
+    @font-face { font-family: "WP Mono"; src: url("/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 600; }
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    /* Drawn at 1920x1080 (what OBS gets) and scaled to fit any window. */
+    #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; background: #0b1220; overflow: hidden; }
+    #map { position: absolute; inset: 0; }
+    .stamp { position: absolute; right: 26px; top: 96px; display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 12px; background: rgba(8, 11, 20, .78);
+      border-left: 3px solid #33d4ff; font: 600 17px/1 "WP Mono", monospace; letter-spacing: .1em; color: #e8eefb; text-transform: uppercase; transition: opacity .4s; }
+    .stamp i { width: 9px; height: 9px; background: #3ee08f; }
+    .stamp.old i { background: #8a96b0; }
+    .stamp.off { opacity: 0; }
+    .wait { position: absolute; inset: 0; display: grid; place-items: center; font: 600 40px "WP Display", sans-serif; letter-spacing: .08em; color: #56627c; }
+  </style>
+</head>
+<body>
+  <div id="stage"><div id="map"></div><div class="stamp off" id="stamp"><i></i><span id="stamp-t"></span></div><div class="wait" id="wait">WEATHERPOWER</div></div>
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="/wpmap.js"></script>
+  <script>
+    (async () => {
+      const $ = (id) => document.getElementById(id);
+      const params = new URLSearchParams(location.search);
+      const fit = () => { const s = Math.min(innerWidth / 1920, innerHeight / 1080); $('stage').style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`; };
+      addEventListener('resize', fit); fit();
+      let M = null, firstView = null, cfg = null, data = null, shapesAt = '';
+      const fmt = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const loadShapes = async () => {
+        if (!M || !data || data.updatedAt === shapesAt) return;
+        shapesAt = data.updatedAt;
+        try { M.setShapes(await (await fetch('/api/map/shapes', { cache: 'no-store' })).json()); } catch { shapesAt = ''; }
+      };
+      const connect = () => {
+        const es = new EventSource('/api/events?who=' + (params.get('who') || 'map'));
+        es.addEventListener('state', (e) => { cfg = JSON.parse(e.data).map; if (M) M.setConfig(cfg); });
+        es.addEventListener('data', (e) => { data = JSON.parse(e.data); if (M) { M.setReports(data.reports); loadShapes(); } });
+        es.addEventListener('view', (e) => { const v = JSON.parse(e.data); if (M) M.setView(v, v.how); else firstView = v; });
+        es.onerror = () => { es.close(); setTimeout(connect, 2000); };
+      };
+      connect();
+      // Wait for where the map should look before drawing it.
+      for (let i = 0; i < 30 && !firstView; i++) await new Promise((r) => setTimeout(r, 100));
+      M = await WPMap.create($('map'), { interactive: false, view: firstView || undefined });
+      M.onFrame = ({ time, latest, site }) => {
+        const on = cfg?.layers.radar && time;
+        $('stamp').classList.toggle('off', !on);
+        $('stamp').classList.toggle('old', !latest);
+        if (on) $('stamp-t').textContent = (site ? M.siteLabel(site) + ' RADAR ' : 'RADAR ') + fmt(time);
+      };
+      M.onReady = () => { $('wait').remove(); if (cfg) M.setConfig(cfg); if (data) { M.setReports(data.reports); loadShapes(); } };
+      if (M.ready) M.onReady();
+    })();
+  </script>
+</body>
+</html>

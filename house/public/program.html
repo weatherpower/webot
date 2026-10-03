@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Program · WeatherPower Stream House</title>
+  <link rel="icon" href="/assets/wp-logo.png">
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    /* The stream map with the overlay on top: what viewers see. One Window Capture or Browser Source. */
+    #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; }
+    iframe { position: absolute; inset: 0; width: 1920px; height: 1080px; border: 0; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <iframe src="/map?who=program" title="Stream map"></iframe>
+    <iframe src="/overlay?who=program" title="Overlay" allow="autoplay" style="background: transparent"></iframe>
+  </div>
+  <script>
+    const stage = document.getElementById('stage');
+    const fit = () => { const s = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`; };
+    addEventListener('resize', fit); fit();
+  </script>
+</body>
+</html>

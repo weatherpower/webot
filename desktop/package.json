@@ -1,0 +1,16 @@
+{
+  "name": "weatherpower-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WeBot Studio and WeatherPower Stream House as Windows programs",
+  "main": "main.cjs",
+  "scripts": {
+    "studio": "electron . --app=studio",
+    "house": "electron . --app=house",
+    "build": "node build.cjs"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "rcedit": "^5.0.2"
+  }
+}
