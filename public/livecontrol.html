@@ -203,6 +203,14 @@
       </section>
 
       <section class="box">
+        <h2>Top bar headlines</h2>
+        <p class="note" style="margin-top:0">What scrolls through the bar at the top of the stream. Tornado, severe thunderstorm and flash flood warnings always break in.</p>
+        <div class="row"><div class="seg" id="hl-mode">
+          <button data-v="mix">Weather + news</button><button data-v="weather">Weather news</button><button data-v="alerts">Warnings</button>
+        </div></div>
+      </section>
+
+      <section class="box">
         <h2>Be right back</h2>
         <p class="note" style="margin-top:0">Covers the stream with a "We'll be right back" card (music keeps playing, WeBot and the show pause). Use it before switching servers or fixing something, then end it to pick the show back up.</p>
         <input id="brb-msg" maxlength="140" style="width:100%" placeholder="Hang tight, live weather coverage is coming right back.">
@@ -384,6 +392,7 @@
       $('live-line').innerHTML = st
         ? '<b>● ON AIR</b> · ' + (st.playing ? '♪ ' + esc(st.playing) + (st.mood ? ' (' + esc(st.mood) + ')' : '') : 'music off') + ' · voice: ' + esc(st.tts || '?')
         : 'The stream page hasn’t checked in for a minute. Open it in OBS or click "Open stream".';
+      document.querySelectorAll('#hl-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (control.headlines || 'mix'))));
       $('brb-line').innerHTML = control.brb ? '<b style="color:#ffd34d">BRB IS ON AIR</b> since ' + esc(new Date(control.brb.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + (control.brb.message ? ': ' + esc(control.brb.message) : '') : 'Off: the show is running.';
       $('banner-line').innerHTML = control.banner ? 'SHOWING UNTIL <b>' + esc(new Date(control.banner.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })) + '</b>: ' + esc(control.banner.text) : 'No banner message.';
       renderAlerts();
@@ -621,6 +630,10 @@
     $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to WeBot'); });
     $('voice').addEventListener('click', () => act({ action: 'voice', on: control?.voice === false }));
     $('sound').addEventListener('click', () => act({ action: 'sound', on: control?.sound === false }));
+    $('hl-mode').addEventListener('click', (e) => {
+      const v = e.target.closest('button')?.dataset.v;
+      if (v) act({ action: 'headlines', mode: v }, v === 'mix' ? 'Top bar: weather + news headlines' : v === 'weather' ? 'Top bar: weather news only' : 'Top bar: warnings');
+    });
     $('brb-on').addEventListener('click', () => act({ action: 'brb', on: true, message: $('brb-msg').value }, 'BRB card is up'));
     $('brb-off').addEventListener('click', () => act({ action: 'brb', on: false }, 'BRB ended, back to the show'));
     $('banner-set').addEventListener('click', () => act({ action: 'banner', text: $('banner').value, minutes: Number($('minutes').value) }, 'Banner set'));

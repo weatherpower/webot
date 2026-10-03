@@ -19,6 +19,7 @@ import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
 import { randomCityForecast } from './cityForecast.js';
+import { getHeadlines } from './headlines.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
@@ -319,6 +320,16 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=300');
       res.json(await surfaceAnalysis());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Top-bar headlines: weather news and top US news (headline + source only).
+  router.get('/headlines', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json(await getHeadlines());
     } catch (error) {
       next(error);
     }

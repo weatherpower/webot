@@ -1674,14 +1674,41 @@
     };
 
     const headlineFor = (a) => (a.eventLabel + ' FOR ' + (a.area || stateLine(a)) + (a.times?.expires ? ' UNTIL ' + a.times.expires : '')).toUpperCase();
+    // Top bar. mix (default): weather news and top US news, with dangerous warnings breaking in;
+    // weather: weather news only; alerts: the warnings list like before. Set in Live Control.
+    const loadNewsHeadlines = async () => {
+      try { S.news = await getJson('/api/v3/headlines'); } catch {}
+      buildHeadlines();
+    };
     const buildHeadlines = () => {
       const st = focusState();
+      const mode = S.control.headlines || 'mix';
       const fresh = (a) => Date.now() - Date.parse(a.issuedAt || 0) < 30 * 60 * 1000;
-      const list = S.alerts
+      const alertItem = (a) => ({ tag: fresh(a) && a.status === 'NEW' ? 'NEW' : a.rank <= 3 ? 'ALERT' : 'LATEST', text: headlineFor(a), color: a.color });
+      const alerts = S.alerts
         .filter((a) => ['warnings', 'watches'].includes(a.group) && (a.states || []).length && (!st || a.states.includes(st)))
-        .sort((x, y) => (x.rank - y.rank) || (Date.parse(y.issuedAt || 0) - Date.parse(x.issuedAt || 0)))
-        .slice(0, 8)
-        .map((a) => ({ tag: fresh(a) && a.status === 'NEW' ? 'NEW' : a.rank <= 3 ? 'ALERT' : 'LATEST', text: headlineFor(a), color: a.color }));
+        .sort((x, y) => (x.rank - y.rank) || (Date.parse(y.issuedAt || 0) - Date.parse(x.issuedAt || 0)));
+      const fallback = alerts.slice(0, 8).map(alertItem);
+      let list = fallback;
+      if (mode !== 'alerts') {
+        const story = (tag) => (h) => ({ tag, text: h.title + (h.source ? ' · ' + h.source : ''), color: null });
+        const weather = (S.news?.weather || []).map(story('WEATHER NEWS'));
+        const news = mode === 'mix' ? (S.news?.news || []).map(story('NEWS')) : [];
+        const stories = [];
+        for (let i = 0; i < Math.max(weather.length, news.length); i++) {
+          if (weather[i]) stories.push(weather[i]);
+          if (news[i]) stories.push(news[i]);
+        }
+        // Dangerous warnings still break in, every third item.
+        const urgent = alerts.filter((a) => a.group === 'warnings' && (a.rank <= 3 || /^(tornado|severe thunderstorm|flash flood) warning$/i.test(a.event || ''))).slice(0, 4).map(alertItem);
+        if (stories.length) {
+          list = [];
+          stories.forEach((s, i) => {
+            if (urgent.length && i % 2 === 0) list.push(urgent[(i / 2) % urgent.length]);
+            list.push(s);
+          });
+        }
+      }
       S.headlines = list.length ? list : [{ tag: 'LIVE', text: 'WEATHERPOWER LIVE · SEVERE WEATHER COVERAGE 24/7', color: null }];
     };
     const showHeadline = () => {
@@ -2859,6 +2886,7 @@
       applyCameraControl();
       puterGate();
       loadMusicFiles();
+      if (prevCtl.headlines !== S.control.headlines) { buildHeadlines(); S.hlIndex = 0; }
       if (prevRev >= 0 && prevRev !== S.control.rev && (prevCtl.pin !== S.control.pin || prevCtl.mode !== S.control.mode || prevCtl.state !== S.control.state)) {
         S.recent = [];
         buildHeadlines();
@@ -2935,6 +2963,8 @@
       loadTropics().catch(() => {});
       loadSurface().catch(() => {});
       poll(loadSurface, 15 * 60 * 1000);
+      loadNewsHeadlines();
+      poll(loadNewsHeadlines, 10 * 60 * 1000);
       poll(loadTropics, 5 * 60 * 1000);
     };
     boot().catch((error) => { $('boot').textContent = 'WEATHERPOWER LIVE · RECONNECTING…'; console.error(error); setTimeout(() => location.reload(), 15000); });

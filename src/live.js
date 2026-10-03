@@ -240,7 +240,7 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'mix', commands: [] };
 const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
@@ -413,6 +413,10 @@ export const applyLiveCommand = async (body = {}) => {
       current.banner = text ? { text, until: new Date(Date.now() + minutes * 60 * 1000).toISOString() } : null;
       break;
     }
+    case 'headlines':
+      // Top bar: mix = weather + top news, weather = weather news only, alerts = warnings like before.
+      current.headlines = ['mix', 'weather', 'alerts'].includes(body.mode) ? body.mode : 'mix';
+      break;
     case 'brb':
       // Be-right-back card over the stream (host switches, maintenance). WeBot and the show pause under it.
       current.brb = body.on ? { message: cleanText(body.message, 140), since: new Date().toISOString() } : null;
