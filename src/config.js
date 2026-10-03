@@ -74,6 +74,8 @@ export const config = {
   },
   autoRender: {
     enabled: bool(process.env.AUTO_RENDER_ENABLED, true),
+    // false: keep the warning list current without drawing card images (the live stream draws its own).
+    cards: bool(process.env.AUTO_RENDER_CARDS, true),
     intervalMs: Math.round(clamp(number(process.env.AUTO_RENDER_INTERVAL_MS, 60000), 60000, 60 * 60 * 1000)),
     limit: Math.round(Math.max(0, number(process.env.AUTO_RENDER_LIMIT, 0))),
     concurrency: Math.round(clamp(number(process.env.AUTO_RENDER_CONCURRENCY, 2), 1, 4)),

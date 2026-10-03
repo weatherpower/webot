@@ -648,6 +648,12 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
           await saveProgress(completed === activeWarnings.length);
           continue;
         }
+        if (!config.autoRender.cards) {
+          renderResults[index] = toItem({ warning, render: null, hash, status: 'data' });
+          completed += 1;
+          await saveProgress(completed === activeWarnings.length);
+          continue;
+        }
         renderQueue.push({ warning, index, hash, existing });
       }
 

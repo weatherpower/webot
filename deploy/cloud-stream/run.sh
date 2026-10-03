@@ -47,6 +47,9 @@ pactl set-default-sink stream
 # server nothing outside this machine counts as the "home network".
 export HOST="${HOST:-0.0.0.0}" PORT LIVE_TRUST_LAN=false SHORTS_ENABLED="${SHORTS_ENABLED:-false}" SHORTS_AUTO_ENABLED="${SHORTS_AUTO_ENABLED:-false}"
 export AUTO_RENDER_ENABLED="${AUTO_RENDER_ENABLED:-true}"
+# The stream draws its own warnings: skip the card images (a second headless Chrome that starves the
+# stream of CPU, which makes the audio sputter).
+export AUTO_RENDER_CARDS="${AUTO_RENDER_CARDS:-false}"
 (while true; do bash scripts/dev-safe.sh; log "server stopped (exit $?), restarting in 5 s"; sleep 5; done) &
 pids+=($!)
 for _ in $(seq 1 120); do curl -sf "http://127.0.0.1:${PORT}/warningcenter/api/v3/live" >/dev/null && break; sleep 1; done
@@ -62,7 +65,7 @@ CHROME_GL_FLAGS="${CHROME_GL_FLAGS:---disable-gpu-compositing --use-gl=angle --u
   "$CHROME" --kiosk --start-fullscreen --window-position=0,0 --window-size="${WIDTH},${HEIGHT}" \
     --no-first-run --no-default-browser-check --disable-infobars --disable-session-crashed-bubble \
     --disable-features=Translate,MediaRouter --noerrdialogs --no-sandbox --disable-dev-shm-usage \
-    --autoplay-policy=no-user-gesture-required \
+    --autoplay-policy=no-user-gesture-required --audio-buffer-size=${CHROME_AUDIO_BUFFER:-2048} \
     $CHROME_GL_FLAGS ${CHROME_EXTRA_FLAGS:-} \
     --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
     --user-data-dir=/tmp/stream-chrome "$PAGE" >/dev/null 2>&1
@@ -76,10 +79,10 @@ GOP=$((FPS * 2))
 (while true; do
   ffmpeg -hide_banner -loglevel warning -nostats \
     -thread_queue_size 1024 -f x11grab -draw_mouse 0 -framerate "$FPS" -video_size "${WIDTH}x${HEIGHT}" -i :99.0+0,0 \
-    -thread_queue_size 1024 -f pulse -ac 2 -i stream.monitor \
+    -thread_queue_size 4096 -f pulse -fragment_size 8192 -ac 2 -i stream.monitor \
     -c:v libx264 -preset "$PRESET" -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_BITRATE" -bufsize "$(( ${VIDEO_BITRATE%k} * 2 ))k" \
     -pix_fmt yuv420p -g "$GOP" -keyint_min "$GOP" -sc_threshold 0 \
-    -c:a aac -b:a "$AUDIO_BITRATE" -ar 48000 \
+    -af aresample=async=1000 -c:a aac -b:a "$AUDIO_BITRATE" -ar 48000 \
     -f flv "$OUTPUT"
   log "ffmpeg stopped (exit $?), restarting in 5 s"; sleep 5
 done) &
