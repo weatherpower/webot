@@ -82,7 +82,7 @@ export const safeName = (name) => {
 /* ---------------- chat reader ---------------- */
 const state = {
   enabled: false, videoId: '', chatId: '', pageToken: '', primed: false, viewers: null, viewersAt: 0,
-  lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: []
+  lastFind: 0, lastSearch: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: []
 };
 const ptDay = () => new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
 const spend = (units) => {
@@ -100,20 +100,33 @@ const api = async (path, params, units) => {
   return body;
 };
 
-// The channel's live video, from the public /live page (no quota), then its chat id and viewer count.
+// The channel's live video: the one already found, the public /live page (no quota; YouTube sometimes
+// leaves the link out for servers), or an API search (100 units, so at most once an hour). Each candidate
+// must be live and on this channel. Then its chat id and viewer count.
+const liveVideo = async (videoId, channel) => {
+  if (!videoId) return null;
+  const body = await api('videos', { part: 'snippet,liveStreamingDetails', id: videoId }, 1);
+  const v = body.items?.[0];
+  if (!v || v.snippet?.liveBroadcastContent !== 'live' || (channel && v.snippet?.channelId !== channel)) return null;
+  return { videoId, live: v.liveStreamingDetails || {} };
+};
 const findLive = async () => {
   state.lastFind = Date.now();
-  let videoId = process.env.YOUTUBE_VIDEO_ID || '';
   const channel = process.env.YOUTUBE_CHANNEL_ID || '';
-  if (!videoId && channel) {
+  let found = await liveVideo(process.env.YOUTUBE_VIDEO_ID || state.videoId, channel);
+  if (!found && channel) {
     const html = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channel)}/live`, {
       headers: { 'User-Agent': 'Mozilla/5.0 (WeatherPower Live chat)', 'Accept-Language': 'en-US' }, signal: AbortSignal.timeout(15000)
     }).then((r) => r.text()).catch(() => '');
-    videoId = html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1] || '';
+    found = await liveVideo(html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/)?.[1], channel);
   }
-  if (!videoId) { state.videoId = ''; state.chatId = ''; return; }
-  const body = await api('videos', { part: 'liveStreamingDetails', id: videoId }, 1);
-  const live = body.items?.[0]?.liveStreamingDetails;
+  if (!found && channel && Date.now() - state.lastSearch > 60 * 60 * 1000) {
+    state.lastSearch = Date.now();
+    const body = await api('search', { part: 'id', channelId: channel, eventType: 'live', type: 'video', maxResults: '1' }, 100);
+    found = await liveVideo(body.items?.[0]?.id?.videoId, channel);
+  }
+  if (!found) { state.videoId = ''; state.chatId = ''; return; }
+  const { videoId, live } = found;
   state.viewers = live?.concurrentViewers != null ? Number(live.concurrentViewers) : null;
   state.viewersAt = Date.now();
   const chatId = live?.activeLiveChatId || '';
