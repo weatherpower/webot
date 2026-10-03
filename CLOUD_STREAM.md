@@ -155,3 +155,23 @@ docker compose up -d --build                      # after copying a new version
 - On the cloud server, only the server itself counts as "home network". The Puter link and the free
   voice are never handed to anyone else.
 - Cameras stay off air (`CAMERA_ON_AIR=false`) until you have permission to broadcast them.
+
+## Live Control from your home IP only (no tunnel)
+
+Live Control can be opened straight on the server's address, but only from your home's internet IP:
+
+```bash
+# on the server
+cp deploy/cloud-stream/wp-firewall.sh /usr/local/sbin/ && chmod +x /usr/local/sbin/wp-firewall.sh
+cp deploy/cloud-stream/wp-firewall.service /etc/systemd/system/
+echo "YOUR.HOME.IP" > /opt/weatherpower/allowed-ips.txt      # find it at https://api.ipify.org
+systemctl daemon-reload && systemctl enable --now wp-firewall
+echo "LIVE_CONTROL_BIND=0.0.0.0" >> .env && docker compose up -d
+```
+
+Then open `http://SERVER_IP:8899/warningcenter/live/control` from any device on your home network.
+Anyone else is blocked by the firewall before they reach the page.
+
+If your home IP changes (ISPs do this now and then), Live Control stops loading. Put the new IP in
+`/opt/weatherpower/allowed-ips.txt` (log in with SSH or the provider's web console) and run
+`systemctl restart wp-firewall`. It's plain http, so only use it from your own network.
