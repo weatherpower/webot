@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeBot Status</title>
+  <meta name="description" content="What WeBot is doing on WeatherPower Live right now: the segment on air, what's up next, and what he just said.">
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    @font-face { font-family: "WP Display"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "WP Sans"; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+    @font-face { font-family: "WP Mono"; src: url("/warningcenter/public/assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+    :root { --bg: #070b1f; --panel: #0d1430; --panel2: #111a3d; --line: rgba(255,255,255,.09); --text: #eef3ff; --muted: #8f9bc0; --edge: #33d4ff; --violet: #8b5cff; --live: #ff3b4a; --ok: #6dff9a; }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 400 15px/1.45 "WP Sans", system-ui, sans-serif;
+      background-image: radial-gradient(1.2px 1.2px at 30px 40px, rgba(255,255,255,.55) 60%, transparent 65%), radial-gradient(1px 1px at 140px 110px, rgba(220,230,255,.4) 60%, transparent 65%), radial-gradient(1.4px 1.4px at 230px 20px, rgba(255,255,255,.5) 60%, transparent 65%), linear-gradient(180deg, #151c42 0, var(--bg) 420px);
+      background-size: 290px 160px, 290px 160px, 290px 160px, auto; background-repeat: repeat, repeat, repeat, no-repeat; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 22px 16px 48px; }
+    header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    header img { width: 74px; height: auto; filter: drop-shadow(0 6px 18px rgba(51,212,255,.35)); }
+    header h1 { margin: 0; font: 700 34px/1 "WP Display", sans-serif; text-transform: uppercase; letter-spacing: .01em; }
+    header p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+    .pill { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--line); background: rgba(0,0,0,.25); font: 700 12px "WP Mono", monospace; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
+    .pill i { width: 10px; height: 10px; border-radius: 50%; background: #5a637e; }
+    .pill.on i { background: var(--live); box-shadow: 0 0 0 0 rgba(255,59,74,.6); animation: pulse 1.6s infinite; }
+    .pill.brb i { background: #ffd34d; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 10px rgba(255,59,74,0); } 100% { box-shadow: 0 0 0 0 rgba(255,59,74,0); } }
+    .grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; }
+    .col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+    .box { position: relative; background: var(--panel); border: 1px solid var(--line); padding: 18px 20px; min-width: 0;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%); }
+    .box::before { content: ""; position: absolute; left: -1px; top: -1px; width: 20px; height: 20px; border-left: 3px solid var(--edge); border-top: 3px solid var(--edge); }
+    h2 { margin: 0 0 12px; font: 600 12px "WP Mono", monospace; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; }
+    .now .kind { display: flex; align-items: center; gap: 12px; }
+    .now .ico { font-size: 34px; line-height: 1; }
+    .now .label { font: 700 30px/1.05 "WP Display", sans-serif; text-transform: uppercase; }
+    .now .title { margin-top: 10px; font: 500 19px/1.3 "WP Display", sans-serif; text-transform: uppercase; color: #dfe6ff; overflow-wrap: anywhere; }
+    .bar { margin-top: 14px; height: 6px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--edge), var(--violet)); transition: width 1s linear; }
+    .meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font: 600 12px "WP Mono", monospace; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+    .next { list-style: none; margin: 0; padding: 0; counter-reset: n; }
+    .next li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+    .next li:first-child { border-top: 0; padding-top: 0; }
+    .next li::before { counter-increment: n; content: counter(n); flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--edge); color: var(--edge); font: 700 13px "WP Mono", monospace; }
+    .next b { font: 600 20px "WP Display", sans-serif; text-transform: uppercase; }
+    .next span { display: block; color: var(--muted); font-size: 13px; }
+    .note { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    .said { display: grid; gap: 12px; }
+    .said blockquote { margin: 0; padding: 12px 14px; background: var(--panel2); border-left: 3px solid var(--violet); font-size: 15px; overflow-wrap: anywhere; }
+    .said blockquote:first-child { border-left-color: var(--edge); font-size: 16px; }
+    .said small { display: block; margin-top: 6px; font: 600 11px "WP Mono", monospace; letter-spacing: .1em; color: var(--muted); }
+    .empty { color: var(--muted); font-size: 14px; }
+    .wis { display: flex; align-items: baseline; gap: 12px; }
+    .wis b { font: 700 54px/1 "WP Display", sans-serif; color: var(--ok); }
+    .wis span { font: 600 16px "WP Display", sans-serif; text-transform: uppercase; }
+    .tallies { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+    .tallies div { padding: 8px; text-align: center; background: var(--c, #222); }
+    .tallies b { display: block; font: 700 26px/1 "WP Display", sans-serif; color: #fff; }
+    .tallies small { font: 700 10px "WP Mono", monospace; letter-spacing: .12em; color: rgba(255,255,255,.85); }
+    .watch { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .watch li { padding: 8px 10px; background: var(--panel2); border-left: 4px solid var(--c, #888); }
+    .watch b { display: block; font: 600 16px "WP Display", sans-serif; text-transform: uppercase; }
+    .watch span { font-size: 13px; color: var(--muted); }
+    .recent { list-style: none; margin: 0; padding: 0; }
+    .recent li { display: grid; grid-template-columns: 64px 28px 1fr; gap: 6px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+    .recent li:first-child { border-top: 0; }
+    .recent time { font: 600 12px "WP Mono", monospace; color: var(--muted); }
+    .recent li > div { min-width: 0; }
+    .recent em { font-style: normal; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; font-size: 12.5px; }
+    .facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
+    .facts dt { color: var(--muted); font: 600 12px "WP Mono", monospace; letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
+    .facts dd { margin: 0; overflow-wrap: anywhere; }
+    footer { margin-top: 26px; color: var(--muted); font-size: 12.5px; text-align: center; }
+    footer a { color: var(--edge); }
+    @media (max-width: 820px) {
+      .grid { grid-template-columns: 1fr; }
+      header { flex-wrap: wrap; }
+      header img { width: 56px; }
+      header h1 { font-size: 28px; }
+      .pill { margin-left: 0; }
+      .now .label { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img src="/warningcenter/public/assets/webot.png" alt="WeBot">
+      <div>
+        <h1>WeBot Status</h1>
+        <p>What WeBot is doing on WeatherPower Live right now.</p>
+      </div>
+      <span class="pill" id="pill"><i></i><span id="pill-t">Checking…</span></span>
+    </header>
+
+    <div class="grid">
+      <div class="col">
+        <section class="box now">
+          <h2>On the stream now</h2>
+          <div class="kind"><span class="ico" id="now-ico">📡</span><span class="label" id="now-label">—</span></div>
+          <div class="title" id="now-title"></div>
+          <div class="bar"><i id="now-bar"></i></div>
+          <div class="meta"><span id="now-start"></span><span id="now-left"></span></div>
+        </section>
+
+        <section class="box">
+          <h2>Up next</h2>
+          <ol class="next" id="next"></ol>
+          <p class="note" id="next-note">Breaking weather always cuts in line. Tornado warnings and new alerts go first.</p>
+        </section>
+
+        <section class="box">
+          <h2>WeBot just said</h2>
+          <div class="said" id="said"><p class="empty">Nothing yet. WeBot stays quiet on calm days and talks when the weather gets serious.</p></div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="box">
+          <h2>Weather Intensity Score</h2>
+          <div class="wis"><b id="wis">—</b><span id="wis-l"></span></div>
+          <div class="tallies">
+            <div style="--c:#c0172b"><b id="t-tor">0</b><small>TORNADO</small></div>
+            <div style="--c:#b8650a"><b id="t-svr">0</b><small>SEVERE</small></div>
+            <div style="--c:#1d7a3a"><b id="t-ffw">0</b><small>FLASH FLOOD</small></div>
+            <div style="--c:#5a3fb8"><b id="t-wat">0</b><small>WATCHES</small></div>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2>Top warnings WeBot is watching</h2>
+          <ul class="watch" id="watch"></ul>
+        </section>
+
+        <section class="box">
+          <h2>Earlier on the stream</h2>
+          <ul class="recent" id="recent"></ul>
+        </section>
+
+        <section class="box">
+          <h2>Stream details</h2>
+          <dl class="facts">
+            <dt>Voice</dt><dd id="f-voice">—</dd>
+            <dt>Music</dt><dd id="f-music">—</dd>
+            <dt>Show</dt><dd id="f-mode">—</dd>
+            <dt>Updated</dt><dd id="f-upd">—</dd>
+          </dl>
+        </section>
+      </div>
+    </div>
+
+    <footer>WeatherPower Live · data from the National Weather Service, SPC, NHC and U.S. EIA · <a href="https://weatherpower.app">weatherpower.app</a></footer>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const KINDS = {
+      alert: ['⚠️', 'Top alert', 'A close look at one of the biggest warnings or watches'],
+      pinned: ['📌', 'Pinned alert', 'The host pinned an alert to stay on screen'],
+      think: ['🤔', 'WeBot thinks it over', 'WeBot picks a weather model to check'],
+      models: ['🧮', 'Weather models', 'HRRR, NAM, GFS or ECMWF model check'],
+      national: ['🗺️', 'National overview', 'Every active warning across the country'],
+      outlook: ['🎯', 'Severe outlook', "Today's SPC severe weather outlook"],
+      reports: ['⚡', 'Storm reports', 'Tornado, hail and wind reports from the last few hours'],
+      tropics: ['🌀', 'Tropics', 'Hurricanes, tropical storms and areas to watch'],
+      surface: ['📡', 'National radar & fronts', 'Radar with highs, lows and fronts'],
+      forecast: ['🌤️', 'Daily forecast', 'WeBot zooms to a random city for its forecast'],
+      gas: ['⛽', 'Gas prices', 'Weekly gas prices and stations around a city']
+    };
+    const kind = (k) => KINDS[k] || ['📺', String(k || 'On air'), ''];
+    const clock = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    const ago = (iso) => {
+      const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+      return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' hr ago';
+    };
+    let data = null;
+
+    const tick = () => {
+      const now = data?.now;
+      if (!now?.start || !now?.end) { $('now-bar').style.width = '0'; $('now-left').textContent = ''; return; }
+      const start = Date.parse(now.start), end = Date.parse(now.end), t = Date.now();
+      $('now-bar').style.width = Math.min(100, Math.max(0, ((t - start) / (end - start)) * 100)) + '%';
+      const left = Math.round((end - t) / 1000);
+      $('now-left').textContent = left > 0 ? 'next in ~' + (left >= 60 ? Math.floor(left / 60) + 'm ' + (left % 60) + 's' : left + 's') : 'wrapping up';
+    };
+
+    const render = (d) => {
+      data = d;
+      const pill = $('pill');
+      pill.className = 'pill' + (d.brb ? ' brb' : d.onAir ? ' on' : '');
+      $('pill-t').textContent = d.brb ? 'Be right back' : d.onAir ? 'Live now' : 'Offline';
+
+      const n = d.now;
+      if (d.brb) {
+        $('now-ico').textContent = '⏸️';
+        $('now-label').textContent = 'Be right back';
+        $('now-title').textContent = d.brb.message || 'The show will pick back up shortly.';
+        $('now-start').textContent = 'since ' + clock(d.brb.since);
+      } else if (d.onAir && n) {
+        const [ico, label] = kind(n.type);
+        $('now-ico').textContent = ico;
+        $('now-label').textContent = n.k && !/^(NOW TRACKING)$/i.test(n.k) ? n.k : label;
+        $('now-title').textContent = n.title || '';
+        $('now-start').textContent = 'started ' + clock(n.start);
+      } else {
+        $('now-ico').textContent = '📴';
+        $('now-label').textContent = 'Stream offline';
+        $('now-title').textContent = 'WeBot will be back soon.';
+        $('now-start').textContent = '';
+      }
+      tick();
+
+      const plan = d.onAir && !d.brb ? d.upNext || [] : [];
+      $('next').innerHTML = plan.length
+        ? plan.map((k) => { const [ico, label, about] = kind(k); return '<li><div><b>' + ico + ' ' + esc(label) + '</b><span>' + esc(about) + '</span></div></li>'; }).join('')
+        : '<li class="empty" style="list-style:none">' + (d.brb ? 'The show is paused.' : d.onAir ? 'Picking the next segment…' : 'Nothing while offline.') + '</li>';
+      $('next-note').textContent = d.mode && d.mode !== 'auto'
+        ? 'The host locked the show on ' + kind(d.mode === 'models' ? 'think' : d.mode)[1].toLowerCase() + '. Breaking weather still cuts in.'
+        : d.pinned ? 'An alert is pinned. Breaking weather still cuts in.'
+        : 'Breaking weather always cuts in line. Tornado warnings and new alerts go first.';
+
+      $('said').innerHTML = (d.said || []).length
+        ? d.said.slice(0, 6).map((l) => '<blockquote>“' + esc(l.text) + '”<small>' + esc(clock(l.at)) + ' · ' + esc(ago(l.at)) + '</small></blockquote>').join('')
+        : '<p class="empty">Nothing yet. WeBot stays quiet on calm days and talks when the weather gets serious.</p>';
+
+      $('wis').textContent = d.wis ? d.wis.score : '—';
+      $('wis-l').textContent = d.wis ? d.wis.label : 'loading';
+      const t = d.tallies || {};
+      $('t-tor').textContent = t.tor || 0;
+      $('t-svr').textContent = t.svr || 0;
+      $('t-ffw').textContent = t.ffw || 0;
+      $('t-wat').textContent = t.watches || 0;
+
+      $('watch').innerHTML = (d.watching || []).length
+        ? d.watching.map((a) => '<li style="--c:' + esc(a.color || '#888') + '"><b>' + esc(a.label) + (a.count > 1 ? ' ×' + a.count : '') + '</b><span>' + esc([a.place, (a.states || []).join(', ')].filter(Boolean).join(' · ')) + (a.expiresAt ? ' · until ' + esc(clock(a.expiresAt)) : '') + '</span></li>').join('')
+        : '<li class="empty" style="border:0;background:none;padding:0">No warnings right now. Quiet weather.</li>';
+
+      $('recent').innerHTML = (d.recent || []).length
+        ? d.recent.slice(0, 8).map((s) => { const [ico, label] = kind(s.type); return '<li><time>' + esc(clock(s.start)) + '</time><span>' + ico + '</span><div>' + esc(label) + (s.title ? '<em>' + esc(s.title) + '</em>' : '') + '</div></li>'; }).join('')
+        : '<li class="empty">The history fills in as the show runs.</li>';
+
+      $('f-voice').textContent = !d.onAir ? '—' : /quiet|off/i.test(d.voice || '') ? 'Quiet (talks when the weather gets serious or the host turns him on)' : d.voice || 'On';
+      $('f-music').textContent = d.onAir && d.playing ? d.playing : '—';
+      $('f-mode').textContent = (d.mode && d.mode !== 'auto' ? 'Locked: ' + kind(d.mode)[1] : 'Auto (WeBot picks)') + (d.focus ? ' · Focus: ' + d.focus : '');
+      $('f-upd').textContent = clock(d.generatedAt);
+    };
+
+    const load = async () => {
+      try {
+        const r = await fetch('/warningcenter/api/v3/webot/status', { cache: 'no-store' });
+        if (!r.ok) throw new Error(r.status);
+        render(await r.json());
+      } catch {
+        $('pill-t').textContent = 'Reconnecting…';
+      }
+    };
+    load();
+    setInterval(() => { if (!document.hidden) load(); }, 5000);
+    setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+  </script>
+</body>
+</html>

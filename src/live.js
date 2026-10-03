@@ -267,6 +267,7 @@ export const noteStreamBeat = (query = {}) => {
     return;
   }
   if (!query.np && !query.tts) return;
+  noteWebot(query, clip);
   streamBeat = {
     at: new Date().toISOString(),
     playing: clip(query.np, 90),
@@ -275,6 +276,49 @@ export const noteStreamBeat = (query = {}) => {
     theme: THEMES.includes(query.theme) ? query.theme : '',
     // Characters the stream sent to a paid voice (Puter/OpenAI) in the last hour.
     chars: Math.max(0, Math.min(10_000_000, Math.round(Number(query.chars) || 0)))
+  };
+};
+
+// WeBot status (public page): the segment on now, the planned next few, recent segments and lines he said.
+const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'forecast', 'gas']);
+const webot = { seg: null, plan: [], history: [], said: [], saidKeys: new Set() };
+const parseJson = (value) => { try { return JSON.parse(value); } catch { return null; } };
+const noteWebot = (query, clip) => {
+  const seg = parseJson(query.seg);
+  if (seg && SEG_KINDS.has(seg.type)) {
+    const next = {
+      type: seg.type, k: clip(seg.k, 30), title: clip(seg.title, 160),
+      start: Number.isFinite(seg.start) ? new Date(seg.start).toISOString() : null,
+      end: Number.isFinite(seg.start) && Number.isFinite(seg.dur) ? new Date(seg.start + seg.dur).toISOString() : null
+    };
+    if (webot.seg && webot.seg.start !== next.start) webot.history = [{ type: webot.seg.type, k: webot.seg.k, title: webot.seg.title, start: webot.seg.start }, ...webot.history].slice(0, 12);
+    webot.seg = next;
+  }
+  if (typeof query.plan === 'string') webot.plan = query.plan.split(',').filter((k) => SEG_KINDS.has(k) || k === 'pinned').slice(0, 4);
+  const said = parseJson(query.said);
+  if (Array.isArray(said)) {
+    for (const line of said.slice(-6)) {
+      const key = clip(query.sid, 16) + ':' + Number(line?.id);
+      const text = clip(line?.text, 700);
+      if (!text || webot.saidKeys.has(key)) continue;
+      webot.saidKeys.add(key);
+      webot.said = [{ at: Number.isFinite(line.at) ? new Date(line.at).toISOString() : new Date().toISOString(), text }, ...webot.said].slice(0, 10);
+    }
+    if (webot.saidKeys.size > 200) webot.saidKeys = new Set([...webot.saidKeys].slice(-60));
+  }
+};
+export const webotActivity = () => {
+  const live = streamBeat && Date.now() - Date.parse(streamBeat.at) < 60 * 1000;
+  return {
+    onAir: Boolean(live),
+    beatAt: streamBeat?.at || null,
+    voice: live ? streamBeat.tts : '',
+    playing: live ? streamBeat.playing : '',
+    theme: live ? streamBeat.theme : '',
+    now: live ? webot.seg : null,
+    upNext: live ? webot.plan : [],
+    recent: webot.history,
+    said: webot.said
   };
 };
 

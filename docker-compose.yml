@@ -7,6 +7,8 @@ services:
     environment:
       # Keeps WeBot's free voice model (~300 MB) between rebuilds.
       TTS_CACHE_DIR: /app/data/tts-cache
+      # Public WeBot status page on its own read-only listener (only that page and its JSON).
+      PUBLIC_STATUS_PORT: "8080"
     volumes:
       - ./data:/app/data
       - ./cards:/app/cards
@@ -15,6 +17,8 @@ services:
     # LIVE_CONTROL_BIND in .env: 127.0.0.1 (default, SSH tunnel) or the server's Tailscale IP (100.x.y.z).
     ports:
       - "${LIVE_CONTROL_BIND:-127.0.0.1}:8899:8899"
+      # WeBot status page for viewers: http://<server IP>/ (STATUS_PUBLIC_PORT in .env to change 80).
+      - "${STATUS_PUBLIC_PORT:-80}:8080"
     # Leave the server headroom (hosts suspend VMs that run flat out): at most STREAM_CPUS cores.
     cpus: ${STREAM_CPUS:-3}
     shm_size: 2gb

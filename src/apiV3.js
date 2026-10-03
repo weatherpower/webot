@@ -11,7 +11,7 @@ import {
 } from './broadcast.js';
 import {
   applyLiveCommand, fromHomeNetwork, streamKeyOk, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
-  recentReports, requireLiveToken, siteRadar, talliesFor
+  recentReports, requireLiveToken, siteRadar, talliesFor, webotActivity
 } from './live.js';
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
 import { localSpeech, localVoiceStatus, warmLocalVoice } from './localVoice.js';
@@ -147,6 +147,36 @@ const radarFrames = async () => {
     }
   };
   return radarCache.body;
+};
+
+// Public WeBot status: what's on, what's next, what he said, and the weather he's watching. Nothing private.
+let webotCache = { at: 0, body: null };
+export const webotStatus = async () => {
+  if (webotCache.body && Date.now() - webotCache.at < 3000) return webotCache.body;
+  const { alerts } = await currentAlerts();
+  const control = await liveControl();
+  const wis = wisSummary();
+  const body = {
+    generatedAt: new Date().toISOString(),
+    ...webotActivity(),
+    brb: control.brb ? { message: control.brb.message || '', since: control.brb.since } : null,
+    mode: control.mode || 'auto',
+    focus: control.state || '',
+    talk: control.talk || 'auto',
+    pinned: Boolean(control.pin),
+    wis: wis?.loaded ? { score: Math.round(wis.score), label: wis.label, trend: wis.trend ?? null } : null,
+    tallies: talliesFor(alerts),
+    // Same warning type in the same place (one per county zone) shows once, with a count.
+    watching: [...alerts.filter((a) => a.group === 'warnings').reduce((map, a) => {
+      const key = [a.eventLabel, a.place, (a.states || []).join()].join('|');
+      const hit = map.get(key);
+      if (hit) hit.count += 1;
+      else map.set(key, { label: a.eventLabel, place: a.place || '', states: a.states || [], color: a.color, expiresAt: a.expiresAt || null, count: 1 });
+      return map;
+    }, new Map()).values()].slice(0, 6)
+  };
+  webotCache = { at: Date.now(), body };
+  return body;
 };
 
 export const apiV3Router = () => {
@@ -302,6 +332,15 @@ export const apiV3Router = () => {
       const [index, control, reports] = await Promise.all([indexSummary(alerts), liveControl(), recentReports()]);
       res.set('Cache-Control', 'no-store');
       res.json({ generatedAt: new Date().toISOString(), tallies: talliesFor(alerts), index, wis: wisSummary(), control, reports });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/webot/status', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=3');
+      res.json(await webotStatus());
     } catch (error) {
       next(error);
     }

@@ -194,3 +194,11 @@ main one stops. So:
 
 Copy `data/live-control.json` to the new server while BRB is on, and the new server starts with the
 card already up.
+
+## Public WeBot status page
+
+Viewers can see what WeBot is doing at `http://<server IP>/`: the segment on the stream now, the next three
+segments it has planned, what WeBot just said, the warnings it is watching and the Weather Intensity Score.
+That port (80) runs a separate, read-only listener that serves only this page and its JSON, so it is safe to
+leave open. Live Control stays on port 8899 behind the home-IP firewall. The same page is also at
+`/warningcenter/webot` on the main server.

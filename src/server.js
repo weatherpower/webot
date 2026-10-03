@@ -23,7 +23,7 @@ import { deleteWeWatch, listWeWatches, saveWeWatch } from './weWatchStore.js';
 import { publicWarningCenterFeed } from './publicFeed.js';
 import { generateForecastSearchCards } from './forecastSearch.js';
 import { geocodeMapRequest, publicMapConfig, routeMapRequest } from './mapServices.js';
-import { apiV3Router } from './apiV3.js';
+import { apiV3Router, webotStatus } from './apiV3.js';
 import { shortsStatus } from './shorts.js';
 
 const app = express();
@@ -34,7 +34,7 @@ app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
-  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|wis|favicon\.ico)\b/.test(req.url)) {
+  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|wis|webot|favicon\.ico)\b/.test(req.url)) {
     req.url = req.url.replace(/^\/warningcenter/, '');
   }
   if (/^\/dashboard\/(api|public|cards|controller|warningcenter|warningdetail|weatherspace)\b/.test(req.url)) {
@@ -67,6 +67,7 @@ app.use((req, res, next) => {
     '/warningdetail',
     '/live',
     '/wis',
+    '/webot',
     '/live/control',
     '/favicon.ico',
     '/api/health',
@@ -141,6 +142,12 @@ app.get('/warningdetail', (req, res) => {
 app.get('/wis', (req, res) => {
   res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(publicDir, 'wis.html'));
+});
+
+// WeBot status page (public): what's on the stream now, what's next, what WeBot said.
+app.get('/webot', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(publicDir, 'webot.html'));
 });
 
 app.get('/live', (req, res) => {
@@ -603,6 +610,29 @@ const startServer = async () => {
     startAutoRenderer();
     startWis().catch((error) => console.error('WIS', error.message));
   });
+  // PUBLIC_STATUS_PORT: a second, read-only listener with only the WeBot status page (safe to open to
+  // the internet while the main port stays behind the home-IP firewall).
+  const statusPort = Number(process.env.PUBLIC_STATUS_PORT || 0);
+  if (statusPort) {
+    const pub = express();
+    pub.disable('x-powered-by');
+    pub.use(compression());
+    const page = (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(publicDir, 'webot.html')); };
+    pub.get(['/', '/webot', '/warningcenter/webot'], page);
+    pub.get('/warningcenter/api/v3/webot/status', async (req, res) => {
+      try {
+        res.set('Cache-Control', 'public, max-age=3');
+        res.json(await webotStatus());
+      } catch {
+        res.status(503).json({ ok: false });
+      }
+    });
+    pub.get('/warningcenter/public/assets/webot.png', (req, res) => res.sendFile(path.join(publicDir, 'assets', 'webot.png'), { maxAge: '1d' }));
+    pub.use('/warningcenter/public/assets/fonts', express.static(path.join(publicDir, 'assets', 'fonts'), { maxAge: '7d', index: false }));
+    pub.get('/favicon.ico', (req, res) => res.type('image/png').sendFile(path.join(publicDir, 'assets', 'wp-logo.png')));
+    pub.use((req, res) => res.status(404).type('text').send('Not found'));
+    pub.listen(statusPort, config.host, () => console.log(`WeBot status page: http://${config.host}:${statusPort}/`));
+  }
 
   let shuttingDown = false;
   const shutdown = async (signal) => {

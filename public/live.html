@@ -906,6 +906,8 @@
         if (!opts.urgent && !followUp && since < talkGapMs()) return;
         if (!followUp) S.lastTalkAt = Date.now();
       }
+      (S.said ||= []).push({ id: (S.saidId = (S.saidId || 0) + 1), at: Date.now(), text: String(text).slice(0, 700) });
+      if (S.said.length > 6) S.said.shift();
       if (!voiceOn() || !(canNeural() || speechWorks()) || (actx && actx.state !== 'running')) {
         bot.classList.add('talk');
         setTimeout(() => bot.classList.remove('talk'), Math.min(6000, 1200 + text.length * 30));
@@ -2101,7 +2103,12 @@
       if (!shot) {
         S.cycle += 1;
         const list = candidates().slice(0, 10);
-        const kind = pickKind(list);
+        // The show plans a few segments ahead (shown on the public WeBot page). A planned one that no
+        // longer fits (the weather changed, it just ran) is swapped for a fresh pick.
+        let kind = (S.plan || []).shift();
+        if (!kind || !(pickKind(list, S.kinds || [], true)[kind] > 0)) kind = pickKind(list);
+        S.plan = S.plan || [];
+        while (S.plan.length < 3) S.plan.push(pickKind(list, [...(S.kinds || []), kind, ...S.plan]));
         S.kinds = [...(S.kinds || []), kind].slice(-6);
         if (kind === 'alert') {
           const memory = Math.min(list.length - 1, 6);
@@ -2120,7 +2127,7 @@
     // The show mixes itself up: weighted random segments. Alerts come up most when it's active,
     // nothing non-alert repeats back to back, and the tropics join in whenever NHC has something.
     const tropicsActive = () => Boolean(S.tropics && (S.tropics.storms.length || S.tropics.outlook.features.some((a) => parseInt(a.properties.prob7day, 10) >= 30)));
-    const pickKind = (list) => {
+    const pickKind = (list, recent = S.kinds || [], weightsOnly = false) => {
       const t = S.live?.tallies || {};
       const busy = (t.tor || 0) * 3 + (t.svr || 0) + (t.ffw || 0);
       const w = {
@@ -2140,13 +2147,13 @@
       const calm = isCalm();
       if (calm) Object.assign(w, { surface: S.surface ? 5 : 0, alert: list.length ? 1.5 : 0, think: 1, national: 1, outlook: w.outlook * 0.5, reports: w.reports * 0.5, forecast: forecastWeather() ? 2.5 : 0,
         gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > 40 * 60 * 1000 ? 0.9 : 0 });
-      const recent = S.kinds || [];
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
         // On calm days the radar map may come back sooner; nothing else repeats back to back.
         w[k] *= k === recent[recent.length - 1] ? (calm && k === 'surface' ? 0.5 : 0) : 0.25;
       });
       if (recent.length >= 2 && recent.slice(-2).every((k) => k === 'alert')) w.alert *= 0.3;
+      if (weightsOnly) return w;
       const total = Object.values(w).reduce((a, b) => a + b, 0);
       if (!total) return 'national';
       let r = Math.random() * total;
@@ -2988,7 +2995,7 @@
     };
     const loadLive = async () => {
       // The query is a heartbeat for the control panel: what is playing and which voice is on.
-      const body = await getJson('/api/v3/live?' + new URLSearchParams(OPT.tv ? { tv: '1', scr: screenReport() } : { np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '', chars: ttsCharsHour() }));
+      const body = await getJson('/api/v3/live?' + new URLSearchParams(OPT.tv ? { tv: '1', scr: screenReport() } : { np: M.mode ? M.playing : '', mood: M.mode === 'radio' ? M.mood : '', tts: !voiceOn() ? 'voice off' : talkAllowed() ? ttsLabel() : talkMode() === 'off' ? 'quiet (talk off)' : 'quiet until WIS 100', theme: S.themeKey || '', chars: ttsCharsHour(), ...webotBeat() }));
       const prevRev = S.control.rev;
       const prevCtl = S.control;
       S.live = body;
@@ -3039,6 +3046,27 @@
       const first = !S.radar;
       S.radar = lite(radar);
       if (!first && S.styleReady) S.radar.reflectivity.forEach((f, i) => S.map.getSource('rf' + i)?.setTiles?.([f.tiles]));
+    };
+    // For the public WeBot page: the segment on now, what's planned next, and new lines since the last beat.
+    S.said = S.said || []; S.saidId = S.saidId || 0; S.saidSent = S.saidSent || 0;
+    S.sid = Math.random().toString(36).slice(2, 10);
+    const upNextPlan = () => {
+      if (S.control.brb) return [];
+      if (S.control.pin) return ['pinned'];
+      if (S.control.mode && S.control.mode !== 'auto') return [S.control.mode === 'models' ? 'think' : S.control.mode];
+      const plan = [...(S.plan || [])];
+      if (S.shot?.type === 'think') plan.unshift('models');
+      return plan.slice(0, 3);
+    };
+    const webotBeat = () => {
+      const fresh = S.said.filter((l) => l.id > S.saidSent);
+      const out = {
+        sid: S.sid,
+        seg: S.shot ? JSON.stringify({ type: S.shot.type, k: $('now-k').textContent, title: $('now-t').textContent, start: S.shotStart, dur: S.shotDur }) : '',
+        plan: upNextPlan().join(',')
+      };
+      if (fresh.length) { out.said = JSON.stringify(fresh); S.saidSent = fresh[fresh.length - 1].id; }
+      return out;
     };
     const poll = (fn, ms) => { const run = () => fn().catch((e) => console.warn(e.message)).finally(() => setTimeout(run, ms)); setTimeout(run, ms); };
 
