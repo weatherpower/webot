@@ -175,3 +175,22 @@ Anyone else is blocked by the firewall before they reach the page.
 If your home IP changes (ISPs do this now and then), Live Control stops loading. Put the new IP in
 `/opt/weatherpower/allowed-ips.txt` (log in with SSH or the provider's web console) and run
 `systemctl restart wp-firewall`. It's plain http, so only use it from your own network.
+
+## Switching to a new server without going offline
+
+YouTube takes a **backup** connection on the same stream key, and switches to it on its own when the
+main one stops. So:
+
+1. Live Control → **Be right back** → **Start BRB** (optional message, e.g. "Moving to a faster server").
+2. Set up the new server (steps 1-5 above), with this extra line in its `.env`:
+   ```
+   STREAM_RTMP_URL=rtmp://b.rtmp.youtube.com/live2?backup=1
+   ```
+   Then `docker compose up -d`. It now feeds YouTube's backup slot.
+3. On the old server: `docker compose down`. YouTube switches to the new server, with no offline gap.
+4. On the new server: delete the `STREAM_RTMP_URL` line and run `docker compose up -d`, so it's the main
+   feed again. That's a short blip; do it while BRB is still up.
+5. Live Control (on the new server) → **End BRB**.
+
+Copy `data/live-control.json` to the new server while BRB is on, and the new server starts with the
+card already up.
