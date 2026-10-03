@@ -63,7 +63,8 @@ CHROME_GL_FLAGS="${CHROME_GL_FLAGS:---disable-gpu-compositing --use-gl=angle --u
     --no-first-run --no-default-browser-check --disable-infobars --disable-session-crashed-bubble \
     --disable-features=Translate,MediaRouter --noerrdialogs --no-sandbox --disable-dev-shm-usage \
     --autoplay-policy=no-user-gesture-required \
-    $CHROME_GL_FLAGS \
+    $CHROME_GL_FLAGS ${CHROME_EXTRA_FLAGS:-} \
+    --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
     --user-data-dir=/tmp/stream-chrome "$PAGE" >/dev/null 2>&1
   log "chrome stopped (exit $?), restarting in 3 s"; sleep 3
 done) &
