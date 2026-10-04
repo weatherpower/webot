@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { STATE_NAMES } from './broadcast.js';
 import { applyLiveCommand, liveControl } from './live.js';
 import { loadBrain } from './brain.js';
-import { replyTo, expandSlang } from './personality.js';
+import { replyTo, expandSlang, kindOf } from './personality.js';
+import { factFor } from './knowledge.js';
 import { dataDir } from './paths.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
@@ -290,7 +291,12 @@ const welcomeRegulars = async (items) => {
     const line = lines[Math.floor(Math.random() * lines.length)].replace(/\{name\}/g, r.name);
     state.replies.push(now);
     state.readUsers.set(key, now);   // so the regular answer loop doesn't answer them again right away
-    await applyLiveCommand({ action: 'chat-say', user: r.name, text, reply: line });
+    // A real question or topic gets answered (with a quick welcome in front when it fits); plain hellos get the welcome line.
+    const plain = ['greeting', 'other', 'name', 'first', 'goodbye', 'thanks'].includes(kindOf(text)) && !factFor(expandSlang(text));
+    const answer = plain ? '' : replyTo(text, r.name, brain, { uptime: uptimeWords() });
+    const hi = `Welcome back, ${r.name}! `;
+    const reply = !answer ? line : hi.length + answer.length <= 300 ? hi + answer : answer;
+    await applyLiveCommand({ action: 'chat-say', user: r.name, text, speak: expandSlang(text), reply });
     console.log('[chat] welcomed back a regular');
   }
   // Forget viewers not seen for 60 days.
