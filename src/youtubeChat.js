@@ -178,6 +178,31 @@ const findLive = async () => {
   }
 };
 
+// Is this message meant for someone other than WeBot? Mentions of WeBot always count as his.
+//  - an @mention of someone else, or another chatter's name (from this batch or the regulars list)
+//  - talking to the streamer / mods ("josh", "weatherpower", "mod", "streamer", "owner")
+//  - a bare "same" / "true" / "facts" / "agreed" reply, which is almost always to another viewer
+const talkingToSomeoneElse = (raw, author, batch) => {
+  const t = String(raw || '');
+  if (/\bwe ?bot\b/i.test(t)) return false;
+  if (/@(?!we ?bot\b)[\w.-]{2,}/i.test(t)) return true;
+  if (/\b(josh|weatherpower|streamer|owner|mods?|admin)\b/i.test(t)) return true;
+  if (/^\s*(same|same here|true|so true|facts|agreed|agree|exactly|fr|for real|ikr|yep|yeah|yea|nah|no way|real|this)\s*[!.]*\s*$/i.test(t)) return true;
+  const me = String(author?.displayName || '').replace(/^@/, '').toLowerCase();
+  const names = new Set();
+  for (const m of batch || []) { const n = String(m.authorDetails?.displayName || '').replace(/^@/, ''); if (n) names.add(n); }
+  for (const r of Object.values(loadRegulars())) if (r.name) names.add(r.name);
+  const lower = t.toLowerCase();
+  for (const n of names) {
+    const ln = n.toLowerCase();
+    if (ln === me || ln.length < 4) continue;
+    // Whole name, or its first word / letters before digits ("dragon" for "dragonoftexas" also counts).
+    const short = ln.split(/[\s_.\d-]+/)[0];
+    if (lower.includes(ln) || (short.length >= 5 && new RegExp('\\b' + short.replace(/[^a-z]/g, '') + '\\b').test(lower))) return true;
+  }
+  return false;
+};
+
 // WeBot answers regular chat (anything, not just messages about him): up to maxRepliesPerRead messages
 // from each chat read (oldest first), each viewer at most every sameViewerMinutes, and at most
 // maxRepliesPerHour in all (his voice costs Puter usage). Live Control can turn this off.
@@ -196,6 +221,9 @@ const readOne = async (messages) => {
     if (now - (state.readUsers.get(userKey) || 0) < chat.sameViewerMinutes * 60 * 1000) continue;
     const text = readableChat(message.snippet?.displayMessage, chat.blockedWords);
     if (!text) continue;
+    // Viewers talking to each other (or to the streamer) aren't talking to WeBot: those still show in
+    // the chat box, but he doesn't answer them as if they were.
+    if (talkingToSomeoneElse(message.snippet?.displayMessage || '', author, messages)) continue;
     const control = await liveControl().catch(() => null);
     if (!control || control.chatRead === false) return;
     state.lastReadAt = now;
