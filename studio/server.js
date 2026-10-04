@@ -14,7 +14,7 @@ import { replyTo, kindOf } from '../src/personality.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
 const CONFIG_FILE = path.join(here, 'studio.config.json');
-const DEFAULTS = { port: 7777, host: '104.207.81.143', sshPort: 22022, sshUser: 'root', remoteDir: '/opt/weatherpower', controlPort: 8899, statusPort: 80 };
+const DEFAULTS = { port: 7777, host: '207.244.248.128', sshPort: 22022, sshUser: 'root', remoteDir: '/opt/weatherpower', controlPort: 8899, statusPort: 80 };
 const config = { ...DEFAULTS, ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.readFile(CONFIG_FILE, 'utf8')) : {}), ...(process.env.STUDIO_PORT ? { port: Number(process.env.STUDIO_PORT) } : {}) };
 // For testing against a local server: STUDIO_CONTROL_BASE=http://localhost:8898 STUDIO_TOKEN=...
 const CONTROL_BASE = process.env.STUDIO_CONTROL_BASE || `http://${config.host}:${config.controlPort}`;
@@ -264,7 +264,7 @@ app.get('/api/snapshot', async (req, res) => {
 
 // 15 seconds of the stream's sound: gaps (sputtering) and loudness.
 app.post('/api/check/audio', api(async () => {
-  const cmd = `cd ${R()} && docker compose exec -T -u node stream sh -c 'ffmpeg -hide_banner -loglevel error -f pulse -i stream.monitor -t 15 -y /tmp/check.wav && ffmpeg -hide_banner -nostats -i /tmp/check.wav -af silencedetect=noise=-60dB:d=0.004,ebur128 -f null - 2>&1 | grep -E "silence_end|I:" ; rm -f /tmp/check.wav'`;
+  const cmd = `cd ${R()} && docker compose exec -T -u node stream sh -c 'export XDG_RUNTIME_DIR=/tmp/runtime-$(id -u); ffmpeg -hide_banner -loglevel error -f pulse -i stream.monitor -t 15 -y /tmp/check.wav && ffmpeg -hide_banner -nostats -i /tmp/check.wav -af silencedetect=noise=-60dB:d=0.004,ebur128 -f null - 2>&1 | grep -E "silence_end|I:" ; rm -f /tmp/check.wav'`;
   const r = await ssh(cmd, { timeout: 60000 });
   const gaps = (r.out.match(/silence_end/g) || []).length;
   const lufs = Number((r.out.match(/I:\s+(-?[\d.]+) LUFS/g) || []).pop()?.match(/-?[\d.]+/)?.[0]);

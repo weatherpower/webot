@@ -22,7 +22,7 @@ const config = {
   port: 7788,
   // Where the weather comes from: your cloud server (Live Control port, home internet only), then the
   // WeatherPower server on this PC if you run one.
-  dataSources: ['http://104.207.81.143:8899/warningcenter', 'http://localhost:8899/warningcenter'],
+  dataSources: ['http://207.244.248.128:8899/warningcenter', 'http://localhost:8899/warningcenter'],
   ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.readFile(CONFIG_FILE, 'utf8')) : {}),
   ...(process.env.HOUSE_PORT ? { port: Number(process.env.HOUSE_PORT) } : {})
 };
