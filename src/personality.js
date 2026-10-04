@@ -86,6 +86,16 @@ export const DEFAULT_PERSONALITY = {
       'I’ve seen more personality in a partly cloudy forecast, {name}, and that’s sayin somethin.',
       'Sugar, I’ve been insulted by better. A dust devil called me short once.'
     ],
+    // A regular comes back after 3+ hours away.
+    welcomeBack: [
+      'Well look who’s back! Howdy, {name}, missed you, sugar.',
+      '{name}’s back in the weather house! Pull up your usual chair.',
+      'Welcome back, {name}! The radar didn’t feel the same without you.',
+      'There’s my favorite regular, {name}. Don’t tell the others.',
+      '{name}! Back again? You must really like me. Can’t blame you.',
+      'Look what the storm dragged back in. Hey there, {name}!',
+      '{name}, you’re back! I saved your seat and only judged you a little.'
+    ],
     // "!roast me": the viewer asked for it. Tease the chat habits and the weather nerding, never looks or who they are.
     roastMe: [
       '{name}, you asked a robot to roast you on a weather stream. Sugar, that is the roast.',

@@ -10,6 +10,7 @@ import { STATE_NAMES } from './broadcast.js';
 import { applyLiveCommand, liveControl } from './live.js';
 import { loadBrain } from './brain.js';
 import { replyTo } from './personality.js';
+import { dataDir } from './paths.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const KEY = () => process.env.YOUTUBE_API_KEY || '';
@@ -209,6 +210,57 @@ const readOne = async (messages) => {
   }
 };
 
+/* ---------------- regulars: WeBot remembers who keeps coming back ---------------- */
+// data/regulars.json: per viewer, how many visits (a visit = chatting again after 3+ hours away) and messages.
+// A viewer who chatted on an earlier visit gets a "welcome back" by name on their first message of a new
+// visit (personality → welcomeBack). It counts toward the hourly answer cap.
+const REG_FILE = () => dataDir + '/regulars.json';
+const VISIT_GAP = 3 * 3600 * 1000;
+let regulars = null, regSaveTimer = null;
+const loadRegulars = () => {
+  if (regulars) return regulars;
+  try { regulars = JSON.parse(fs.readFileSync(REG_FILE(), 'utf8')); } catch { regulars = {}; }
+  return regulars;
+};
+const saveRegulars = () => {
+  clearTimeout(regSaveTimer);
+  regSaveTimer = setTimeout(() => { try { fs.writeFileSync(REG_FILE(), JSON.stringify(regulars)); } catch (e) { console.warn('[chat] regulars:', e.message); } }, 2000);
+};
+const welcomeRegulars = async (items) => {
+  const reg = loadRegulars();
+  const now = Date.now();
+  const brain = await loadBrain();
+  const { chat } = brain;
+  for (const message of items) {
+    if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) continue;
+    const author = message.authorDetails || {};
+    const key = author.channelId || author.displayName;
+    if (!key || author.isChatOwner) continue;
+    const r = reg[key] || (reg[key] = { name: '', first: now, last: 0, visits: 0, messages: 0 });
+    const newVisit = now - (r.last || 0) > VISIT_GAP;
+    const wasRegular = r.visits >= 1 && r.messages >= 3;
+    r.name = safeName(author.displayName) || r.name;
+    if (newVisit) r.visits += 1;
+    r.messages += 1;
+    r.last = now;
+    if (!newVisit || !wasRegular || !r.name) continue;
+    const text = readableChat(message.snippet?.displayMessage, chat.blockedWords);
+    const lines = brain.personality?.replies?.welcomeBack || [];
+    state.replies = (state.replies || []).filter((t) => now - t < 3600 * 1000);
+    if (!text || !lines.length || state.replies.length >= chat.maxRepliesPerHour) continue;
+    const control = await liveControl().catch(() => null);
+    if (!control || control.chatRead === false) continue;
+    const line = lines[Math.floor(Math.random() * lines.length)].replace(/\{name\}/g, r.name);
+    state.replies.push(now);
+    state.readUsers.set(key, now);   // so the regular answer loop doesn't answer them again right away
+    await applyLiveCommand({ action: 'chat-say', user: r.name, text, reply: line });
+    console.log('[chat] welcomed back a regular');
+  }
+  // Forget viewers not seen for 60 days.
+  for (const [k, v] of Object.entries(reg)) if (now - v.last > 60 * 86400000) delete reg[k];
+  saveRegulars();
+};
+
 // Chat on the stream: the newest messages that pass the filter go up in WeBot's chat box (commands too).
 const showChats = async (items) => {
   const { chat } = await loadBrain();
@@ -290,6 +342,7 @@ const readChat = async () => {
       if (!command) regular.push(message);
     }
     await showChats(body.items || []).catch((e) => console.warn('[chat]', e.message));
+    await welcomeRegulars(body.items || []).catch((e) => console.warn('[chat]', e.message));
     await readOne(regular).catch((e) => console.warn('[chat]', e.message));
   }
   state.primed = true;
