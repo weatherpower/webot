@@ -56,3 +56,8 @@ Read this first. It explains what this project is, where it runs, and how to cha
 - Cameras stay off the stream (`CAMERA_ON_AIR=false`) until permission is granted.
 - Keep the stream at 1080p; ask before trade-offs that restart the stream or lower quality.
 - Test on a local copy first (`PORT=8898 ... bash scripts/dev-safe.sh`), never with real credentials.
+
+## Planned next (owner's requests, not built yet)
+1. **Costumes:** a WeBot Studio page to pick WeBot's hat/outfit (today `hatSvg()` in `public/live.html` picks by month).
+2. **Fold Live Control into WeBot Studio:** every Live Control feature in Studio, then retire `public/livecontrol.html` (keep `/api/v3/live/control`).
+3. **Studio on the web too:** keep the desktop app, but also serve Studio from the cloud server with a login and HTTPS. The SSH-based features (logs, env, restart, deploy) need server-side versions.
