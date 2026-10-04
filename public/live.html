@@ -358,6 +358,31 @@
 
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
   <script>
+    // Nothing from Puter.js may ever pop up on the stream (its "Low Balance" / "Upgrade" / sign-in dialogs).
+    // Anything Puter adds to the page that isn't ours gets removed the moment it appears.
+    new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) {
+        if (n.nodeType !== 1 || n.id === 'webot-root') continue;
+        const tag = n.tagName || '';
+        const text = (n.textContent || '') + (n.shadowRoot?.textContent || '');
+        if (/^PUTER/i.test(tag) || /puter/i.test(n.className?.baseVal ?? n.className ?? '') || /low balance|upgrade now|not have enough funding|puter-tts/i.test(text)) {
+          n.remove();
+          console.warn('Removed a Puter popup from the stream:', tag, text.trim().slice(0, 80));
+          if (/funding|balance|upgrade/i.test(text) && window.WPPuterBroke) window.WPPuterBroke();
+        }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: false });
+    new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        const text = (n.textContent || '') + (n.shadowRoot?.textContent || '');
+        if (/^PUTER/i.test(n.tagName || '') || /low balance|upgrade now|not have enough funding/i.test(text) && !n.closest?.('.chatbox, .cm')) {
+          n.remove();
+          console.warn('Removed a Puter popup from the stream:', n.tagName);
+          if (/funding|balance|upgrade/i.test(text) && window.WPPuterBroke) window.WPPuterBroke();
+        }
+      }
+    }).observe(document.body || document.documentElement, { childList: true });
   (() => {
     const BASE = '/warningcenter';
     const $ = (id) => document.getElementById(id);
@@ -709,13 +734,15 @@
       if (cfg.engine === 'openai' && S.openaiVoice === false) cfg.engine = 'neural';
       // Puter out of usage (or not linked): the free voice on the stream PC takes over. Puter gets
       // another try every 20 minutes, so it comes back by itself when the allowance resets.
-      if (cfg.engine === 'puter' && S.localVoice && (pt.state === 'signed-out' || pt.state === 'failed' || Date.now() - (pt.failedAt || 0) < 20 * 60 * 1000)) { cfg.engine = 'local'; cfg.fallback = true; }
+      // Out of credits (Low Balance): no Puter at all for 6 hours, so its popup can't come back.
+      if (cfg.engine === 'puter' && (pt.state === 'signed-out' || pt.state === 'failed' || Date.now() - (pt.failedAt || 0) < 20 * 60 * 1000 || Date.now() < (pt.brokeUntil || 0))) { cfg.engine = 'local'; cfg.fallback = true; }
       if (cfg.engine === 'local' && !S.localVoice) cfg.engine = 'neural';
       return cfg;
     };
     const PUTER_JS = 'https://js.puter.com/v2/';
     const VOICE_STYLE = 'You are WeBot, a friendly robot weather broadcaster on a 24/7 live stream. Speak clearly at a steady broadcast pace, warm and upbeat, but serious and urgent about dangerous weather.';
     const pt = { state: 'off', cache: new Map() };
+    window.WPPuterBroke = () => { pt.brokeUntil = Date.now() + 6 * 3600 * 1000; pt.failedAt = Date.now(); pt.lastError = 'Puter is out of credits'; };
     // Takes the Puter sign-in that Live Control linked: any stream page on the home network gets it,
     // and from outside it needs the private ?key= from the OBS link. One sign-in covers every screen.
     const linkPuter = async () => {
@@ -800,6 +827,7 @@
           // Out of usage or any other Puter error: switch to the free voice for a while.
           pt.failedAt = Date.now();
           pt.lastError = String(error?.error?.message || error?.message || error?.error?.code || error).slice(0, 120);
+          if (/fund|balance|upgrade|insufficient|credit|quota|limit/i.test(pt.lastError + ' ' + JSON.stringify(error || {}).slice(0, 400))) window.WPPuterBroke();
           console.warn('Puter voice failed, using the free voice:', pt.lastError);
           throw error;
         });
