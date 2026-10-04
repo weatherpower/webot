@@ -482,7 +482,7 @@ export const applyLiveCommand = async (body = {}) => {
       // A viewer's chat message (already filtered in src/youtubeChat.js) for WeBot to read out loud.
       const text = cleanText(body.text, 160);
       if (!text) throw Object.assign(new Error('Nothing to read'), { status: 400 });
-      pushCommand({ type: 'chat-say', text, user: cleanText(body.user, 24), reply: cleanText(body.reply, 300) });
+      pushCommand({ type: 'chat-say', text, speak: cleanText(body.speak, 220), user: cleanText(body.user, 24), reply: cleanText(body.reply, 300) });
       break;
     }
     case 'chat-show': {

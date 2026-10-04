@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { STATE_NAMES } from './broadcast.js';
 import { applyLiveCommand, liveControl } from './live.js';
 import { loadBrain } from './brain.js';
-import { replyTo } from './personality.js';
+import { replyTo, expandSlang } from './personality.js';
 import { dataDir } from './paths.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
@@ -205,7 +205,7 @@ const readOne = async (messages) => {
     if (state.readUsers.size > 500) state.readUsers.delete(state.readUsers.keys().next().value);
     const user = safeName(author.displayName);
     // WeBot's comeback (src/personality.js): written lines only, so it can't come out crude.
-    await applyLiveCommand({ action: 'chat-say', user, text, reply: replyTo(text, user, brain) });
+    await applyLiveCommand({ action: 'chat-say', user, text, speak: expandSlang(text), reply: replyTo(text, user, brain) });
     console.log('[chat] answering a viewer message');
   }
 };

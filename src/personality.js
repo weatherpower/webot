@@ -21,11 +21,11 @@ export const placeIn = (text) => {
   return ab ? STATES[ab[1].toUpperCase()] : '';
 };
 
-const AT_HIM = /\b(webot|we bot|bot|robot|ai|you|u|ur|youre|you're|this|stream|channel)\b/i;
+const AT_HIM = /\b(webot|we bot|bot|robot|ai|you|u|ur|your|youre|you're|this|stream|channel)\b/i;
 const AT_BOT = /\b(webot|we bot|bot|robot|ai)\b/i;
 const WX = /\b(storms?|rain|snow|tornado|hail|wind|weather|radar|flood|heat|cold|traffic|roads?|power)\b/i;
 const STRONG = /\b(trash|garbage|sucks?|boring|stupid|dumb|lame|worst|cringe|annoying|shut up|ugly|mid|clown|loser|useless|fake)\b/i;
-const WEAK = /\b(bad|hate|weird|broken|slow|terrible|awful)\b/i;
+const WEAK = /\b(bad|hate|weird|broken|slow|terrible|awful|loss)\b/i;
 // Insults aimed at WeBot, not at the weather ("this rain is annoying" isn't about him).
 const roastTest = (t) => (STRONG.test(t) && (AT_BOT.test(t) || (!WX.test(t) && (AT_HIM.test(t) || t.split(' ').length <= 3))))
   || (WEAK.test(t) && AT_BOT.test(t) && !WX.test(t));
@@ -33,7 +33,7 @@ const RULES = [
   ['rival', /ryan\s*hall|\bryan\b|y'?all\s*-?\s*bot|yallbot|rip\s*-?\s*off|knock\s*-?\s*off|copy\s*cat|copying|copy of|wannabe|wanna be|cheap version|off\s*brand|bootleg/i],
   ['roast', roastTest],
   ['bot', /\b(are|r)\s+(you|u)\s+(a |an )?(real|bot|robot|ai|human|person|alive)\b|\bwho\s+(made|built|created|programmed)\s+(you|u|webot)|\bis\s+(this|webot|he|it)\s+(a |an )?(real|bot|robot|ai|human)\b/i],
-  ['goodbye', /\b(bye|goodbye|good ?night|gn|gotta go|got to go|heading out|see ya|see you|later y'?all|i'?m out)\b/i],
+  ['goodbye', /\b(bye|goodbye|good ?night|gn|gotta go|got to go|heading out|see ya|see you|later y'?all|i'?m out|talk to you later|be right back)\b/i],
   ['first', /^first\b|\bfirst!*$/i],
   ['thanks', /\b(thanks|thank you|thank u|thx|ty)\b/i],
   ['compliment', /\b(love|awesome|cool|great|nice|amazing|best|goat|legend|good job|great job|fantastic|beautiful|underrated)\b/i],
@@ -43,13 +43,34 @@ const RULES = [
   ['snow', /\b(snow|snowing|ice|icy|sleet|blizzard)\b/i],
   ['hot', /\b(hot|heat|humid|sweating|burning up|scorching)\b/i],
   ['cold', /\b(cold|freezing|chilly|frost|brr+)\b/i],
-  ['laugh', /\b(lol|lmao|lmfao|haha+|hehe+|rofl|funny)\b/i],
+  ['laugh', /\b(lol|lmao|lmfao|haha+|hehe+|rofl|funny|laughing)\b/i],
+  ['howAreYou', /\bhow (are|r) (you|u|ya)\b|\bhow you doin|\bhow’?s it goin|\bwhat’?s up\b|\bhow have you been\b/i],
   ['name', /\bwebot\b|\bwe bot\b/i],
   ['question', /\?/],
   ['wx', /\b(radar|weather|sky|skies|clouds?|cloudy|sunny|wind|windy|front|forecast)\b/i]
 ];
+// Chat shorthand → plain words, so WeBot reads "ngl ur mid lol" as "not gonna lie your mid laughing".
+const SLANG = {
+  lol: 'laughing', lmao: 'laughing', lmfao: 'laughing', rofl: 'laughing', lolol: 'laughing', haha: 'haha',
+  brb: 'be right back', gn: 'good night', gm: 'good morning', ty: 'thank you', tysm: 'thank you so much', thx: 'thanks', tx: 'thanks',
+  np: 'no problem', idk: 'I don’t know', idc: 'I don’t care', ngl: 'not gonna lie', fr: 'for real', frfr: 'for real for real',
+  tbh: 'to be honest', imo: 'in my opinion', imho: 'in my opinion', smh: 'shaking my head', omg: 'oh my gosh', omw: 'on my way',
+  wyd: 'what are you doing', wbu: 'what about you', hbu: 'how about you', hru: 'how are you', ikr: 'I know right',
+  rn: 'right now', u: 'you', ur: 'your', r: 'are', ya: 'you', yall: 'y’all', pls: 'please', plz: 'please', gg: 'good game',
+  irl: 'in real life', btw: 'by the way', afk: 'away', bc: 'because', cuz: 'because', bcuz: 'because', nvm: 'never mind',
+  tmrw: 'tomorrow', tmr: 'tomorrow', tmrrw: 'tomorrow', '2day': 'today', '2nite': 'tonight', rly: 'really', ppl: 'people', sup: 'what’s up',
+  wsp: 'what’s up', wassup: 'what’s up', istg: 'I swear', ong: 'for real', fyi: 'for your information', wx: 'weather', svr: 'severe',
+  tor: 'tornado', ffw: 'flash flood warning', tstorm: 'thunderstorm', tstorms: 'thunderstorms', hw: 'homework', gtg: 'got to go', g2g: 'got to go',
+  ttyl: 'talk to you later', cya: 'see ya', ily: 'I love you', ilysm: 'I love you so much', w: 'win', l: 'loss', dw: 'don’t worry',
+  ok: 'okay', k: 'okay', kk: 'okay', mb: 'my bad', srsly: 'seriously', prob: 'probably', def: 'definitely', ez: 'easy'
+};
+export const expandSlang = (text) => String(text || '').replace(/[A-Za-z0-9’']+/g, (w) => {
+  const v = SLANG[w.toLowerCase().replace(/[’']/g, '')];
+  return v === undefined || v === '' ? w : v;
+}).replace(/\s+/g, ' ').trim();
+
 export const kindOf = (text) => {
-  const t = String(text || '');
+  const t = expandSlang(text);
   const greet = /\b(hi|hello|hey|howdy|yo|sup|hiya|good (morning|evening|afternoon))\b/i.test(t);
   for (const [kind, test] of RULES) {
     // Greetings with a place ("hey from Texas") get the hometown welcome instead.
@@ -180,6 +201,12 @@ export const DEFAULT_PERSONALITY = {
       'Hello to {place}! Hold onto your hats, folks.',
       '{place}, huh? Good people, questionable drivers. Welcome, {name}.',
       'Well howdy, {place}! Glad you’re here, {name}.'
+    ],
+    howAreYou: [
+      'I’m doin fine as frog hair, {name}. Thanks for askin.',
+      'Better now that you asked, {name}. The radar’s keepin me company.',
+      'Livin the dream, {name}. Watchin storms and judgin chat.',
+      'Can’t complain, {name}. Well, I could, but nobody’d listen.'
     ],
     wx: [
       'The sky’s doin its thing, {name}, and I’m doin mine. Watchin it like a hawk.',

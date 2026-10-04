@@ -3457,7 +3457,8 @@
       if (S.control.brb || S.inBreaking || !isCalm()) return;
       const reply = cmd.reply != null ? cmd.reply : chatReply(cmd.text);
       chatAnswer(cmd.user, cmd.text, reply);
-      say((cmd.user || 'A viewer') + ' says: ' + cmd.text + (reply ? ' ... ' + reply : ''), { chat: true });
+      // Spoken with chat shorthand spelled out ("ngl" → "not gonna lie"); the chat box shows what they typed.
+      say((cmd.user || 'A viewer') + ' says: ' + (cmd.speak || cmd.text) + (reply ? ' ... ' + reply : ''), { chat: true });
     };
     /* ---------------- live chat box on screen ---------------- */
     // Messages come in batches (chat is read about once a minute), so they drip in a couple of seconds apart.
