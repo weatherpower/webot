@@ -202,3 +202,11 @@ segments it has planned, what WeBot just said, the warnings it is watching and t
 That port (80) runs a separate, read-only listener that serves only this page and its JSON, so it is safe to
 leave open. Live Control stays on port 8899 behind the home-IP firewall. The same page is also at
 `/warningcenter/webot` on the main server.
+
+## Phone alerts (ntfy)
+
+`deploy/cloud-stream/notify-cron.sh` runs every minute from root's crontab and pushes to the free
+**ntfy** app (topic `NTFY_TOPIC` in `.env`): tornado warnings within `NOTIFY_MILES` (40) of home,
+severe storm / flash flood warnings and tornado or severe watches covering home, and the stream going
+down or coming back. Home is `/api/v3/config` → `home`. Log: `/var/log/wp-notify.log`.
+Test: `/opt/weatherpower/deploy/cloud-stream/notify-cron.sh --test`.
