@@ -1,0 +1,12 @@
+# HTTPS for WeBot Studio on the web. sslip.io turns the server's IP into a name, so Let's Encrypt can
+# give it a real certificate (no domain to buy). Port 80 belongs to the status page, so the certificate
+# check runs on 443 (TLS-ALPN) and Caddy's own http port is moved out of the way.
+{
+	http_port 8081
+	auto_https disable_redirects
+}
+
+{$STUDIO_DOMAIN:207-244-248-128.sslip.io} {
+	encode gzip
+	reverse_proxy 127.0.0.1:7777
+}

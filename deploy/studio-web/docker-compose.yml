@@ -1,0 +1,29 @@
+# WeBot Studio on the web: https://207-244-248-128.sslip.io (sign in with the Live Control password).
+# Start/update on the server:  cd /opt/weatherpower/deploy/studio-web && docker compose up -d --build
+# Its own compose project, so Studio's "restart the stream" never restarts Studio itself.
+name: studio-web
+services:
+  studio:
+    build:
+      context: ../..
+      dockerfile: deploy/studio-web/Dockerfile
+    restart: unless-stopped
+    network_mode: host      # listens on 127.0.0.1:7777 only; Caddy is the way in
+    pid: host               # health check sees ffmpeg / Chrome
+    environment:
+      STUDIO_WEB: "1"
+      STUDIO_PORT: "7777"
+      STUDIO_CONTROL_BASE: http://127.0.0.1:8899
+      STUDIO_STATUS_BASE: http://127.0.0.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/weatherpower:/opt/weatherpower
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+volumes:
+  caddy-data: {}

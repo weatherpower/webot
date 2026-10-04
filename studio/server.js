@@ -9,6 +9,8 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import http from 'node:http';
+import crypto from 'node:crypto';
 import { replyTo, kindOf } from '../src/personality.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +21,10 @@ const config = { ...DEFAULTS, ...(existsSync(CONFIG_FILE) ? JSON.parse(await fs.
 // For testing against a local server: STUDIO_CONTROL_BASE=http://localhost:8898 STUDIO_TOKEN=...
 const CONTROL_BASE = process.env.STUDIO_CONTROL_BASE || `http://${config.host}:${config.controlPort}`;
 const STATUS_BASE = process.env.STUDIO_STATUS_BASE || `http://${config.host}${config.statusPort === 80 ? '' : ':' + config.statusPort}`;
+// Web mode (STUDIO_WEB=1): Studio runs on the cloud server itself (deploy/studio-web), behind HTTPS with a sign-in.
+// Server commands run right there instead of over SSH; code editing and deploys stay in the desktop app.
+const WEB = process.env.STUDIO_WEB === '1';
+const PUBLIC_STATUS = `http://${config.host}${config.statusPort === 80 ? '' : ':' + config.statusPort}`;
 
 /* ---------------- shell helpers ---------------- */
 const run = (cmd, args, { input, timeout = 60000, cwd = projectRoot } = {}) => new Promise((resolve) => {
@@ -33,7 +39,7 @@ const run = (cmd, args, { input, timeout = 60000, cwd = projectRoot } = {}) => n
   if (input != null) child.stdin.end(input); else child.stdin.end();
 });
 const sshArgs = () => ['-p', String(config.sshPort), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'ServerAliveInterval=15', `${config.sshUser}@${config.host}`];
-const ssh = (command, opts = {}) => run('ssh', [...sshArgs(), command], opts);
+const ssh = (command, opts = {}) => (WEB ? run('bash', ['-c', command], opts) : run('ssh', [...sshArgs(), command], opts));
 const scp = (local, remote) => run('scp', ['-P', String(config.sshPort), '-o', 'BatchMode=yes', '-q', local, `${config.sshUser}@${config.host}:${remote}`], { timeout: 120000 });
 const git = (args, opts) => run('git', args, opts);
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;   // single-quote for the remote shell
@@ -151,7 +157,51 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '8mb' }));
 // Only this computer, and only this page: no other website can drive the studio.
+const COOKIE = 'wpstudio';
+const signFor = async (exp) => crypto.createHmac('sha256', 'studio-web|' + await getToken()).update(String(exp)).digest('hex');
+const signedIn = async (req) => {
+  const m = String(req.headers.cookie || '').match(/(?:^|;\s*)wpstudio=(\d+)\.([0-9a-f]{64})/);
+  if (!m || Number(m[1]) < Date.now()) return false;
+  const want = Buffer.from(await signFor(m[1])), got = Buffer.from(m[2]);
+  return want.length === got.length && crypto.timingSafeEqual(want, got);
+};
+const tries = new Map();   // sign-in attempts per address: at most 8 every 15 minutes
+if (WEB) app.use(async (req, res, next) => {
+  // Same-site only: other websites can't drive Studio with your sign-in.
+  const origin = req.headers.origin;
+  if (req.method !== 'GET' && origin && origin !== 'https://' + req.headers.host) return res.status(403).json({ error: 'Blocked: request from another site' });
+  if (req.path === '/api/login' && req.method === 'POST') {
+    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',').pop().trim();
+    const t = (tries.get(ip) || []).filter((at) => Date.now() - at < 15 * 60000);
+    if (t.length >= 8) return res.status(429).json({ error: 'Too many tries. Wait 15 minutes.' });
+    t.push(Date.now()); tries.set(ip, t);
+    const pass = String(req.body?.password || '').trim();
+    const goods = [await getToken().catch(() => ''), process.env.STUDIO_PASSWORD || ''].filter(Boolean).map((g) => crypto.createHash('sha256').update(g).digest());
+    const mine = crypto.createHash('sha256').update(pass).digest();
+    if (!pass || !goods.some((g) => crypto.timingSafeEqual(g, mine))) return res.status(401).json({ error: 'Wrong password' });
+    tries.delete(ip);
+    const exp = Date.now() + 30 * 86400000;
+    res.setHeader('Set-Cookie', `${COOKIE}=${exp}.${await signFor(exp)}; Path=/; Max-Age=${30 * 86400}; HttpOnly; Secure; SameSite=Strict`);
+    return res.json({ ok: true });
+  }
+  if (req.path === '/api/logout') { res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`); return res.json({ ok: true }); }
+  if (!/^\/(api|warningcenter)(\/|$)/.test(req.path)) return next();   // the page itself (no secrets in it)
+  if (!(await signedIn(req).catch(() => false))) return res.status(401).json({ error: 'Sign in', signIn: true });
+  if (/^\/api\/(files?|git|deploy|firewall)(\/|$)/.test(req.path)) return res.status(400).json({ error: 'Code, deploys and the firewall are in the desktop app.' });
+  if (req.path.startsWith('/warningcenter')) {
+    // Live Control (and the stream page) through Studio, so they work over HTTPS from anywhere once signed in.
+    const up = new URL(CONTROL_BASE);
+    const headers = { ...req.headers, host: up.host };
+    delete headers.cookie;
+    const p = http.request({ hostname: up.hostname, port: up.port || 80, path: req.originalUrl, method: req.method, headers }, (r) => { res.writeHead(r.statusCode, r.headers); r.pipe(res); });
+    p.on('error', (e) => { if (!res.headersSent) res.status(502).json({ error: 'Live Control not answering: ' + e.message }); else res.end(); });
+    if (req.body && Object.keys(req.body).length) { const b = JSON.stringify(req.body); p.setHeader('content-length', Buffer.byteLength(b)); p.end(b); } else req.pipe(p);
+    return;
+  }
+  next();
+});
 app.use((req, res, next) => {
+  if (WEB) return next();
   const host = String(req.headers.host || '');
   if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return res.status(403).send('Local only');
   const origin = req.headers.origin;
@@ -164,9 +214,9 @@ const api = (fn) => async (req, res) => {
   try { res.json(await fn(req, res)); } catch (e) { res.status(e.status && e.status < 600 ? e.status : 500).json({ error: e.message }); }
 };
 
-app.get('/api/config', api(async () => ({ ...config, controlBase: CONTROL_BASE, statusBase: STATUS_BASE, projectRoot })));
+app.get('/api/config', api(async () => (WEB ? { host: config.host, web: true, controlBase: '', statusBase: PUBLIC_STATUS } : { ...config, controlBase: CONTROL_BASE, statusBase: STATUS_BASE, projectRoot })));
 // The Controls page (Live Control inside Studio) opens already signed in with the controller token.
-app.get('/api/control-url', api(async () => ({ url: `${CONTROL_BASE}/warningcenter/live/control#token=${encodeURIComponent(await getToken())}` })));
+app.get('/api/control-url', api(async () => ({ url: `${WEB ? '' : CONTROL_BASE}/warningcenter/live/control#token=${encodeURIComponent(await getToken())}` })));
 
 app.get('/api/overview', api(async () => {
   const [status, server, ctl] = await Promise.allSettled([

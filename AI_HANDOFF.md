@@ -24,6 +24,7 @@ Read this first. It explains what this project is, where it runs, and how to cha
 | `deploy/cloud-stream/` | `run.sh` (stream), `notify.cjs` + `notify-cron.sh` (ntfy phone alerts), `snapshot.cjs` |
 | `studio/` | **WeBot Studio**: local control-room app (port 7777) that manages the server over SSH |
 | `house/` | **WeatherPower Stream House**: warning-map + OBS overlay app for the owner's own streams (port 7788) |
+| `deploy/studio-web/` | **Studio on the web**: https://207-244-248-128.sslip.io (Caddy HTTPS + sign-in with the controller token, STUDIO_WEB=1; runs server commands locally instead of SSH; no code/deploy/firewall). Update: `cd /opt/weatherpower/deploy/studio-web && docker compose up -d --build` |
 | `desktop/` | Electron shell that runs Studio and Stream House as Windows .exe programs (`npm run build`) |
 
 ## Newer features (Oct 2026)
@@ -58,6 +59,6 @@ Read this first. It explains what this project is, where it runs, and how to cha
 - Test on a local copy first (`PORT=8898 ... bash scripts/dev-safe.sh`), never with real credentials.
 
 ## Planned next (owner's requests, not built yet)
-1. **Costumes:** a WeBot Studio page to pick WeBot's hat/outfit (today `hatSvg()` in `public/live.html` picks by month).
-2. **Fold Live Control into WeBot Studio:** every Live Control feature in Studio, then retire `public/livecontrol.html` (keep `/api/v3/live/control`).
-3. **Studio on the web too:** keep the desktop app, but also serve Studio from the cloud server with a login and HTTPS. The SSH-based features (logs, env, restart, deploy) need server-side versions.
+1. **Fold Live Control into WeBot Studio natively:** Studio has a Controls page (Live Control in a frame); next is native Studio versions, then retire `public/livecontrol.html` (keep `/api/v3/live/control`).
+2. **Open source someday:** move owner-specific IDs/IPs/branding into config, pick a license, one-command VPS setup.
+(Done: costumes, Studio on the web.)

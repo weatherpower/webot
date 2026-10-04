@@ -4,6 +4,7 @@ const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':
 const call = async (method, url, body) => {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const json = await r.json().catch(() => ({}));
+  if (r.status === 401 && json.signIn) { $('login').hidden = false; $('login-pass').focus(); }
   if (!r.ok) throw new Error(json.error || `${method} ${url} failed (${r.status})`);
   return json;
 };
@@ -656,6 +657,14 @@ $('chk-mark').addEventListener('click', async () => {
   try { const r = await call('POST', '/api/deploy/mark'); $('chk-mark-out').textContent = 'SERVER MARKED AT ' + r.deployed.slice(0, 7); loadOverview(); } catch (e) { toast(e.message, 'bad'); }
 });
 
+/* ---------------- sign-in (Studio on the web) ---------------- */
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await call('POST', '/api/login', { password: $('login-pass').value }); location.reload(); }
+  catch (err) { $('login-err').textContent = err.message; }
+});
+$('logout').addEventListener('click', async () => { await call('POST', '/api/logout').catch(() => {}); location.reload(); });
+
 /* ---------------- start ---------------- */
 (async () => {
   try {
@@ -664,8 +673,17 @@ $('chk-mark').addEventListener('click', async () => {
     $('l-status').href = S.cfg.statusBase + '/';
 
     $('l-stream').href = S.cfg.controlBase + '/warningcenter/live?music=0&voice=0';
+    if (S.cfg.web) {
+      // Studio on the web: code, deploys and the firewall stay in the desktop app.
+      document.body.classList.add('web');
+      document.querySelector('.nav button[data-page=code]').hidden = true;
+      $('fw-list').closest('.panel').hidden = true;
+      $('chk-mark').closest('.panel').hidden = true;
+      $('f-ssh').previousElementSibling.textContent = 'MODE';
+      $('logout').hidden = false;
+    }
   } catch (e) { toast('Studio server not answering: ' + e.message, 'bad'); }
   show((location.hash || '#overview').slice(1));
   if (S.page !== 'overview') loadOverview();
-  loadFiles();
+  if (!S.cfg?.web) loadFiles();
 })();

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WeBot Studio</title>
   <link rel="icon" href="/assets/webot.png">
+  <link rel="apple-touch-icon" href="/assets/webot.png">
+  <meta name="theme-color" content="#070b14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
   <link rel="stylesheet" href="/studio.css">
 </head>
@@ -26,6 +30,7 @@
       <div class="row"><span>SSH</span><b id="f-ssh"><span class="dot"></span></b></div>
       <div class="row"><span>CODE</span><b id="f-head">—</b></div>
       <div class="row"><span>ON SERVER</span><b id="f-deployed">—</b></div>
+      <button class="btn sm" id="logout" hidden style="margin-top:10px;width:100%">Sign out</button>
     </div>
   </aside>
 
@@ -128,7 +133,7 @@
 
       <!-- ================= BRAIN ================= -->
       <section class="page" id="page-controls" style="padding:0">
-        <iframe id="controls-frame" title="Controls" style="width:100%;height:calc(100vh - 56px);border:0;display:block;background:#06090f"></iframe>
+        <iframe id="controls-frame" title="Controls" style="width:100%;height:calc(100dvh - 56px);border:0;display:block;background:#06090f"></iframe>
       </section>
       <section class="page" id="page-brain">
         <div class="page-head"><h1>WeBot’s brain</h1><p>What WeBot says, how long segments last, how chat works and what the radio plays. Saving sends it straight to the stream: no restart.</p></div>
@@ -265,6 +270,15 @@
 
   <div class="modal" id="modal"><div class="panel"><h2 id="m-title">—</h2><div id="m-body"></div><div class="row" id="m-actions" style="margin-top:14px;justify-content:flex-end"></div></div></div>
   <div class="toast" id="toast"></div>
+  <div class="login" id="login" hidden>
+    <form class="panel" id="login-form">
+      <div class="brand" style="border:0;padding:0 0 14px"><img src="/assets/webot.png" alt=""><div><b>WEBOT</b><span>STUDIO</span></div></div>
+      <label class="k" for="login-pass">Password (your Live Control password)</label>
+      <input type="password" id="login-pass" autocomplete="current-password" style="margin-top:8px">
+      <button class="btn" type="submit" style="margin-top:12px;width:100%">Sign in</button>
+      <div class="bad" id="login-err" style="margin-top:10px;min-height:18px"></div>
+    </form>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
