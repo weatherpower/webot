@@ -1,0 +1,94 @@
+name: Deploy WeatherPower Live
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "README.md"
+      - "AI_HANDOFF.md"
+      - "CLOUD_STREAM.md"
+      - "DEPLOY_WEATHERPOWER.md"
+      - "SPACESHIP_CPANEL_PRINTABLE_GUIDE.md"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: weatherpower-live-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${VPS_PORT:-22}" "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Sync application to VPS
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.env' \
+            --exclude 'data/' \
+            --exclude 'cards/' \
+            --exclude 'node_modules/' \
+            -e "ssh -p ${VPS_PORT:-22}" \
+            ./ "${VPS_USER}@${VPS_HOST}:/opt/weatherpower/"
+
+      - name: Build and restart stream container
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -p "${VPS_PORT:-22}" "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/weatherpower && \
+             docker compose build -q && \
+             docker compose up -d && \
+             printf '%s\n' '${DEPLOY_SHA:0:7}' > .deployed-commit && \
+             docker compose ps"
+
+      - name: Verify public status endpoint
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          for i in {1..12}; do
+            if curl -fsS --max-time 8 "http://${VPS_HOST}/" >/dev/null; then
+              echo "WeatherPower public status page is responding."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Deployment finished, but the public status page did not respond in time."
+          exit 1
