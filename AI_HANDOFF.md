@@ -26,6 +26,12 @@ Read this first. It explains what this project is, where it runs, and how to cha
 | `house/` | **WeatherPower Stream House**: warning-map + OBS overlay app for the owner's own streams (port 7788) |
 | `desktop/` | Electron shell that runs Studio and Stream House as Windows .exe programs (`npm run build`) |
 
+## Newer features (Oct 2026)
+- Chat: WeBot answers any chat (3 per check, 15/hour, 1/min per viewer), , , , and welcomes back regulars ().
+- Segments: Rain outlook (WPC Excessive Rainfall, ), Train Cam (SouthWest RailCams, ; off because YouTube embeds ask the server to sign in).
+- Map moves fade instead of zooming (CPU-drawn map). Studio and Live Control show viewers, total views and live time.
+- Every commit auto-pushes to GitHub ().
+
 ## The cloud server
 - Contabo VPS, Ubuntu 24.04, 6 cores / 12 GB. `ssh -p 22022 root@207.244.248.128`. App in `/opt/weatherpower`.
 - Secrets live only in `/opt/weatherpower/.env` on the server (YouTube stream key + API key, controller token,
