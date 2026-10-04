@@ -48,9 +48,14 @@ const show = (name) => {
   document.querySelectorAll('.nav button').forEach((b) => b.classList.toggle('on', b.dataset.page === name));
   document.querySelectorAll('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + name));
   history.replaceState(null, '', '#' + name);
+  document.body.dataset.page = name;
+  $('mbar-title').textContent = document.querySelector('.nav button[data-page=' + name + ']')?.firstChild?.nextSibling?.textContent?.trim() || name;
   pages[name]?.enter?.();
 };
-$('nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-page]'); if (b) show(b.dataset.page); });
+$('nav').addEventListener('click', (e) => { const b = e.target.closest('button[data-page]'); if (b) { show(b.dataset.page); document.body.classList.remove('menu'); } });
+// Phones: the menu button opens the rail as a slide-out menu.
+$('burger').addEventListener('click', () => document.body.classList.toggle('menu'));
+$('scrim').addEventListener('click', () => document.body.classList.remove('menu'));
 const S = { page: 'overview', overview: null, cfg: null };
 
 /* ---------------- overview + top strip ---------------- */
@@ -62,6 +67,8 @@ const renderOverview = (o) => {
   const onair = $('s-onair');
   onair.className = 'onair' + (st.brb ? ' brb' : st.onAir ? ' live' : '');
   $('s-onair-t').textContent = st.error ? 'NO STATUS' : st.brb ? 'BRB' : st.onAir ? 'ON AIR' : 'OFF AIR';
+  $('mbar-live-t').textContent = st.error ? '—' : st.brb ? 'BRB' : st.onAir ? 'LIVE' : 'OFF';
+  $('mbar-live').classList.toggle('on', Boolean(st.onAir && !st.brb && !st.error));
   const now = st.now;
   $('s-now').textContent = st.brb ? 'Be right back' : now ? (KINDS[now.type] || now.type) + (now.title ? ' · ' + now.title : '') : '—';
   $('s-viewers').textContent = st.chat?.viewers ?? '—';

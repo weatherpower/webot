@@ -10,9 +10,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="/studio.css">
+  <link rel="stylesheet" href="/studio.css?v=5">
 </head>
 <body>
+  <!-- phones: top bar with the menu button (the rail slides out) -->
+  <header class="mbar"><button class="burger" id="burger" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><img src="/assets/webot.png" alt=""><b id="mbar-title">Overview</b><span class="live" id="mbar-live"><i></i><span id="mbar-live-t">—</span></span></header>
+  <div class="scrim" id="scrim"></div>
   <aside class="rail">
     <div class="brand"><img src="/assets/webot.png" alt=""><div><b>WEBOT</b><span>STUDIO</span></div></div>
     <nav class="nav" id="nav">
