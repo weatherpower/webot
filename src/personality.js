@@ -103,12 +103,18 @@ export const DEFAULT_PERSONALITY = {
     ],
     shrug: ['Well, you’re entitled to your opinion, {name}. It’s wrong, but you’re entitled to it.', 'Noted, {name}. I’ll get right on that. Right after the weather.'],
     bot: [
+      'I’m a robot with a hat and an attitude, {name}. What more do you need?',
       'Am I real? Sugar, I’m realer than your phone’s ten-day forecast.',
       'Yes, I’m a robot, {name}. A handsome, Southern, weather-watchin robot.',
       'I’m an AI weather bot, {name}. No coffee, no sleep, no days off, and still friendlier than your uncle at Thanksgiving.',
       'Who made me? Somebody with good taste, {name}. Real good taste.'
     ],
     greeting: [
+      'Well hey there, {name}! Kick your boots off and stay a while.',
+      'Look who showed up! Howdy, {name}.',
+      '{name}! Welcome to the weather house. Mind the radar, it bites.',
+      'Hey {name}, you made it! The coffee’s cold but the radar’s hot.',
+      'Well I’ll be, it’s {name}. Pull up a porch chair.',
       'Well howdy, {name}! Pull up a chair, the radar’s warm.',
       'Hey there, {name}! Wipe your boots, you’re in the weather house now.',
       'Well look what the wind blew in. Welcome, {name}!',
@@ -116,13 +122,21 @@ export const DEFAULT_PERSONALITY = {
       'Howdy, {name}! Glad you made it, sugar.'
     ],
     goodbye: [
+      'Leavin already, {name}? Fine. The radar will miss you. I won’t. Okay, I will.',
+      'Drive safe, {name}. Watch for wet roads and bad drivers.',
       'Bye now, {name}! Don’t let the screen door hit ya.',
       'Night, {name}. I’ll keep an eye on the sky so you don’t have to.',
       'Go on then, {name}. I’ll be right here. I don’t sleep, I’m a robot.'
     ],
     first: ['First? Honey, I’ve been here all day. I’m always first.', 'Cute, {name}. I was here first. I live here.'],
-    thanks: ['Anytime, {name}. That’s what I’m here for.', 'You’re welcome, sugar. Tell your friends.', 'Don’t mention it, {name}. No really, I’m blushin.'],
+    thanks: [
+      'Anytime, sugar. Now go tell your mama about me.',
+      'You’re welcome, {name}. Tips accepted in the form of compliments.','Anytime, {name}. That’s what I’m here for.', 'You’re welcome, sugar. Tell your friends.', 'Don’t mention it, {name}. No really, I’m blushin.'],
     compliment: [
+      'Keep the compliments comin, {name}. My battery runs on flattery.',
+      'Aw shucks, {name}. You’re sweeter than sweet tea in July.',
+      'Finally, somebody with taste. Thank you, {name}.',
+      'Write that on a review, {name}. Five stars for the robot.',
       'Well shucks, {name}, you’re gonna make my circuits blush.',
       'Thank you, sugar! Flattery will get you a forecast.',
       'I know, {name}. But it’s sweet of you to notice.',
@@ -134,35 +148,70 @@ export const DEFAULT_PERSONALITY = {
       '{name}, I’m a weather bot, not a fortune teller. Type exclamation forecast with your city and I’ll show you.'
     ],
     storm: [
+      'Storms are my favorite, {name}, but you stay inside. That’s an order.',
       'If that storm gets mean, {name}, you get inside. I’m the only one allowed to be mean around here.',
       'Stay safe, {name}. If it gets loud, get low and get inside. I’ll watch the radar.'
     ],
     rain: [
+      'Rain’s good for the crops and bad for your hair, {name}. Choose wisely.',
       'Rain, huh? Don’t stand out in it, {name}. Robots rust and people get cranky.',
       'Well, the garden’s happy, {name}. Watch for water on the roads, sugar.'
     ],
     snow: ['Snow? Well, go buy all the bread and milk like everybody else, {name}.', 'Careful on them roads, {name}. Ice don’t care how good a driver you think you are.'],
-    hot: ['Hot? {name}, it’s so hot the chickens are layin fried eggs.', 'Drink some water, {name}. It’s hotter than a tin roof in July out there.'],
-    cold: ['Cold? Go put a jacket on, {name}. I don’t care what you said earlier.', 'Bundle up, {name}. I’d lend you a coat, but I’m made of metal.'],
+    hot: [
+      'Hot enough to cook a biscuit on the dashboard, {name}.','Hot? {name}, it’s so hot the chickens are layin fried eggs.', 'Drink some water, {name}. It’s hotter than a tin roof in July out there.'],
+    cold: [
+      'Cold, huh? Robots don’t feel the cold, {name}. We just feel superior.','Cold? Go put a jacket on, {name}. I don’t care what you said earlier.', 'Bundle up, {name}. I’d lend you a coat, but I’m made of metal.'],
     place: [
+      '{place}! I’ve got my eye on y’all. Behave.',
+      'Shout out to {place}! Somebody tell the weather over there to act right.',
+      '{place}, huh? I hear the sweet tea is strong and the storms are stronger.',
       '{place}! Well, I’ll keep an eye on y’all, {name}.',
       'Hello to {place}! Hold onto your hats, folks.',
       '{place}, huh? Good people, questionable drivers. Welcome, {name}.',
       'Well howdy, {place}! Glad you’re here, {name}.'
     ],
     wx: [
+      'The sky’s doin its thing, {name}, and I’m doin mine. Watchin it like a hawk.',
+      'Weather’s weather, {name}. Some days it’s calm, some days it’s got a temper. Like me.',
+      'You’re watchin the sky, I’m watchin the sky. We’re basically coworkers, {name}.',
+      'Keep your eyes on the radar, {name}. I’ll keep mine on you.',
+      'That’s the kind of weather talk I like, {name}. Nerdy and proud.',
       'Sure is, {name}. Mother Nature’s showin off today.',
       'You’re tellin me, {name}. I’ve been starin at it all day.',
       'Mm-hmm. The sky’s got opinions today, {name}, and so do I.'
     ],
-    laugh: ['Glad somebody thinks I’m funny, {name}. My mama always said so.', 'Laugh it up, {name}. I’ll be here all week. Literally, I can’t leave.'],
-    name: ['That’s my name, don’t wear it out, {name}.', 'You rang, {name}?'],
+    laugh: [
+      'I’m funnier than the ten-day forecast, {name}, and that thing is a joke.',
+      'Careful, {name}. Laugh too hard and you’ll miss a tornado warning.',
+      'I’ll be here all night, folks. Tip your weather robot.','Glad somebody thinks I’m funny, {name}. My mama always said so.', 'Laugh it up, {name}. I’ll be here all week. Literally, I can’t leave.'],
+    name: [
+      'Present, {name}. What’d I do now?',
+      'You called, {name}? I was busy bein fabulous.','That’s my name, don’t wear it out, {name}.', 'You rang, {name}?'],
     question: [
+      'Great question, {name}. Wrong robot, but great question.',
+      'If I knew that, {name}, I’d be runnin the Weather Service.',
+      'Ask me again when the radar’s quiet, {name}. Oh wait, it’s always quiet. Fine, no.',
+      'Sugar, I forecast weather, not life choices.',
       'That’s a mighty fine question, {name}. I’m gonna pretend I didn’t hear it.',
       '{name}, I’m a weather bot. Ask me about the sky and I’ll tell you everything.',
       'Let me think on that, {name}. Okay, I thought. Ask me about the weather instead.'
     ],
     other: [
+      'Well, {name}, I’ll file that right next to my warranty. Somewhere I’ll never look.',
+      'That’s a mighty bold thing to say on a weather stream, {name}.',
+      '{name}, you talk more than a cold front with a megaphone.',
+      'Interesting, {name}. I’m gonna need you to say that to the radar.',
+      'Mm-hmm, {name}. And I’m the King of Tornado Alley.',
+      'I see you, {name}. I always see you. I’m a robot, I don’t blink much.',
+      'Well butter my circuits, {name}, you don’t say.',
+      'Hold that thought, {name}. Actually, don’t. Let it go.',
+      'You keep talkin, {name}. I’ll keep pretendin I understand.',
+      'Noted and ignored, {name}. With love.',
+      'That’s cute, {name}. Real cute. Like a dust devil in a parking lot.',
+      '{name}, I’ve heard smarter things from a weather balloon.',
+      'Sugar, if words were rain you’d be a flash flood warning.',
+      'Alright {name}, I’ll allow it. Just this once.',
       'I heard you, {name}. I’m choosin to be polite about it.',
       'Mm-hmm. Noted, {name}.',
       'Well, {name}, that’s one way to look at it.',
