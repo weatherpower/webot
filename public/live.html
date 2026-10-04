@@ -25,6 +25,15 @@
     /* Map moves fade through dark instead of zooming (no graphics card on the stream server). */
     .mapfade { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #0b1220; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
     .mapfade.on { opacity: 1; }
+    /* Train Cam: a live SouthWest RailCams cam between the top and bottom bars (calm days). */
+    .train { position: absolute; left: 0; top: 80px; width: 1920px; height: 920px; z-index: 11; background: #000; opacity: 0; pointer-events: none; transition: opacity .6s ease; }
+    .train.on { opacity: 1; }
+    .train iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .train .tl { position: absolute; left: 32px; top: 24px; display: flex; align-items: stretch; background: rgba(9,16,30,.92); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+    .train .tl b { display: grid; place-items: center; padding: 0 16px; background: #ff8a1e; color: #1a0d00; font: 700 22px/1 "WP Display"; letter-spacing: .06em; }
+    .train .tl div { padding: 10px 18px 11px; }
+    .train .tl strong { display: block; font: 700 30px/1.05 "WP Display"; letter-spacing: .02em; text-transform: uppercase; color: #fff; }
+    .train .tl small { display: block; margin-top: 4px; font: 700 13px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.7); }
     .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,0) 12%, rgba(0,0,0,0) 86%, rgba(0,0,0,.35)); }
 
     /* ---------- top bar ---------- */
@@ -285,6 +294,7 @@
   <div id="stage">
     <div id="map"></div>
     <div class="mapfade" id="mapfade"></div>
+    <div class="train" id="train"><div class="tl"><b>🚂 TRAIN CAM</b><div><strong id="train-place"></strong><small id="train-line"></small></div></div></div>
     <div class="shade"></div>
 
     <header class="top">
@@ -2121,7 +2131,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, think: 13, ...(B.brain?.calmSeconds || {}) };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -2366,7 +2376,8 @@
         surface: S.surface ? (busy ? 0.8 : 2) : 0,
         // Daily forecasts only on calm days: never with tornado, severe thunderstorm or flash flood warnings out.
         forecast: 0,
-        gas: 0
+        gas: 0,
+        train: 0
       };
       const calm = isCalm();
       // Calm-day weights come from WeBot's brain (WeBot Studio → Brain → Segments).
@@ -2374,7 +2385,9 @@
       const num = (v, d) => (Number.isFinite(v) ? v : d);
       if (calm) Object.assign(w, { surface: S.surface ? num(bw.surface, 5) : 0, alert: list.length ? num(bw.alert, 1.5) : 0, think: num(bw.think, 1), national: num(bw.national, 1),
         outlook: w.outlook * num(bw.outlook, 0.5), reports: w.reports * num(bw.reports, 0.5), forecast: forecastWeather() ? num(bw.forecast, 2.5) : 0,
-        gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > num(B.brain?.gasEveryMinutes, 40) * 60 * 1000 ? num(bw.gas, 0.9) : 0 });
+        gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > num(B.brain?.gasEveryMinutes, 40) * 60 * 1000 ? num(bw.gas, 0.9) : 0,
+        // Train Cam (SouthWest RailCams) only on calm days, when some cams are live.
+        train: S.trainCams?.length && S.control.train !== false ? num(bw.train, 0) : 0 });
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
         // On calm days the radar map may come back sooner; nothing else repeats back to back.
@@ -2448,6 +2461,7 @@
       if (shot.type !== 'surface') hideSurface();
       if (shot.type !== 'forecast' && shot.type !== 'gas') hideCity();
       if (shot.type !== 'gas') hideGas();
+      if (shot.type !== 'train') hideTrain();
       hideCam();
       // A pinned camera gets a mention every few segments, after WeBot's line for the segment.
       if (S.camPinnedId && S.camPinned && shot.type !== 'think' && !shot.breaking && ++S.pinTalk % 4 === 0) {
@@ -2482,6 +2496,14 @@
       if (shot.type === 'models') {
         modelsShot(shot.seg);
         $('rp').classList.add('show');
+        return;
+      }
+      if (shot.type === 'train') {
+        setSelected('');
+        setOutlookVisible(false);
+        setMood('calm');
+        $('rp').classList.remove('show');
+        trainShot(shot);
         return;
       }
       if (shot.type === 'gas') {
@@ -2676,6 +2698,37 @@
       S.map.addSource('gas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       S.map.addLayer({ id: 'gas', type: 'circle', source: 'gas', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 9, 5.5], 'circle-color': '#ffb020', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#10131a' } }, 'a-case');
     };
+    /* ---------------- Train Cam (SouthWest RailCams, with their permission) ---------------- */
+    const loadTrainCams = async () => { try { S.trainCams = (await getJson('/api/v3/traincams')).cams || []; } catch {} };
+    const hideTrain = () => {
+      const el = $('train');
+      if (!el.classList.contains('on')) return;
+      el.classList.remove('on');
+      // Stop the video once it has faded out (it costs CPU while it plays).
+      setTimeout(() => { if (!el.classList.contains('on')) el.querySelector('iframe')?.remove(); }, 700);
+    };
+    const trainShot = (shot) => {
+      const cams = S.trainCams || [];
+      if (!cams.length) return;
+      S.trainSeen ||= [];
+      const fresh = cams.filter((c) => !S.trainSeen.includes(c.id));
+      const cam = pick(fresh.length ? fresh : cams);
+      S.trainSeen = [...S.trainSeen, cam.id].slice(-Math.max(1, cams.length - 1));
+      const el = $('train');
+      el.querySelector('iframe')?.remove();
+      const f = document.createElement('iframe');
+      f.allow = 'autoplay; encrypted-media';
+      f.referrerPolicy = 'strict-origin-when-cross-origin';
+      f.src = 'https://www.youtube.com/embed/' + encodeURIComponent(cam.id) + '?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&origin=' + encodeURIComponent(location.origin);
+      el.prepend(f);
+      $('train-place').textContent = cam.place;
+      $('train-line').textContent = (cam.line ? cam.line + ' · ' : '') + 'Live from SouthWest RailCams';
+      setTimeout(() => { if (S.shot === shot) el.classList.add('on'); }, 1200);
+      const place = cam.place.replace(/\s*\(.*?\)/, '');
+      chatter(fillLine(pick(brainLines('train', ['Let’s check on the trains, y’all. This is {city}, live from SouthWest RailCams.', 'Train time! Here’s {city}, courtesy of SouthWest RailCams.', 'Let’s see if anything’s rollin through {city}. Live from SouthWest RailCams.'])), { city: place }));
+    };
+    setTimeout(loadTrainCams, 20000);
+    setInterval(loadTrainCams, 30 * 60 * 1000);
     const hideGas = () => {
       if (S.styleReady && S.map.getLayer('gas')) S.map.setLayoutProperty('gas', 'visibility', 'none');
     };

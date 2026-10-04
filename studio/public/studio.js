@@ -204,6 +204,7 @@ const SEGMENTS = [
   ['forecast', 'Daily forecasts', 'WeBot zooms to a random city', true, true],
   ['alert', 'Top alerts', 'A close look at one warning or watch', true, true],
   ['gas', 'Gas prices', 'Weekly prices around a city', true, true],
+  ['train', 'Train Cam', 'A live SouthWest RailCams cam', true, true],
   ['think', 'Model check', 'WeBot “thinks”, then shows a weather model', true, true],
   ['national', 'National overview', 'Every active warning', true, true],
   ['outlook', 'Severe outlook', 'Today’s SPC outlook (when there is one)', true, true],
@@ -222,7 +223,8 @@ const BRAIN = [
     { path: 'lines.forecastRequest', label: 'When a viewer asks for a forecast', type: 'text' },
     { path: 'lines.gas', label: 'Gas price openers', type: 'lines' },
     { path: 'lines.gasRequest', label: 'When a viewer asks about gas', type: 'text' },
-    { path: 'lines.surface', label: 'National radar openers', type: 'lines' }
+    { path: 'lines.surface', label: 'National radar openers', type: 'lines' },
+    { path: 'lines.train', label: 'Train Cam openers ({city} = the cam’s town)', type: 'lines' }
   ] },
   { id: 'chat', title: 'Chat', fields: [
     { path: 'chat.readAloud', label: 'Read regular chat messages out loud', type: 'bool' },
@@ -310,7 +312,7 @@ const segmentsHtml = () => {
       <td>${hasS ? `<input type="number" min="5" step="5" value="${s}" data-path="calmSeconds.${key}" data-type="num">` : ''}</td></tr>`;
   }).join('');
   const total = SEGMENTS.filter((x) => x[3]).reduce((a, [k]) => a + (Number(BR.work.calmWeights[k]) || 0), 0);
-  const SHORT = { surface: 'Radar', forecast: 'Forecasts', alert: 'Alerts', gas: 'Gas', think: 'Models', national: 'Overview', outlook: 'Outlook', reports: 'Reports' };
+  const SHORT = { surface: 'Radar', forecast: 'Forecasts', alert: 'Alerts', gas: 'Gas', train: 'Trains', think: 'Models', national: 'Overview', outlook: 'Outlook', reports: 'Reports' };
   const share = SEGMENTS.filter((x) => x[3]).map(([k]) => `${SHORT[k]} ${total ? Math.round((BR.work.calmWeights[k] / total) * 100) : 0}%`).join(' · ');
   return `<div class="panel"><h2>Calm-day segments <span class="r">severe weather always takes over</span></h2>
     <table class="seg-table"><tr><th>Segment</th><th>How often (weight)</th><th>Seconds on screen</th></tr>${rows}</table>

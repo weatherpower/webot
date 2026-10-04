@@ -23,6 +23,7 @@ import { chatStatus } from './youtubeChat.js';
 import { loadBrain } from './brain.js';
 import { getHeadlines } from './headlines.js';
 import { gasSegment } from './gasPrices.js';
+import { trainCams } from './trainCams.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
@@ -418,6 +419,11 @@ export const apiV3Router = () => {
 
   // Gas prices segment: EIA weekly averages + stations near a random city (inside ?state= when focused),
   // or near ?lat=&lon=&name=&state= for a viewer request.
+  // SouthWest RailCams live cams for the Train Cam segment (src/trainCams.js).
+  router.get('/traincams', async (req, res, next) => {
+    try { res.json({ cams: await trainCams() }); } catch (error) { next(error); }
+  });
+
   router.get('/gas', async (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store');
