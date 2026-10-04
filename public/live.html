@@ -3587,11 +3587,24 @@
         container: 'map', style: config.darkStyleUrl, center: [-96, 38.6], zoom: 4.1,
         interactive: false, attributionControl: false, fadeDuration: 0, pixelRatio: mapPixelRatio()
       });
+      // After a restart (or a page reload), pick up where the show was: the same segment if it was
+      // still on in the last 15 minutes, the same plan after it, and no repeats of what just ran.
+      const resumeShow = async () => {
+        try {
+          const st = await getJson('/api/v3/webot/status');
+          const last = st.last;
+          if (!last?.start || Date.now() - Date.parse(last.end || last.start) > 15 * 60 * 1000) return;
+          S.kinds = [...(st.recent || []).slice(0, 5).reverse().map((h) => h.type)].filter(Boolean).slice(-6);
+          S.plan = (st.lastPlan || []).filter((k) => k !== 'pinned');
+          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
+          else if (last.type) S.plan.unshift(last.type);
+        } catch {}
+      };
       S.map.once('style.load', () => {
         installLayers();
         showHeadline();
         $('boot').classList.add('done');
-        nextShot();
+        resumeShow().finally(() => nextShot());
       });
       loadBrainCfg();
       poll(loadBrainCfg, 60000);

@@ -281,8 +281,24 @@ export const noteStreamBeat = (query = {}) => {
 };
 
 // WeBot status (public page): the segment on now, the planned next few, recent segments and lines he said.
-const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'forecast', 'gas']);
+const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'forecast', 'gas', 'rain', 'train']);
 const webot = { seg: null, plan: [], requests: [], history: [], said: [], saidKeys: new Set() };
+// Where the show was (segment, plan, recent segments, lines said) survives restarts: saved to
+// data/webot-activity.json at most every 15 s, loaded at startup. The stream page picks up from it.
+const activityPath = path.join(dataDir, 'webot-activity.json');
+let activitySavedAt = 0, activityTimer = null;
+fs.readFile(activityPath, 'utf8').then((text) => {
+  const saved = JSON.parse(text);
+  Object.assign(webot, { seg: saved.seg || null, plan: saved.plan || [], history: saved.history || [], said: saved.said || [] });
+}).catch(() => {});
+const saveActivity = () => {
+  if (activityTimer) return;
+  activityTimer = setTimeout(() => {
+    activityTimer = null;
+    activitySavedAt = Date.now();
+    fs.writeFile(activityPath, JSON.stringify({ seg: webot.seg, plan: webot.plan, history: webot.history, said: webot.said, at: new Date().toISOString() })).catch(() => {});
+  }, Math.max(0, 15000 - (Date.now() - activitySavedAt)));
+};
 const parseJson = (value) => { try { return JSON.parse(value); } catch { return null; } };
 const noteWebot = (query, clip) => {
   const seg = parseJson(query.seg);
@@ -309,6 +325,7 @@ const noteWebot = (query, clip) => {
     }
     if (webot.saidKeys.size > 200) webot.saidKeys = new Set([...webot.saidKeys].slice(-60));
   }
+  saveActivity();
 };
 export const webotActivity = () => {
   const live = streamBeat && Date.now() - Date.parse(streamBeat.at) < 60 * 1000;
@@ -322,7 +339,10 @@ export const webotActivity = () => {
     upNext: live ? webot.plan : [],
     requests: live ? webot.requests : [],
     recent: webot.history,
-    said: webot.said
+    said: webot.said,
+    // For the stream page after a restart: where the show was, even while it's off the air.
+    last: webot.seg,
+    lastPlan: webot.plan
   };
 };
 
