@@ -2131,7 +2131,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, rain: 70, reports: 70, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -2145,6 +2145,7 @@
       else if (shot.type === 'surface') s = 22;
       else if (shot.type === 'forecast') s = 22;
       else if (shot.type === 'gas') s = 22;
+      else if (shot.type === 'rain') s = 20;
       else s = 14;
       return s * OPT.speed * 1000;
     };
@@ -2377,7 +2378,9 @@
         // Daily forecasts only on calm days: never with tornado, severe thunderstorm or flash flood warnings out.
         forecast: 0,
         gas: 0,
-        train: 0
+        train: 0,
+        // WPC flash flood outlook: whenever there's a slight risk or worse somewhere today.
+        rain: (S.wpc?.days?.[0]?.max || 0) >= 2 ? (S.wpc.days[0].max >= 3 ? 1.6 : 0.8) : 0
       };
       const calm = isCalm();
       // Calm-day weights come from WeBot's brain (WeBot Studio → Brain → Segments).
@@ -2387,7 +2390,8 @@
         outlook: w.outlook * num(bw.outlook, 0.5), reports: w.reports * num(bw.reports, 0.5), forecast: forecastWeather() ? num(bw.forecast, 2.5) : 0,
         gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > num(B.brain?.gasEveryMinutes, 40) * 60 * 1000 ? num(bw.gas, 0.9) : 0,
         // Train Cam (SouthWest RailCams) only on calm days, when some cams are live.
-        train: S.trainCams?.length && S.control.train !== false ? num(bw.train, 0) : 0 });
+        train: S.trainCams?.length && S.control.train !== false ? num(bw.train, 0) : 0,
+        rain: S.wpc?.days?.[0]?.max ? num(bw.rain, 0.8) * (S.wpc.days[0].max >= 3 ? 2 : 1) : 0 });
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
         // On calm days the radar map may come back sooner; nothing else repeats back to back.
@@ -2462,6 +2466,7 @@
       if (shot.type !== 'forecast' && shot.type !== 'gas') hideCity();
       if (shot.type !== 'gas') hideGas();
       if (shot.type !== 'train') hideTrain();
+      if (shot.type !== 'rain') hideWpc();
       hideCam();
       // A pinned camera gets a mention every few segments, after WeBot's line for the segment.
       if (S.camPinnedId && S.camPinned && shot.type !== 'think' && !shot.breaking && ++S.pinTalk % 4 === 0) {
@@ -2495,6 +2500,15 @@
       }
       if (shot.type === 'models') {
         modelsShot(shot.seg);
+        $('rp').classList.add('show');
+        return;
+      }
+      if (shot.type === 'rain') {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(false);
+        rainShot();
+        renderRadarPanel();
         $('rp').classList.add('show');
         return;
       }
@@ -2698,6 +2712,36 @@
       S.map.addSource('gas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       S.map.addLayer({ id: 'gas', type: 'circle', source: 'gas', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 9, 5.5], 'circle-color': '#ffb020', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#10131a' } }, 'a-case');
     };
+    /* ---------------- WPC flash flood (Excessive Rainfall) outlook ---------------- */
+    const RAIN_RISK = { 1: ['MARGINAL', '#3fd16b'], 2: ['SLIGHT', '#ffd23f'], 3: ['MODERATE', '#ff3b3b'], 4: ['HIGH', '#ff3bf5'] };
+    const loadWpc = async () => { try { S.wpc = await getJson('/api/v3/wpc'); } catch {} };
+    const hideWpc = () => { if (S.styleReady && S.map.getLayer('wpc-fill')) ['wpc-fill', 'wpc-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none')); };
+    const rainShot = () => {
+      const days = S.wpc?.days || [];
+      const d1 = days[0] || { max: 0, features: [] };
+      const map = S.map;
+      if (!map.getSource('wpc')) {
+        const color = ['match', ['get', 'dn'], 1, '#3fd16b', 2, '#ffd23f', 3, '#ff3b3b', 4, '#ff3bf5', '#888'];
+        map.addSource('wpc', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({ id: 'wpc-fill', type: 'fill', source: 'wpc', paint: { 'fill-color': color, 'fill-opacity': 0.3 } }, 'a-fill');
+        map.addLayer({ id: 'wpc-line', type: 'line', source: 'wpc', paint: { 'line-color': color, 'line-width': 2.5 } }, 'a-case');
+      }
+      map.getSource('wpc').setData({ type: 'FeatureCollection', features: d1.features || [] });
+      ['wpc-fill', 'wpc-line'].forEach((id) => map.setLayoutProperty(id, 'visibility', 'visible'));
+      const [name, color] = RAIN_RISK[d1.max] || ['NONE', '#3fe0ff'];
+      const rows = days.map((d) => { const [n, c] = RAIN_RISK[d.max] || ['NO RISK', '#56627c']; return '<div class="rowi" style="--rc:' + c + '"><i></i><b>' + (d.day === 1 ? 'Today' : d.day === 2 ? 'Tomorrow' : 'Day 3') + '</b><span>' + n + '</span></div>'; }).join('');
+      setCard('<div class="head"><div class="ico">' + icon('flood', 30) + '</div><div><h2>FLASH FLOOD OUTLOOK</h2><div class="sub">WPC EXCESSIVE RAINFALL · ' + esc(d1.valid || '') + '</div></div></div><div class="rows">' + rows + '</div>', color);
+      const geos = (d1.features || []).map((f) => f.geometry);
+      fly(geos.length ? bboxOf({ type: 'GeometryCollection', geometries: geos }) : CONUS, { padding: { top: 120, bottom: 110, left: 600, right: 140 }, maxZoom: 6.5 });
+      setMood(d1.max >= 3 ? 'alert' : 'calm');
+      setNow({ k: 'RAIN OUTLOOK', title: d1.max ? 'Flash flood risk today: ' + name.toLowerCase() : 'No flash flood risk today', color, crawl: days.map((d) => (d.day === 1 ? 'Today' : d.day === 2 ? 'Tomorrow' : 'Day 3') + ': ' + ((RAIN_RISK[d.max] || ['no risk'])[0]).toLowerCase()).join(' · ') });
+      const d2 = days[1];
+      chatter(fillLine(pick(brainLines('rain', ['Let’s check the flash flood outlook from the Weather Prediction Center.', 'Time for the rain outlook, y’all.'])), {})
+        + (d1.max ? ' Today’s highest risk of flash flooding is ' + name.toLowerCase() + '.' + (d1.max >= 3 ? ' That’s serious, sugar. If you see water over the road, turn around, don’t drown.' : '') : ' No flash flooding risk today. Enjoy it.')
+        + (d2?.max ? ' Tomorrow, a ' + RAIN_RISK[d2.max][0].toLowerCase() + ' risk.' : ''));
+    };
+    setTimeout(loadWpc, 15000);
+    setInterval(loadWpc, 30 * 60 * 1000);
     /* ---------------- Train Cam (SouthWest RailCams, with their permission) ---------------- */
     const loadTrainCams = async () => { try { S.trainCams = (await getJson('/api/v3/traincams')).cams || []; } catch {} };
     const hideTrain = () => {
