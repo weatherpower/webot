@@ -36,7 +36,9 @@ const RULES = [
   ['goodbye', /\b(bye|goodbye|good ?night|gn|gotta go|got to go|heading out|see ya|see you|later y'?all|i'?m out|talk to you later|be right back)\b/i],
   ['first', /^first\b|\bfirst!*$/i],
   ['thanks', /\b(thanks|thank you|thank u|thx|ty)\b/i],
-  ['compliment', /\b(love|awesome|cool|great|nice|amazing|best|goat|legend|good job|great job|fantastic|beautiful|underrated)\b/i],
+  // "not talking to you, WeBot": he takes the hint (sassily).
+  ['notYou', /\b(not|wasn'?t|wasn’t|ain'?t|ain’t) (talking|talkin|talkin’|speaking) to (you|u|webot)\b|\bnobody (asked|was talking to) (you|u)\b/i],
+  ['compliment', /\b(love|awesome|cool|great|nice|amazing|best|goat|legend|good job|great job|good work|nice work|keep it up|fantastic|beautiful|underrated|appreciate|helpful|proud|potential)\b/i],
   ['weatherQuestion', (t) => /\?/.test(t) && /\b(rain|storm|snow|weather|forecast|tornado|hot|cold|temp|wind|hail|sunny|cloudy)/i.test(t)],
   ['storm', /\b(storm|storming|thunder|lightning|tornado|hail|siren|sirens)\b/i],
   ['rain', /\b(rain|raining|rainy|pouring|flood|flooding|drizzle)\b/i],
@@ -45,7 +47,9 @@ const RULES = [
   ['cold', /\b(cold|freezing|chilly|frost|brr+)\b/i],
   ['laugh', /\b(lol|lmao|lmfao|haha+|hehe+|rofl|funny|laughing)\b/i],
   ['howAreYou', /\bhow (are|r) (you|u|ya)\b|\bhow you doin|\bhow’?s it goin|\bwhat’?s up\b|\bhow have you been\b/i],
-  ['name', /\bwebot\b|\bwe bot\b/i],
+  // Just calling his name ("webot?", "hey webot"): short messages only. Longer ones that mention him
+  // fall through to whatever else they're about.
+  ['name', (t) => /\bwebot\b|\bwe bot\b/i.test(t) && t.split(/\s+/).length <= 4],
   ['question', /\?/],
   ['wx', /\b(radar|weather|sky|skies|clouds?|cloudy|sunny|wind|windy|front|forecast)\b/i]
 ];
@@ -222,6 +226,11 @@ export const DEFAULT_PERSONALITY = {
       'I’m funnier than the ten-day forecast, {name}, and that thing is a joke.',
       'Careful, {name}. Laugh too hard and you’ll miss a tornado warning.',
       'I’ll be here all night, folks. Tip your weather robot.','Glad somebody thinks I’m funny, {name}. My mama always said so.', 'Laugh it up, {name}. I’ll be here all week. Literally, I can’t leave.'],
+    notYou: [
+      'Fine, {name}. I’ll just sit here and look pretty.',
+      'Well excuse me, {name}. I’ll mind my own circuits.',
+      'Noted, {name}. I wasn’t listenin anyway. Okay, I was.'
+    ],
     name: [
       'Present, {name}. What’d I do now?',
       'You called, {name}? I was busy bein fabulous.','That’s my name, don’t wear it out, {name}.', 'You rang, {name}?'],

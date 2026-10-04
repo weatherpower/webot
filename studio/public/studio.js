@@ -270,6 +270,7 @@ const BRAIN = [
     { path: 'personality.replies.wx', label: 'Other weather talk', type: 'lines' },
     { path: 'personality.replies.laugh', label: 'lol / haha', type: 'lines' },
     { path: 'personality.replies.howAreYou', label: '“How are you?” / “What’s up?”', type: 'lines' },
+    { path: 'personality.replies.notYou', label: '“Not talking to you, WeBot”', type: 'lines' },
     { path: 'personality.replies.name', label: 'Says “WeBot”', type: 'lines' },
     { path: 'personality.replies.question', label: 'Any other question', type: 'lines' },
     { path: 'personality.replies.other', label: 'Everything else', type: 'lines' }
