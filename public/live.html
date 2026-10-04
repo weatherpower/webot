@@ -749,12 +749,27 @@
       pt.state = puter.auth.isSignedIn() ? 'ready' : 'signed-out';
       puterGate();
     });
+    // Puter turns away bursts (429 Too Many Requests), so voice requests go one at a time, and one that
+    // gets turned away tries again a moment later instead of being skipped.
+    const puterCall = (text, opts) => {
+      const run = async () => {
+        for (let i = 0; ; i++) {
+          try { return await puter.ai.txt2speech(text, opts); } catch (error) {
+            if (i >= 3 || !puter.auth.isSignedIn()) throw error;
+            await new Promise((resolve) => setTimeout(resolve, 1500 * (i + 1)));
+          }
+        }
+      };
+      const p = (pt.chain || Promise.resolve()).then(run, run);
+      pt.chain = p.catch(() => {});
+      return p;
+    };
     const puterAudio = (text, cfg) => {
       const key = cfg.openaiVoice + '|' + cfg.speed + '|' + text;
       if (pt.cache.has(key)) return Promise.resolve(pt.cache.get(key));
       const pace = cfg.speed > 1.05 ? ' Talk a little faster than normal.' : cfg.speed < 0.95 ? ' Talk a little slower than normal.' : '';
       noteTtsChars(text.length);
-      return puter.ai.txt2speech(text, { provider: 'openai', model: 'gpt-4o-mini-tts', voice: cfg.openaiVoice, instructions: VOICE_STYLE + pace })
+      return puterCall(text, { provider: 'openai', model: 'gpt-4o-mini-tts', voice: cfg.openaiVoice, instructions: VOICE_STYLE + pace })
         // Decoded audio plays through Web Audio like the other engines; if the clip can't be
         // fetched, the audio element Puter returned plays as-is.
         .then((el) => fetch(el.src).then((r) => r.arrayBuffer()).then((bytes) => actx.decodeAudioData(bytes)).catch(() => el))
@@ -906,10 +921,14 @@
           bot.classList.add('talk');
           source.start();
           speech.played = (speech.played || 0) + 1;
+          (speech.log ||= []).push({ at: Date.now(), n: item.text.length, sec: Math.round(buffer.duration * 10) / 10 });
+          if (speech.log.length > 12) speech.log.shift();
           speech.guard = setTimeout(done, buffer.duration * 1000 + 2000);
           return;
         } catch (error) {
           console.warn('Voice fell back to the computer voice:', error.message);
+          (speech.log ||= []).push({ at: Date.now(), n: item.text.length, err: String(error?.message || error).slice(0, 80) });
+          if (speech.log.length > 12) speech.log.shift();
         }
       }
       browserSpeak(item, done);
@@ -943,10 +962,13 @@
         .replace(/(\d)\.(\d)/g, '$1' + SAFE + '$2')
         .replace(/\b(U\.S|St|Mt|Dr|Ave|Rd|Hwy|Ft|Jr|Sr|vs)\./g, (m, w) => w.replace(/\./g, SAFE) + SAFE);
       const parts = (guarded.match(/[^.!?]+[.!?]*/g) || [guarded]).map((p) => p.split(SAFE).join('.'));
-      parts.map((p) => p.trim()).filter(Boolean).forEach((p) => {
+      let lines = parts.map((p) => p.trim()).filter(Boolean);
+      // Puter: a few sentences per request (fewer requests, same natural pacing).
+      if (ttsCfg().engine === 'puter') lines = lines.reduce((acc, p) => { const last = acc[acc.length - 1]; if (last && last.length + p.length < 220) acc[acc.length - 1] = last + ' ' + p; else acc.push(p); return acc; }, []);
+      lines.forEach((p) => {
         const audio = synth(p);
         audio?.catch(() => {});
-        speech.queue.push({ text: p, audio, force: Boolean(opts.force) });
+        speech.queue.push({ text: p, audio, force: Boolean(opts.force), chat: Boolean(opts.chat) });
       });
       pumpSpeech();
     };
@@ -3234,7 +3256,8 @@
       if (ttsCfg().engine === 'neural' && OPT.voice) startNeural();
       if ((OPT.tts || S.control.tts?.engine || 'puter') === 'puter' && OPT.voice) startPuter();
       if (focusState()) loadShapes();
-      if (!talkAllowed() && speech.queue.some((item) => !item.force)) speech.queue = speech.queue.filter((item) => item.force);
+      // Talk switched off: drop WeBot's own chatter, but finish typed lines and answers to chat.
+      if (!talkAllowed() && speech.queue.some((item) => !item.force && !item.chat)) speech.queue = speech.queue.filter((item) => item.force || item.chat);
       const linkedAt = S.control.puter?.linkedAt || null;
       // Only mark a link as taken once Puter.js has loaded, so a link made while it loads isn't skipped.
       if (linkedAt !== S.puterLinkedAt && ['ready', 'signed-out', 'failed'].includes(pt.state)) { S.puterLinkedAt = linkedAt; linkPuter(); }
@@ -3280,6 +3303,8 @@
     };
     // Diagnostics (deploy/cloud-stream/fly-check.cjs).
     window.WPLive = { S, FLY, nextShot: (force) => nextShot(force) };
+    // Read-only voice check for troubleshooting (deploy/cloud-stream scripts, WeBot Studio).
+    window.WPVoice = () => ({ voiceOn: voiceOn(), engine: ttsCfg().engine, puter: pt.state, canNeural: canNeural(), speechWorks: Boolean(speechWorks()), actx: actx ? actx.state : 'none', queue: speech.queue.length, busy: speech.busy, played: speech.played || 0, log: speech.log || [], lastError: pt.lastError || '' });
     // Viewer requests from YouTube chat: say "got it" in the top bar, then cut over to it soon (15 s into the
     // current segment, at most one request every 2 minutes, only on calm weather).
     const queueChatRequest = (cmd, ack = true) => {
