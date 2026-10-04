@@ -134,10 +134,10 @@ const api = async (path, params, units) => {
 // must be live and on this channel. Then its chat id and viewer count.
 const liveVideo = async (videoId, channel) => {
   if (!videoId) return null;
-  const body = await api('videos', { part: 'snippet,liveStreamingDetails', id: videoId }, 1);
+  const body = await api('videos', { part: 'snippet,liveStreamingDetails,statistics', id: videoId }, 1);
   const v = body.items?.[0];
   if (!v || v.snippet?.liveBroadcastContent !== 'live' || (channel && v.snippet?.channelId !== channel)) return null;
-  return { videoId, live: v.liveStreamingDetails || {} };
+  return { videoId, live: v.liveStreamingDetails || {}, stats: v.statistics || {} };
 };
 const findLive = async () => {
   state.lastFind = Date.now();
@@ -154,13 +154,15 @@ const findLive = async () => {
     const list = await api('playlistItems', { part: 'contentDetails', playlistId: 'UU' + channel.slice(2), maxResults: '5' }, 1);
     const ids = (list.items || []).map((i) => i.contentDetails?.videoId).filter(Boolean);
     if (ids.length) {
-      const body = await api('videos', { part: 'snippet,liveStreamingDetails', id: ids.join(',') }, 1);
+      const body = await api('videos', { part: 'snippet,liveStreamingDetails,statistics', id: ids.join(',') }, 1);
       const v = (body.items || []).find((x) => x.snippet?.liveBroadcastContent === 'live' && x.snippet?.channelId === channel);
-      if (v) found = { videoId: v.id, live: v.liveStreamingDetails || {} };
+      if (v) found = { videoId: v.id, live: v.liveStreamingDetails || {}, stats: v.statistics || {} };
     }
   }
   if (!found) { state.videoId = ''; state.chatId = ''; return; }
-  const { videoId, live } = found;
+  const { videoId, live, stats } = found;
+  // Total views of this live broadcast (YouTube counts everyone who has watched it).
+  state.totalViews = stats?.viewCount != null ? Number(stats.viewCount) : state.totalViews ?? null;
   state.viewers = live?.concurrentViewers != null ? Number(live.concurrentViewers) : null;
   state.viewersAt = Date.now();
   // When this YouTube broadcast went live (for the "live for" timers in Studio and Live Control).
@@ -327,5 +329,6 @@ export const chatStatus = () => ({
   live: Boolean(state.chatId),
   viewers: Date.now() - state.viewersAt < 10 * 60 * 1000 ? state.viewers : null,
   startedAt: state.startedAt || null,
+  totalViews: state.totalViews ?? null,
   lastCommandAt: state.lastCommandAt
 });

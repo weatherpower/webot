@@ -689,16 +689,16 @@
     loadAlerts();
     setInterval(loadAlerts, 30000);
     // YouTube viewers and how long the broadcast has been live (from WeBot's public status).
-    let ytSince = null, ytViewers = null;
+    let ytSince = null, ytViewers = null, ytViews = null;
     const ytShow = () => {
       const ms = ytSince ? Date.now() - ytSince : NaN;
       const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
       const dur = Number.isFinite(ms) && ms >= 0 ? (d ? d + 'D ' + h + 'H' : h ? h + 'H ' + (m % 60) + 'M' : (m % 60) + 'M') : '';
       $('yt').hidden = ytViewers == null && !dur;
-      $('yt-t').textContent = [ytViewers != null ? ytViewers + ' WATCHING' : '', dur ? 'LIVE ' + dur : ''].filter(Boolean).join(' · ');
+      $('yt-t').textContent = [ytViewers != null ? ytViewers + ' WATCHING' : '', ytViews != null ? Number(ytViews).toLocaleString() + ' VIEWS' : '', dur ? 'LIVE ' + dur : ''].filter(Boolean).join(' · ');
     };
     const loadYt = async () => {
-      try { const s = await fetch(BASE + '/api/v3/webot/status', { cache: 'no-store' }).then((r) => r.json()); ytViewers = s.chat?.viewers ?? null; ytSince = s.chat?.startedAt ? Date.parse(s.chat.startedAt) : null; } catch {}
+      try { const s = await fetch(BASE + '/api/v3/webot/status', { cache: 'no-store' }).then((r) => r.json()); ytViewers = s.chat?.viewers ?? null; ytViews = s.chat?.totalViews ?? null; ytSince = s.chat?.startedAt ? Date.parse(s.chat.startedAt) : null; } catch {}
       ytShow();
     };
     loadYt();
