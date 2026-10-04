@@ -242,7 +242,7 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'afterdark', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, chatRead: true, commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, chatRead: true, costume: 'auto', commands: [] };
 const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
@@ -581,6 +581,10 @@ export const applyLiveCommand = async (body = {}) => {
       break;
     case 'theme':
       current.theme = THEMES.includes(body.theme) ? body.theme : 'auto';
+      break;
+    case 'costume':
+      // WeBot's hat (WeBot Studio → Costume). auto = by the month (witch hat in October, Santa in December).
+      current.costume = ['auto', 'none', 'witch', 'cowboy', 'santa', 'party', 'crown', 'cap'].includes(body.costume) ? body.costume : 'auto';
       break;
     case 'tv':
       // TV fit: percent of the screen edge left empty for TVs that crop the picture (overscan). Only

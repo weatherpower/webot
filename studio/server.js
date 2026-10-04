@@ -165,6 +165,8 @@ const api = (fn) => async (req, res) => {
 };
 
 app.get('/api/config', api(async () => ({ ...config, controlBase: CONTROL_BASE, statusBase: STATUS_BASE, projectRoot })));
+// The Controls page (Live Control inside Studio) opens already signed in with the controller token.
+app.get('/api/control-url', api(async () => ({ url: `${CONTROL_BASE}/warningcenter/live/control#token=${encodeURIComponent(await getToken())}` })));
 
 app.get('/api/overview', api(async () => {
   const [status, server, ctl] = await Promise.allSettled([

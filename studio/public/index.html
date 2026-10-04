@@ -13,6 +13,7 @@
     <div class="brand"><img src="/assets/webot.png" alt=""><div><b>WEBOT</b><span>STUDIO</span></div></div>
     <nav class="nav" id="nav">
       <button data-page="overview" class="on"><svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/></svg>Overview</button>
+      <button data-page="controls"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Controls</button>
       <button data-page="brain"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4v1a3 3 0 0 0-2 5 3 3 0 0 0 2 5 4 4 0 0 0 8 0 3 3 0 0 0 2-5 3 3 0 0 0-2-5V7a4 4 0 0 0-4-4zM12 3v18"/></svg>Brain<span class="badge" id="brain-badge" hidden>EDIT</span></button>
       <button data-page="server"><svg viewBox="0 0 24 24"><path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01"/></svg>Server</button>
       <button data-page="code"><svg viewBox="0 0 24 24"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/></svg>Code<span class="badge" id="code-badge" hidden>0</span></button>
@@ -37,7 +38,7 @@
       <div><small>Live for</small><strong id="s-uptime">—</strong></div>
       <div><small>CPU</small><strong id="s-cpu">—</strong></div>
       <div><small>Quality</small><strong id="s-quality">—</strong></div>
-      <div class="links"><a id="l-status" target="_blank" rel="noopener">Status page</a><a id="l-control" target="_blank" rel="noopener">Live Control</a><a id="l-stream" target="_blank" rel="noopener">Stream page</a></div>
+      <div class="links"><a id="l-status" target="_blank" rel="noopener">Status page</a><a id="l-stream" target="_blank" rel="noopener">Stream page</a></div>
     </div>
 
     <div class="pages">
@@ -88,6 +89,7 @@
                 <button class="btn warn" id="c-brb">Start BRB</button>
                 <button class="btn" data-act="music-next">Next song</button>
               </div>
+              <div class="row"><span class="k" style="width:70px">Costume</span><select id="c-costume" style="width:auto"><option value="auto">Auto (by the month)</option><option value="none">No hat</option><option value="cowboy">Cowboy hat</option><option value="witch">Witch hat</option><option value="santa">Santa hat</option><option value="party">Party hat</option><option value="crown">Crown</option><option value="cap">WeatherPower cap</option></select></div>
               <div class="row"><span class="k" style="width:70px">Talk</span><div class="seg" id="c-talk"><button data-v="auto">Auto</button><button data-v="on">On</button><button data-v="off">Off</button></div>
                 <span class="k" style="margin-left:14px">Voice</span><div class="seg" id="c-voice"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
               <div class="row"><span class="k" style="width:70px">Show</span>
@@ -125,6 +127,9 @@
       </section>
 
       <!-- ================= BRAIN ================= -->
+      <section class="page" id="page-controls" style="padding:0">
+        <iframe id="controls-frame" title="Controls" style="width:100%;height:calc(100vh - 56px);border:0;display:block;background:#06090f"></iframe>
+      </section>
       <section class="page" id="page-brain">
         <div class="page-head"><h1>WeBot’s brain</h1><p>What WeBot says, how long segments last, how chat works and what the radio plays. Saving sends it straight to the stream: no restart.</p></div>
         <div class="brain">

@@ -314,6 +314,9 @@
     const QUICK = ['Stay safe out there, everyone!', 'Let’s take a look at the next warning.', 'If you are under a tornado warning, get to your safe place now.', 'Thanks for watching WeatherPower Live!', 'Things are quiet right now. Great time to check your weather radio batteries.'];
     let token = '';
     try { token = localStorage.getItem('wp-live-token') || ''; } catch {}
+    // Opened inside WeBot Studio: Studio passes the token in the address (#token=...), never sent to the server.
+    const hashToken = new URLSearchParams(location.hash.slice(1)).get('token');
+    if (hashToken) { token = hashToken; try { localStorage.setItem('wp-live-token', token); } catch {} history.replaceState(null, '', location.pathname + location.search); }
     let control = null;
     let alerts = [];
     let voices = { neural: [], openai: { available: false, voices: [] } };

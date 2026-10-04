@@ -156,6 +156,7 @@ const act = async (body, ok) => {
 document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => act({ action: b.dataset.act }, b.textContent.trim())));
 const segClick = (id, fn) => $(id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) fn(b.dataset.v, b); });
 segClick('c-talk', (v) => act({ action: 'talk', mode: v }, 'Talk: ' + v));
+$('c-costume').addEventListener('change', () => act({ action: 'costume', costume: $('c-costume').value }, 'WeBot is wearing: ' + $('c-costume').selectedOptions[0].textContent));
 segClick('c-voice', (v) => act({ action: 'voice', on: v === 'on' }, 'Voice ' + v));
 segClick('c-genre', (v) => act({ action: 'music', genre: v }, 'Radio style: ' + v));
 segClick('c-chat', (v) => act({ action: 'chat-read', on: v === 'on' }, v === 'on' ? 'WeBot reads chat' : 'Chat: commands only'));
@@ -197,6 +198,13 @@ const tickUptime = () => {
   $('s-uptime').textContent = d ? d + 'D ' + h + 'H' : h ? h + 'H ' + (m % 60) + 'M' : (m % 60) + 'M';
 };
 setInterval(tickUptime, 30000);
+
+/* ---------------- controls (everything from Live Control, inside Studio) ---------------- */
+pages.controls = { enter: async () => {
+  const f = $('controls-frame');
+  if (f.dataset.loaded) return;
+  try { f.src = (await call('GET', '/api/control-url')).url; f.dataset.loaded = '1'; } catch (e) { toast(e.message, 'bad'); }
+} };
 
 /* ---------------- brain ---------------- */
 const SEGMENTS = [
@@ -654,7 +662,7 @@ $('chk-mark').addEventListener('click', async () => {
     S.cfg = await call('GET', '/api/config');
     $('f-host').textContent = S.cfg.host;
     $('l-status').href = S.cfg.statusBase + '/';
-    $('l-control').href = S.cfg.controlBase + '/warningcenter/live/control';
+
     $('l-stream').href = S.cfg.controlBase + '/warningcenter/live?music=0&voice=0';
   } catch (e) { toast('Studio server not answering: ' + e.message, 'bad'); }
   show((location.hash || '#overview').slice(1));
