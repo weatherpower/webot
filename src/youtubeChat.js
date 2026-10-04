@@ -178,6 +178,15 @@ const findLive = async () => {
   }
 };
 
+// How long the YouTube broadcast has been live, in words ("1 day and 5 hours").
+const uptimeWords = () => {
+  const ms = state.startedAt ? Date.now() - Date.parse(state.startedAt) : NaN;
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), min = m % 60;
+  const part = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  return d ? part(d, 'day') + (h ? ' and ' + part(h, 'hour') : '') : h ? part(h, 'hour') + (min ? ' and ' + part(min, 'minute') : '') : part(min, 'minute');
+};
+
 // Is this message meant for someone other than WeBot? Mentions of WeBot always count as his.
 //  - an @mention of someone else, or another chatter's name (from this batch or the regulars list)
 //  - talking to the streamer / mods ("josh", "weatherpower", "mod", "streamer", "owner")
@@ -233,7 +242,7 @@ const readOne = async (messages) => {
     if (state.readUsers.size > 500) state.readUsers.delete(state.readUsers.keys().next().value);
     const user = safeName(author.displayName);
     // WeBot's comeback (src/personality.js): written lines only, so it can't come out crude.
-    await applyLiveCommand({ action: 'chat-say', user, text, speak: expandSlang(text), reply: replyTo(text, user, brain) });
+    await applyLiveCommand({ action: 'chat-say', user, text, speak: expandSlang(text), reply: replyTo(text, user, brain, { uptime: uptimeWords() }) });
     console.log('[chat] answering a viewer message');
   }
 };

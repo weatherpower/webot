@@ -29,6 +29,8 @@ const WEAK = /\b(bad|hate|weird|broken|slow|terrible|awful|loss)\b/i;
 // Insults aimed at WeBot, not at the weather ("this rain is annoying" isn't about him).
 const roastTest = (t) => (STRONG.test(t) && (AT_BOT.test(t) || (!WX.test(t) && (AT_HIM.test(t) || t.split(' ').length <= 3))))
   || (WEAK.test(t) && AT_BOT.test(t) && !WX.test(t));
+// A question even without a "?": starts with how / what / whats / is / can... (after "hey webot").
+const isQuestion = (t) => /\?/.test(t) || /^(?:(?:hey|yo|ok|so)\s+)?(?:we ?bot[\s,]+)?(how|hows|how’s|how's|what|whats|what’s|what's|when|where|wheres|why|who|whos|which|is|are|do|does|did|can|could|will|would|should|have|has)\b/i.test(String(t).trim());
 const RULES = [
   ['rival', /ryan\s*hall|\bryan\b|y'?all\s*-?\s*bot|yallbot|rip\s*-?\s*off|knock\s*-?\s*off|copy\s*cat|copying|copy of|wannabe|wanna be|cheap version|off\s*brand|bootleg/i],
   ['roast', roastTest],
@@ -39,18 +41,21 @@ const RULES = [
   // "not talking to you, WeBot": he takes the hint (sassily).
   ['notYou', /\b(not|wasn'?t|wasn’t|ain'?t|ain’t) (talking|talkin|talkin’|speaking) to (you|u|webot)\b|\bnobody (asked|was talking to) (you|u)\b/i],
   ['compliment', /\b(love|awesome|cool|great|nice|amazing|best|goat|legend|good job|great job|good work|nice work|keep it up|fantastic|beautiful|underrated|appreciate|helpful|proud|potential)\b/i],
-  ['weatherQuestion', (t) => /\?/.test(t) && /\b(rain|storm|snow|weather|forecast|tornado|hot|cold|temp|wind|hail|sunny|cloudy)/i.test(t)],
+  ['weatherQuestion', (t) => isQuestion(t) && /\b(rain|storm|snow|weather|forecast|tornado|hot|cold|temp|wind|hail|sunny|cloudy)/i.test(t)],
   ['storm', /\b(storm|storming|thunder|lightning|tornado|hail|siren|sirens)\b/i],
   ['rain', /\b(rain|raining|rainy|pouring|flood|flooding|drizzle)\b/i],
   ['snow', /\b(snow|snowing|ice|icy|sleet|blizzard)\b/i],
   ['hot', /\b(hot|heat|humid|sweating|burning up|scorching)\b/i],
   ['cold', /\b(cold|freezing|chilly|frost|brr+)\b/i],
   ['laugh', /\b(lol|lmao|lmfao|haha+|hehe+|rofl|funny|laughing)\b/i],
+  // "How long have you been up / live?": he answers with the real time on the air.
+  ['uptime', /\bhow (long|many (hours|days|minutes))\b.*\b(up|live|on|on the air|streaming|awake|running|going|been)\b|\bwhen did (you|u|the stream|this) (start|go live)\b/i],
   ['howAreYou', /\bhow (are|r) (you|u|ya)\b|\bhow you doin|\bhow’?s it goin|\bwhat’?s up\b|\bhow have you been\b/i],
   // Just calling his name ("webot?", "hey webot"): short messages only. Longer ones that mention him
   // fall through to whatever else they're about.
   ['name', (t) => /\bwebot\b|\bwe bot\b/i.test(t) && t.split(/\s+/).length <= 4],
-  ['question', /\?/],
+  // A question even without a "?" ("webot how many hours have u been up").
+  ['question', isQuestion],
   ['wx', /\b(radar|weather|sky|skies|clouds?|cloudy|sunny|wind|windy|front|forecast)\b/i]
 ];
 // Chat shorthand → plain words, so WeBot reads "ngl ur mid lol" as "not gonna lie your mid laughing".
@@ -234,7 +239,15 @@ export const DEFAULT_PERSONALITY = {
     name: [
       'Present, {name}. What’d I do now?',
       'You called, {name}? I was busy bein fabulous.','That’s my name, don’t wear it out, {name}.', 'You rang, {name}?'],
+    // {uptime} becomes how long the stream has been live, like "1 day and 5 hours".
+    uptime: [
+      'I’ve been on the air for {uptime} straight, {name}. No coffee, no sleep, no complaints.',
+      '{uptime} and countin, {name}. Robots don’t need naps.',
+      'This stream’s been rollin for {uptime}, sugar. I’ll sleep when the weather does.'
+    ],
     question: [
+      'Good question, {name}. I’ll have to think on that one while I watch the radar.',
+      'Hmm, {name}, that’s above my pay grade. And I don’t get paid.',
       'Great question, {name}. Wrong robot, but great question.',
       'If I knew that, {name}, I’d be runnin the Weather Service.',
       'Ask me again when the radar’s quiet, {name}. Oh wait, it’s always quiet. Fine, no.',
@@ -276,14 +289,15 @@ const pick = (list) => {
   if (recent.length > 24) recent.shift();
   return line;
 };
-const fill = (line, name, place, nicknames) => {
+const fill = (line, name, place, nicknames, ctx = {}) => {
   const who = name || pick(nicknames?.length ? nicknames : ['friend']);
-  let out = line.replace(/\{name\}/g, who).replace(/\{place\}/g, place || 'y’all');
+  let out = line.replace(/\{name\}/g, who).replace(/\{place\}/g, place || 'y’all').replace(/\{uptime\}/g, ctx.uptime || 'a good long while');
   return out.charAt(0).toUpperCase() + out.slice(1);
 };
 
 // WeBot's answer to one chat message ('' = just read it, no comment). `brain` is the full brain.
-export const replyTo = (text, user, brain) => {
+// `ctx` has live facts for the lines: { uptime: '1 day and 5 hours' }.
+export const replyTo = (text, user, brain, ctx = {}) => {
   const p = brain?.personality || DEFAULT_PERSONALITY;
   const r = p.replies || DEFAULT_PERSONALITY.replies;
   if (!p.on) {
@@ -297,5 +311,5 @@ export const replyTo = (text, user, brain) => {
   if ((kind === 'roast' || kind === 'rival') && !p.roastBack) kind = 'shrug';
   const list = r[kind]?.length ? r[kind] : r.other;
   if (!list?.length) return '';
-  return fill(pick(list), user, placeIn(text), p.nicknames);
+  return fill(pick(list), user, placeIn(text), p.nicknames, ctx);
 };
