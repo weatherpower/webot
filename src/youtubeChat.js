@@ -163,6 +163,8 @@ const findLive = async () => {
   const { videoId, live } = found;
   state.viewers = live?.concurrentViewers != null ? Number(live.concurrentViewers) : null;
   state.viewersAt = Date.now();
+  // When this YouTube broadcast went live (for the "live for" timers in Studio and Live Control).
+  state.startedAt = live?.actualStartTime || null;
   const chatId = live?.activeLiveChatId || '';
   if (videoId !== state.videoId || chatId !== state.chatId) {
     state.videoId = videoId;
@@ -324,5 +326,6 @@ export const chatStatus = () => ({
   enabled: state.enabled,
   live: Boolean(state.chatId),
   viewers: Date.now() - state.viewersAt < 10 * 60 * 1000 ? state.viewers : null,
+  startedAt: state.startedAt || null,
   lastCommandAt: state.lastCommandAt
 });

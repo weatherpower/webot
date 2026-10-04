@@ -43,6 +43,7 @@
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-family: "WP Mono"; font-size: 11px; letter-spacing: .1em; }
     .pill i { width: 8px; height: 8px; border-radius: 50%; background: #f2b33d; }
     .pill.ok i { background: var(--ok); }
+    .pill[hidden] { display: none; }
     .list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 460px; overflow: auto; }
     .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid transparent; }
     .item.pinned { border-color: var(--warn); }
@@ -84,7 +85,7 @@
   <div class="wrap">
     <header>
       <div class="brand"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><h1>Live Control<small>WEATHERPOWER LIVE STREAM</small></h1></div>
-      <div class="row"><span class="pill" id="conn"><i></i><span>NOT CONNECTED</span></span><a class="btn" id="open-stream" target="_blank" rel="noopener">Open stream ↗</a></div>
+      <div class="row"><span class="pill ok" id="yt" hidden><i></i><span id="yt-t"></span></span><span class="pill" id="conn"><i></i><span>NOT CONNECTED</span></span><a class="btn" id="open-stream" target="_blank" rel="noopener">Open stream ↗</a></div>
     </header>
 
     <section class="box">
@@ -687,6 +688,22 @@
 
     loadAlerts();
     setInterval(loadAlerts, 30000);
+    // YouTube viewers and how long the broadcast has been live (from WeBot's public status).
+    let ytSince = null, ytViewers = null;
+    const ytShow = () => {
+      const ms = ytSince ? Date.now() - ytSince : NaN;
+      const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+      const dur = Number.isFinite(ms) && ms >= 0 ? (d ? d + 'D ' + h + 'H' : h ? h + 'H ' + (m % 60) + 'M' : (m % 60) + 'M') : '';
+      $('yt').hidden = ytViewers == null && !dur;
+      $('yt-t').textContent = [ytViewers != null ? ytViewers + ' WATCHING' : '', dur ? 'LIVE ' + dur : ''].filter(Boolean).join(' · ');
+    };
+    const loadYt = async () => {
+      try { const s = await fetch(BASE + '/api/v3/webot/status', { cache: 'no-store' }).then((r) => r.json()); ytViewers = s.chat?.viewers ?? null; ytSince = s.chat?.startedAt ? Date.parse(s.chat.startedAt) : null; } catch {}
+      ytShow();
+    };
+    loadYt();
+    setInterval(loadYt, 60000);
+    setInterval(ytShow, 30000);
     loadVoices();
     showObsLink();
     if (token) send({ action: 'ping' }).then(() => { loadCams(true); loadPuter().catch(() => {}); }).catch(() => {});

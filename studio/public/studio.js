@@ -64,6 +64,8 @@ const renderOverview = (o) => {
   const now = st.now;
   $('s-now').textContent = st.brb ? 'Be right back' : now ? (KINDS[now.type] || now.type) + (now.title ? ' · ' + now.title : '') : '—';
   $('s-viewers').textContent = st.chat?.viewers ?? '—';
+  S.liveSince = st.chat?.startedAt ? Date.parse(st.chat.startedAt) : null;
+  tickUptime();
   if (!srv.error) {
     const cpuPct = pct(srv.container.cpu, srv.container.cpuLimit);
     $('s-cpu').textContent = Math.round(cpuPct) + '%';
@@ -185,6 +187,15 @@ const snap = async () => {
 $('snap-btn').addEventListener('click', snap);
 setInterval(() => { if ($('snap-auto').checked && S.page === 'overview' && !document.hidden) snap(); }, 30000);
 pages.overview = { enter: loadOverview };
+
+// How long the YouTube broadcast has been live (YouTube's start time), ticking every 30 s.
+const tickUptime = () => {
+  const ms = S.liveSince ? Date.now() - S.liveSince : NaN;
+  if (!Number.isFinite(ms) || ms < 0) { $('s-uptime').textContent = '—'; return; }
+  const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  $('s-uptime').textContent = d ? d + 'D ' + h + 'H' : h ? h + 'H ' + (m % 60) + 'M' : (m % 60) + 'M';
+};
+setInterval(tickUptime, 30000);
 
 /* ---------------- brain ---------------- */
 const SEGMENTS = [
