@@ -2178,7 +2178,7 @@
       setThinking(true);
       setMood('calm');
       card.classList.remove('show');
-      fly(viewBounds(), { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: focusState() ? 7 : 5, duration: 5200 });
+      fly(viewBounds(), { padding: { top: 110, bottom: 100, left: 120, right: 120 }, maxZoom: focusState() ? 7 : 5, duration: 2200 });
       chatter(pick(['Let me zoom out and think for a second.', 'Hang on, let me see what the models are saying.', 'Let me pull up the models real quick.', 'Time to check in on the computer models.']));
       setNow({ k: 'WEBOT', title: 'Checking the models', color: '#1a8cff', crawl: 'HRRR · NAM 3KM · GFS · ECMWF · WEATHERPOWER MODEL STUDIO · SIMULATED RADAR · CAPE · RAIN · TEMPERATURE · WIND' });
       S.pendingModel = null;
@@ -2257,7 +2257,7 @@
         + '<div class="rows">' + rows + '</div>' + skewt, '#1a8cff');
       showSpotMarkers(seg);
       setNow({ k: 'MODELS', title: seg.modelName + ' ' + (SHORT_FIELD[f.key] || f.name) + ' · ' + horizon, color: '#1a8cff', crawl: seg.take + '   ◆   ' + seg.credit });
-      fly(viewBounds(), { padding: { top: 120, bottom: 130, left: 580, right: 300 }, maxZoom: focusState() ? 7 : 5.2, duration: 2400 });
+      fly(viewBounds(), { padding: { top: 120, bottom: 130, left: 580, right: 300 }, maxZoom: focusState() ? 7 : 5.2, duration: 1500 });
       // Loop through the frames that have finished loading; hold on the last one.
       let i = 0;
       let hold = 0;
@@ -2407,12 +2407,12 @@
       const from = S.map.getCenter();
       const far = Math.abs(from.lng - (bounds[0][0] + bounds[1][0]) / 2) > 45 || Math.abs(from.lat - (bounds[0][1] + bounds[1][1]) / 2) > 25;
       if (FLY.smooth && !far) { S.flying = true; radarFlight(true); }
-      // Ease in and out (a slow start and a soft landing) instead of the default quick start.
+      // Quick zooms (about 1.5 s on the stream server) with a soft start and landing.
       const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-      S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : OPT.lite ? (FLY.smooth ? 2600 : 1800) : 3600, maxZoom: 9.4, essential: true, ...(FLY.smooth ? { easing: easeInOut } : {}), ...opts });
+      S.map.fitBounds(bounds, { padding: PAD, duration: far ? 0 : OPT.lite ? 1500 : 2000, maxZoom: 9.4, essential: true, ...(FLY.smooth ? { easing: easeInOut } : {}), ...opts });
       const shot = S.shot;
       S.map.once('moveend', () => {
-        if (S.flying) { S.flying = false; S.flyRestUntil = Date.now() + 1500; radarFlight(false); }
+        if (S.flying) { S.flying = false; S.flyRestUntil = Date.now() + 800; radarFlight(false); }
         if (OPT.lite || S.shot !== shot || Date.now() - S.shotStart > S.shotDur - 3000) return;
         S.map.easeTo({ zoom: S.map.getZoom() + 0.3, duration: Math.max(2000, S.shotDur - (Date.now() - S.shotStart) - 600), easing: (t) => t, essential: true });
       });
