@@ -22,6 +22,9 @@
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #0a0f18; color: var(--ink); font-family: "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
     #map { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    /* Map moves fade through dark instead of zooming (no graphics card on the stream server). */
+    .mapfade { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #0b1220; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+    .mapfade.on { opacity: 1; }
     .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,0) 12%, rgba(0,0,0,0) 86%, rgba(0,0,0,.35)); }
 
     /* ---------- top bar ---------- */
@@ -281,6 +284,7 @@
 <body>
   <div id="stage">
     <div id="map"></div>
+    <div class="mapfade" id="mapfade"></div>
     <div class="shade"></div>
 
     <header class="top">
@@ -352,6 +356,7 @@
     const OPT = {
       state: (P.get('state') || '').toUpperCase(),
       voice: P.get('voice') !== '0',
+      zoom: P.get('zoom') === '1',
       sound: P.get('sound') !== '0',
       bot: P.get('bot') !== '0',
       hat: P.get('hat') !== '0',
@@ -2400,8 +2405,24 @@
       S.shotTimer = setTimeout(nextShot, S.shotDur);
     };
 
+    // The stream server draws the map without a graphics card, so zooms are choppy: fade out, cut to the
+    // new view, and fade back in once its tiles are drawn. ?zoom=1 brings back the old flying zoom.
     const fly = (bounds, opts = {}) => {
       if (!S.map || !bounds) return;
+      if (!OPT.zoom) {
+        S.map.stop();
+        const fade = $('mapfade');
+        fade.classList.add('on');
+        clearTimeout(S.fadeT);
+        S.fadeT = setTimeout(() => {
+          S.map.fitBounds(bounds, { padding: PAD, maxZoom: 9.4, ...opts, duration: 0 });
+          let shown = false;
+          const show = () => { if (shown) return; shown = true; fade.classList.remove('on'); };
+          S.map.once('idle', show);
+          setTimeout(show, 1800);
+        }, 380);
+        return;
+      }
       S.map.stop();
       // Cross-ocean jumps (Guam, Hawaii) cut instead of flying, so tiles are not loading mid-air.
       const from = S.map.getCenter();
@@ -3327,7 +3348,15 @@
       if (/\b(webot|yallbot)\b/i.test(text)) return one(r.name, 'That’s me!');
       return '';
     };
-    const readChatMessage = (cmd) => {
+    // Several chat answers can arrive together: WeBot takes them one at a time, when he's done talking.
+    const chatSayQ = [];
+    const readChatMessage = (cmd) => { chatSayQ.push({ ...cmd, got: Date.now() }); };
+    setInterval(() => {
+      if (!chatSayQ.length || speech.busy || speech.queue.length) return;
+      const cmd = chatSayQ.shift();
+      if (Date.now() - cmd.got < 4 * 60 * 1000) answerChat(cmd);
+    }, 1000);
+    const answerChat = (cmd) => {
       if (S.control.brb || S.inBreaking || !isCalm()) return;
       const reply = cmd.reply != null ? cmd.reply : chatReply(cmd.text);
       chatAnswer(cmd.user, cmd.text, reply);

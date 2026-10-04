@@ -217,6 +217,8 @@ const BRAIN = [
     { path: 'chat.showOnScreen', label: 'Show chat messages in the chat box on the stream', type: 'bool' },
     { path: 'chat.readEverySeconds', label: 'Read at most one message every (seconds)', type: 'num', min: 15, step: 5 },
     { path: 'chat.sameViewerMinutes', label: 'Same viewer read at most every (minutes)', type: 'num', min: 0, step: 1 },
+    { path: 'chat.maxRepliesPerRead', label: 'Answers per chat check (about once a minute)', type: 'num', min: 1, step: 1 },
+    { path: 'chat.maxRepliesPerHour', label: 'Most answers in an hour', type: 'num', min: 1, step: 5 },
     { path: 'chat.requestEveryMinutes', label: '!forecast / !gas: at most one every (minutes)', type: 'num', min: 0, step: 0.5 },
     { path: 'chat.commandCooldownMinutes', label: 'Each viewer can ask again after (minutes)', type: 'num', min: 0, step: 1 },
     { path: 'chat.maxRequestsPer20Minutes', label: 'Most requests in any 20 minutes', type: 'num', min: 1, step: 1 },

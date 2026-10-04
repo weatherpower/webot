@@ -173,14 +173,18 @@ const findLive = async () => {
   }
 };
 
-// Read one regular chat message out loud (the newest that passes the filter), at most every 75 s and
-// each viewer at most every 5 minutes. Live Control can turn this off.
+// WeBot answers regular chat (anything, not just messages about him): up to maxRepliesPerRead messages
+// from each chat read (oldest first), each viewer at most every sameViewerMinutes, and at most
+// maxRepliesPerHour in all (his voice costs Puter usage). Live Control can turn this off.
 const readOne = async (messages) => {
   const now = Date.now();
   const brain = await loadBrain();
   const { chat } = brain;
   if (!messages.length || !chat.readAloud || now - state.lastReadAt < chat.readEverySeconds * 1000) return;
-  for (const message of [...messages].reverse()) {
+  state.replies = (state.replies || []).filter((t) => now - t < 3600 * 1000);
+  let sent = 0;
+  for (const message of messages) {
+    if (sent >= chat.maxRepliesPerRead || state.replies.length >= chat.maxRepliesPerHour) break;
     if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) continue;
     const author = message.authorDetails || {};
     const userKey = author.channelId || author.displayName;
@@ -190,13 +194,14 @@ const readOne = async (messages) => {
     const control = await liveControl().catch(() => null);
     if (!control || control.chatRead === false) return;
     state.lastReadAt = now;
+    state.replies.push(now);
+    sent += 1;
     state.readUsers.set(userKey, now);
     if (state.readUsers.size > 500) state.readUsers.delete(state.readUsers.keys().next().value);
     const user = safeName(author.displayName);
     // WeBot's comeback (src/personality.js): written lines only, so it can't come out crude.
     await applyLiveCommand({ action: 'chat-say', user, text, reply: replyTo(text, user, brain) });
-    console.log('[chat] reading a viewer message');
-    return;
+    console.log('[chat] answering a viewer message');
   }
 };
 

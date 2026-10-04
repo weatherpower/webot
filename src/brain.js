@@ -28,8 +28,12 @@ export const DEFAULT_BRAIN = {
   },
   chat: {
     readAloud: true,
-    readEverySeconds: 45,
-    sameViewerMinutes: 3,
+    // WeBot answers anything in chat: up to maxRepliesPerRead messages per chat read (about once a minute),
+    // each viewer at most every sameViewerMinutes, at most maxRepliesPerHour in all.
+    readEverySeconds: 20,
+    sameViewerMinutes: 1,
+    maxRepliesPerRead: 3,
+    maxRepliesPerHour: 60,
     // Viewer messages show up in the chat box on the stream (only ones that pass the filter).
     showOnScreen: true,
     requestEveryMinutes: 2,
@@ -88,13 +92,14 @@ const OLD_DEFAULTS = {
   'lines.gas': ['Let’s check gas prices.', 'Time for a gas price check.', 'Let’s see what it costs to fill up this week.', 'Here’s your weekly gas price update.'],
   'lines.gasRequest': '{name} asked about gas prices around {city}.',
   'lines.surface': ['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.'],
-  'chat.readEverySeconds': 75,
-  'chat.sameViewerMinutes': 5
+  'chat.readEverySeconds': [75, 45],
+  'chat.sameViewerMinutes': [5, 3]
 };
 const dropOldDefaults = (saved) => {
   for (const [p, old] of Object.entries(OLD_DEFAULTS)) {
     const [a, b] = p.split('.');
-    if (saved?.[a] && JSON.stringify(saved[a][b]) === JSON.stringify(old)) delete saved[a][b];
+    const olds = typeof old === 'number' ? [old] : Array.isArray(old) && typeof old[0] === 'number' ? old : [old];
+    if (saved?.[a] && olds.some((o) => JSON.stringify(saved[a][b]) === JSON.stringify(o))) delete saved[a][b];
   }
   return saved;
 };
