@@ -1,6 +1,7 @@
 // Live stream support: activity index with history, storm reports, nearest-radar loops and the
 // stream control store (pin an alert, focus a state, make the bot talk, banner messages).
 import { saveBrain } from './brain.js';
+import { expandSlang } from './personality.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -531,7 +532,8 @@ export const applyLiveCommand = async (body = {}) => {
     case 'say': {
       const text = cleanText(body.text, 300);
       if (!text) throw Object.assign(new Error('Nothing to say'), { status: 400 });
-      pushCommand({ type: 'say', text });
+      // Typed lines (Live Control, WeBot Studio) get chat shorthand spelled out too: "ngl" → "not gonna lie".
+      pushCommand({ type: 'say', text: expandSlang(text) });
       break;
     }
     case 'next':
