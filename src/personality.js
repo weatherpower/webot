@@ -86,6 +86,21 @@ export const DEFAULT_PERSONALITY = {
       'I’ve seen more personality in a partly cloudy forecast, {name}, and that’s sayin somethin.',
       'Sugar, I’ve been insulted by better. A dust devil called me short once.'
     ],
+    // "!roast me": the viewer asked for it. Tease the chat habits and the weather nerding, never looks or who they are.
+    roastMe: [
+      '{name}, you asked a robot to roast you on a weather stream. Sugar, that is the roast.',
+      '{name}, your forecast is partly cloudy with a hundred percent chance of bad decisions.',
+      '{name}, you have the energy of a weather app that says sunny during a thunderstorm.',
+      'I would roast you, {name}, but you are already cooked. You have been starin at radar for three hours.',
+      '{name}, you are like a tornado watch. Everybody hears about you, but nothin ever happens.',
+      '{name}, you type like you are wearin oven mitts in a hailstorm.',
+      'Bless your heart, {name}. You are a twenty percent chance of rain. Nobody makes plans around you.',
+      '{name}, if you were a storm, the Weather Service would not even bother givin you a name.',
+      '{name}, you are slower than a cold front in July, and those do not even show up.',
+      'Honey, you asked to get roasted on a weather stream. The dew point is higher than your standards.',
+      '{name}, you are the reason the radar has a loop. You keep comin back and nothin changes.',
+      '{name}, you are what meteorologists call a non-event. Lots of hype, a little drizzle.'
+    ],
     shrug: ['Well, you’re entitled to your opinion, {name}. It’s wrong, but you’re entitled to it.', 'Noted, {name}. I’ll get right on that. Right after the weather.'],
     bot: [
       'Am I real? Sugar, I’m realer than your phone’s ten-day forecast.',

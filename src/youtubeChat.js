@@ -221,9 +221,36 @@ const showChats = async (items) => {
   await applyLiveCommand({ action: 'chat-show', messages: list.slice(-8) });
 };
 
+// "!roast me": WeBot roasts the viewer who asked (src/personality.js → roastMe). Each viewer once per
+// commandCooldownMinutes (owner and mods any time), and it counts toward maxRepliesPerHour.
+const roastRequest = async (message) => {
+  const author = message.authorDetails || {};
+  const userKey = author.channelId || author.displayName;
+  const now = Date.now();
+  const brain = await loadBrain();
+  const { chat } = brain;
+  state.activeUntil = now + 5 * 60 * 1000;
+  state.roasted ||= new Map();
+  if (!(author.isChatOwner || author.isChatModerator) && now - (state.roasted.get(userKey) || 0) < chat.commandCooldownMinutes * 60 * 1000) return;
+  state.replies = (state.replies || []).filter((t) => now - t < 3600 * 1000);
+  if (state.replies.length >= chat.maxRepliesPerHour) return;
+  const control = await liveControl().catch(() => null);
+  if (!control || control.chatRead === false) return;
+  const list = brain.personality?.replies?.roastMe || [];
+  if (!list.length) return;
+  const user = safeName(author.displayName);
+  const who = user || 'Sugar';
+  const line = list[Math.floor(Math.random() * list.length)].replace(/\{name\}/g, who);
+  state.roasted.set(userKey, now);
+  state.replies.push(now);
+  await applyLiveCommand({ action: 'chat-say', user, text: '!roast me', reply: line.charAt(0).toUpperCase() + line.slice(1) });
+  console.log('[chat] roast request');
+};
+
 // Returns true when the message was a ! command (handled or not).
 const handle = async (message) => {
   const text = String(message.snippet?.displayMessage || '').trim();
+  if (/^!roast\b/i.test(text)) { await roastRequest(message); return true; }
   const m = text.match(/^!(forecast|fc|weather|wx|gas)\b\s*(.*)$/i);
   if (!m) return /^!/.test(text);
   const kind = /^gas$/i.test(m[1]) ? 'gas' : 'forecast';

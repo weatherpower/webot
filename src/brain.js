@@ -41,7 +41,7 @@ export const DEFAULT_BRAIN = {
     maxRequestsPer20Minutes: 6,
     // Extra words or phrases WeBot never reads out (on top of the built-in filter).
     blockedWords: [],
-    hint: 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP IN CHAT · WEBOT WILL CHECK IT ON THE STREAM',
+    hint: 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP · OR !ROAST ME IF YOU CAN TAKE IT',
     replies: {
       greeting: ['Hey there, thanks for hanging out!', 'Welcome in!', 'Howdy! Glad you’re here.'],
       compliment: ['Thank you, that means a lot!', 'Appreciate you!', 'Thanks! I’m having fun up here too.'],
@@ -92,6 +92,7 @@ const OLD_DEFAULTS = {
   'lines.gas': ['Let’s check gas prices.', 'Time for a gas price check.', 'Let’s see what it costs to fill up this week.', 'Here’s your weekly gas price update.'],
   'lines.gasRequest': '{name} asked about gas prices around {city}.',
   'lines.surface': ['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.'],
+  'chat.hint': 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP IN CHAT · WEBOT WILL CHECK IT ON THE STREAM',
   'chat.readEverySeconds': [75, 45],
   'chat.sameViewerMinutes': [5, 3]
 };

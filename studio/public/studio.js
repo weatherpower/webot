@@ -233,6 +233,7 @@ const BRAIN = [
     { path: 'personality.on', label: 'Southern sass on (off = the plain replies under Chat)', type: 'bool' },
     { path: 'personality.roastBack', label: 'Roast people back when they insult WeBot or call him a copy', type: 'bool' },
     { path: 'personality.nicknames', label: 'What he calls people when he can’t show their name', type: 'lines' },
+    { path: 'personality.replies.roastMe', label: '“!roast me” (they asked for it)', type: 'lines' },
     { path: 'personality.replies.rival', label: 'Called a copy / rip-off / “y’all bot”', type: 'lines' },
     { path: 'personality.replies.roast', label: 'Insulted (“trash”, “you suck”, “boring”)', type: 'lines' },
     { path: 'personality.replies.shrug', label: 'Insulted, with roasting off', type: 'lines' },
