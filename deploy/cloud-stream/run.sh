@@ -5,8 +5,14 @@
 set -u
 cd "$(dirname "$0")/../.."
 
-WIDTH="${STREAM_WIDTH:-1920}"
-HEIGHT="${STREAM_HEIGHT:-1080}"
+# What YouTube gets (STREAM_*) and what Chrome draws (RENDER_*, default the same). Without a graphics card,
+# drawing 720p and scaling it up to 1080p is far smoother than drawing 1080p.
+OUT_W="${STREAM_WIDTH:-1920}"
+OUT_H="${STREAM_HEIGHT:-1080}"
+WIDTH="${RENDER_WIDTH:-$OUT_W}"
+HEIGHT="${RENDER_HEIGHT:-$OUT_H}"
+SCALE=""
+[ "${WIDTH}x${HEIGHT}" != "${OUT_W}x${OUT_H}" ] && SCALE="-vf scale=${OUT_W}:${OUT_H}:flags=lanczos"
 FPS="${STREAM_FPS:-30}"
 VIDEO_BITRATE="${STREAM_BITRATE:-6000k}"
 PRESET="${STREAM_PRESET:-veryfast}"
@@ -80,12 +86,12 @@ GOP=$((FPS * 2))
   ffmpeg -hide_banner -loglevel warning -nostats \
     -thread_queue_size 1024 -f x11grab -draw_mouse 0 -framerate "$FPS" -video_size "${WIDTH}x${HEIGHT}" -i :99.0+0,0 \
     -thread_queue_size 4096 -f pulse -fragment_size 8192 -ac 2 -i stream.monitor \
-    -c:v libx264 -preset "$PRESET" -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_BITRATE" -bufsize "$(( ${VIDEO_BITRATE%k} * 2 ))k" \
+    $SCALE -c:v libx264 -preset "$PRESET" -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_BITRATE" -bufsize "$(( ${VIDEO_BITRATE%k} * 2 ))k" \
     -pix_fmt yuv420p -g "$GOP" -keyint_min "$GOP" -sc_threshold 0 \
     -af aresample=async=1000 -c:a aac -b:a "$AUDIO_BITRATE" -ar 48000 \
     -f flv "$OUTPUT"
   log "ffmpeg stopped (exit $?), restarting in 5 s"; sleep 5
 done) &
 pids+=($!)
-log "streaming ${WIDTH}x${HEIGHT} at ${FPS} fps, ${VIDEO_BITRATE} (${PRESET})"
+log "streaming ${OUT_W}x${OUT_H} (drawn at ${WIDTH}x${HEIGHT}) at ${FPS} fps, ${VIDEO_BITRATE} (${PRESET})"
 wait
