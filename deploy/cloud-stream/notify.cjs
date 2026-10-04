@@ -109,6 +109,36 @@ const where = (home, g) => {
     for (const [k, t] of Object.entries(s.sent)) if (now - t > 2 * 86400000) delete s.sent[k];
   } catch (e) { console.log('[notify] alerts:', e.message); }
 
+  /* ---------- WeBot's Puter voice credits (checked every 30 minutes) ---------- */
+  // Asks the stream page's Puter sign-in how much of the monthly allowance is left. Warns once at 25%,
+  // once at 10%, and once when it runs out; a new month (or a new Puter account) resets the warnings.
+  if (process.argv.includes('--puter') || now - (s.puterAt || 0) > 30 * 60 * 1000) {
+    s.puterAt = now;
+    try {
+      const { chromium } = require('/app/node_modules/playwright');
+      const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+      const page = browser.contexts()[0].pages().find((p) => p.url().includes('/live'));
+      const info = page ? await page.evaluate(async () => { try { return (await puter.auth.getMonthlyUsage()).allowanceInfo; } catch { return null; } }) : null;
+      await browser.close().catch(() => {});
+      if (info && Number.isFinite(info.remaining) && info.monthUsageAllowance) {
+        const left = Math.max(0, info.remaining), pct = Math.round((left / info.monthUsageAllowance) * 100);
+        if (left > (s.puterLeft ?? -1) + 50) s.puterLevel = 0;   // refilled: new month or a new account
+        s.puterLeft = left;
+        const level = left <= 1 ? 3 : pct <= 10 ? 2 : pct <= 25 ? 1 : 0;
+        if (level > (s.puterLevel || 0)) {
+          s.puterLevel = level;
+          await push({
+            title: level === 3 ? 'WeBot’s voice is OUT of Puter credits' : `WeBot’s Puter credits: ${pct}% left`,
+            message: level === 3 ? 'WeBot can’t talk with the Alloy voice until the credits reset. Link another Puter account in Live Control → Puter to bring his voice back.'
+              : `${Math.round(left)} of ${info.monthUsageAllowance} credits left this month. To make them last, lower "Most answers in an hour" in WeBot Studio → Brain → Chat, or link a second Puter account.`,
+            priority: level === 3 ? 5 : 4, tags: ['speaking_head'], click: WATCH
+          });
+        }
+        console.log('[notify] puter', Math.round(left), pct + '%');
+      }
+    } catch (e) { console.log('[notify] puter check:', e.message); }
+  }
+
   if (process.argv.includes('--test')) await push({ title: 'WeatherPower alerts are on', message: `You’ll get tornado warnings near ${placeName} and a heads-up if the stream goes down.`, click: WATCH, tags: ['white_check_mark'] });
   save(s);
 })().catch((e) => { console.error('[notify]', e.message); process.exit(1); });
