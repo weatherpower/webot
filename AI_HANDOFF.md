@@ -17,6 +17,7 @@ Read this first. It explains what this project is, where it runs, and how to cha
 | `src/live.js` | Live Control state + `applyLiveCommand` actions (say, reload, chat-say, chat-show, brain…) |
 | `src/youtubeChat.js` | Reads YouTube chat (API key, quota-limited), `!forecast` `!gas` `!roast me`, chat filter |
 | `src/personality.js` | WeBot's hand-written Southern replies (no AI text on stream → can't cuss) |
+| `src/knowledge.js` | WeBot's weather encyclopedia: hand-written facts (famous storms, records, weather science) he answers chat questions with |
 | `src/brain.js` | Editable settings (segments, lines, chat limits, personality, radio) saved in `data/webot-brain.json` |
 | `public/live.html` | The stream page (map, bars, cards, chat box, WeBot, radio, voice) |
 | `public/livecontrol.html` | Live Control page (needs the controller token) |

@@ -14,6 +14,7 @@ const STATES = {
 const STATE_RE = new RegExp('\\b(' + Object.values(STATES).sort((a, b) => b.length - a.length).join('|') + ')\\b', 'i');
 // "from tx", "in OK", "watching from ar": two-letter states only after from / in, so "in" or "ok" alone don't count.
 const ABBR_RE = new RegExp('\\b(?:from|in|out of)\\s+(' + Object.keys(STATES).join('|') + ')\\b', 'i');
+import { factFor } from './knowledge.js';
 export const placeIn = (text) => {
   const full = text.match(STATE_RE);
   if (full) return Object.values(STATES).find((s) => s.toLowerCase() === full[1].toLowerCase());
@@ -319,6 +320,12 @@ export const replyTo = (text, user, brain, ctx = {}) => {
     return list?.length ? pick(list) : '';
   }
   let kind = kindOf(text);
+  // Asked about a famous storm, a record or how weather works: the real answer from the encyclopedia
+  // (src/knowledge.js). Insults and copy-talk still get roasted first.
+  if (!['rival', 'roast', 'notYou'].includes(kind)) {
+    const fact = factFor(expandSlang(text), pick);
+    if (fact) return fill(fact, user, placeIn(text), p.nicknames, ctx);
+  }
   if ((kind === 'roast' || kind === 'rival') && !p.roastBack) kind = 'shrug';
   const list = r[kind]?.length ? r[kind] : r.other;
   if (!list?.length) return '';

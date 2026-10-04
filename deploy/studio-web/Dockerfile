@@ -3,7 +3,7 @@ FROM docker:cli
 RUN apk add --no-cache nodejs npm bash procps coreutils
 WORKDIR /app
 RUN npm init -y >/dev/null && npm pkg set type=module && npm install --omit=dev express@5 && npm cache clean --force
-COPY src/personality.js /app/src/personality.js
+COPY src/personality.js src/knowledge.js /app/src/
 COPY public/assets /app/public/assets
 COPY studio /app/studio
 ENTRYPOINT []
