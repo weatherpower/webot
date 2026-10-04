@@ -214,6 +214,7 @@ const BRAIN = [
   ] },
   { id: 'chat', title: 'Chat', fields: [
     { path: 'chat.readAloud', label: 'Read regular chat messages out loud', type: 'bool' },
+    { path: 'chat.showOnScreen', label: 'Show chat messages in the chat box on the stream', type: 'bool' },
     { path: 'chat.readEverySeconds', label: 'Read at most one message every (seconds)', type: 'num', min: 15, step: 5 },
     { path: 'chat.sameViewerMinutes', label: 'Same viewer read at most every (minutes)', type: 'num', min: 0, step: 1 },
     { path: 'chat.requestEveryMinutes', label: '!forecast / !gas: at most one every (minutes)', type: 'num', min: 0, step: 0.5 },
@@ -225,6 +226,32 @@ const BRAIN = [
     { path: 'chat.replies.compliment', label: 'Replies to compliments', type: 'lines' },
     { path: 'chat.replies.weatherQuestion', label: 'Replies to weather questions', type: 'lines' },
     { path: 'chat.replies.name', label: 'Replies when someone says WeBot', type: 'lines' }
+  ] },
+  { id: 'personality', title: 'Personality', tester: true, intro: 'WeBot is a sassy Southern robot: he reads a chat message, then talks back with one of these lines (picked at random, never the same one twice in a row). <code>{name}</code> becomes the viewer’s name, <code>{place}</code> the state they mentioned. He only says what’s written here, so keep it clean.', fields: [
+    { path: 'personality.on', label: 'Southern sass on (off = the plain replies under Chat)', type: 'bool' },
+    { path: 'personality.roastBack', label: 'Roast people back when they insult WeBot or call him a copy', type: 'bool' },
+    { path: 'personality.nicknames', label: 'What he calls people when he can’t show their name', type: 'lines' },
+    { path: 'personality.replies.rival', label: 'Called a copy / rip-off / “y’all bot”', type: 'lines' },
+    { path: 'personality.replies.roast', label: 'Insulted (“trash”, “you suck”, “boring”)', type: 'lines' },
+    { path: 'personality.replies.shrug', label: 'Insulted, with roasting off', type: 'lines' },
+    { path: 'personality.replies.bot', label: '“Are you real / a bot?”', type: 'lines' },
+    { path: 'personality.replies.greeting', label: 'Hello / hey / howdy', type: 'lines' },
+    { path: 'personality.replies.goodbye', label: 'Bye / good night', type: 'lines' },
+    { path: 'personality.replies.place', label: 'Says where they’re from', type: 'lines' },
+    { path: 'personality.replies.first', label: '“First!”', type: 'lines' },
+    { path: 'personality.replies.thanks', label: 'Thanks', type: 'lines' },
+    { path: 'personality.replies.compliment', label: 'Compliments', type: 'lines' },
+    { path: 'personality.replies.weatherQuestion', label: 'Weather questions', type: 'lines' },
+    { path: 'personality.replies.storm', label: 'Storms where they are', type: 'lines' },
+    { path: 'personality.replies.rain', label: 'Rain where they are', type: 'lines' },
+    { path: 'personality.replies.snow', label: 'Snow and ice', type: 'lines' },
+    { path: 'personality.replies.hot', label: 'Heat', type: 'lines' },
+    { path: 'personality.replies.cold', label: 'Cold', type: 'lines' },
+    { path: 'personality.replies.wx', label: 'Other weather talk', type: 'lines' },
+    { path: 'personality.replies.laugh', label: 'lol / haha', type: 'lines' },
+    { path: 'personality.replies.name', label: 'Says “WeBot”', type: 'lines' },
+    { path: 'personality.replies.question', label: 'Any other question', type: 'lines' },
+    { path: 'personality.replies.other', label: 'Everything else', type: 'lines' }
   ] },
   { id: 'radio', title: 'Radio', fields: [
     { path: 'radio.countryShare', label: 'Country songs when the style is Mix', type: 'percent' },
@@ -275,10 +302,24 @@ const segmentsHtml = () => {
     <p class="k" style="margin-top:12px;letter-spacing:.06em">ROUGH SHARE: ${esc(share)}</p></div>
     <div class="panel"><h2>Gas prices</h2>${fieldHtml({ path: 'gasEveryMinutes', label: 'At most once every (minutes)', type: 'num', min: 5, step: 5 })}</div>`;
 };
+// Personality tester: type a chat message and see what WeBot would say back (uses the unsaved edits too).
+const testerHtml = () => `<div class="panel" style="margin-bottom:12px"><h2>Try it <span class="r">nothing goes on the stream</span></h2>
+  <div class="row"><input type="text" id="try-user" placeholder="Viewer name" style="width:170px" value="StormFan"><input type="text" id="try-text" placeholder="Type a chat message, like: this is a ryan hall rip off" style="flex:1;min-width:240px"><button class="btn primary" id="try-go">What would WeBot say?</button></div>
+  <div class="quote" id="try-out" style="margin-top:10px">…</div></div>`;
+const tryReply = async () => {
+  const text = $('try-text')?.value.trim();
+  if (!text) return;
+  try {
+    const r = await call('POST', '/api/brain/try', { text, user: $('try-user').value.trim(), brain: BR.work });
+    $('try-out').innerHTML = '<span class="k" style="display:block;margin-bottom:6px">' + esc(r.kind) + '</span>' + esc(r.reply || '(he just reads it, no comment)');
+  } catch (e) { toast(e.message, 'bad'); }
+};
+document.addEventListener('click', (e) => { if (e.target.id === 'try-go') tryReply(); });
+document.addEventListener('keydown', (e) => { if (e.target.id === 'try-text' && e.key === 'Enter') tryReply(); });
 const renderBrain = () => {
   $('brain-nav').innerHTML = BRAIN.map((s) => `<button data-sec="${s.id}" class="${s.id === BR.section ? 'on' : ''}">${esc(s.title)}</button>`).join('');
   $('brain-form').innerHTML = BRAIN.map((s) => `<div class="form-section ${s.id === BR.section ? 'on' : ''}" data-sec="${s.id}">${s.custom ? segmentsHtml()
-    : `<div class="panel"><h2>${esc(s.title)}</h2>${s.intro ? `<p class="dim" style="margin:0 0 12px">${s.intro}</p>` : ''}<div class="stack">${groupFields(s.fields)}</div></div>`}</div>`).join('');
+    : `${s.tester ? testerHtml() : ''}<div class="panel"><h2>${esc(s.title)}</h2>${s.intro ? `<p class="dim" style="margin:0 0 12px">${s.intro}</p>` : ''}<div class="stack">${groupFields(s.fields)}</div></div>`}</div>`).join('');
   markBrain();
 };
 $('brain-nav').addEventListener('click', (e) => {

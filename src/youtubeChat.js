@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { STATE_NAMES } from './broadcast.js';
 import { applyLiveCommand, liveControl } from './live.js';
 import { loadBrain } from './brain.js';
+import { replyTo } from './personality.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const KEY = () => process.env.YOUTUBE_API_KEY || '';
@@ -176,7 +177,8 @@ const findLive = async () => {
 // each viewer at most every 5 minutes. Live Control can turn this off.
 const readOne = async (messages) => {
   const now = Date.now();
-  const { chat } = await loadBrain();
+  const brain = await loadBrain();
+  const { chat } = brain;
   if (!messages.length || !chat.readAloud || now - state.lastReadAt < chat.readEverySeconds * 1000) return;
   for (const message of [...messages].reverse()) {
     if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) continue;
@@ -190,10 +192,28 @@ const readOne = async (messages) => {
     state.lastReadAt = now;
     state.readUsers.set(userKey, now);
     if (state.readUsers.size > 500) state.readUsers.delete(state.readUsers.keys().next().value);
-    await applyLiveCommand({ action: 'chat-say', user: safeName(author.displayName), text });
+    const user = safeName(author.displayName);
+    // WeBot's comeback (src/personality.js): written lines only, so it can't come out crude.
+    await applyLiveCommand({ action: 'chat-say', user, text, reply: replyTo(text, user, brain) });
     console.log('[chat] reading a viewer message');
     return;
   }
+};
+
+// Chat on the stream: the newest messages that pass the filter go up in WeBot's chat box (commands too).
+const showChats = async (items) => {
+  const { chat } = await loadBrain();
+  if (!chat.showOnScreen) return;
+  const list = [];
+  for (const message of items) {
+    if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) continue;
+    const text = readableChat(message.snippet?.displayMessage, chat.blockedWords);
+    if (text) list.push({ user: safeName(message.authorDetails?.displayName), text });
+  }
+  if (!list.length) return;
+  const control = await liveControl().catch(() => null);
+  if (!control || control.chatRead === false) return;
+  await applyLiveCommand({ action: 'chat-show', messages: list.slice(-8) });
 };
 
 // Returns true when the message was a ! command (handled or not).
@@ -233,6 +253,7 @@ const readChat = async () => {
       const command = await handle(message).catch((e) => { console.warn('[chat]', e.message); return true; });
       if (!command) regular.push(message);
     }
+    await showChats(body.items || []).catch((e) => console.warn('[chat]', e.message));
     await readOne(regular).catch((e) => console.warn('[chat]', e.message));
   }
   state.primed = true;

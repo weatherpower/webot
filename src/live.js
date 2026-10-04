@@ -482,7 +482,15 @@ export const applyLiveCommand = async (body = {}) => {
       // A viewer's chat message (already filtered in src/youtubeChat.js) for WeBot to read out loud.
       const text = cleanText(body.text, 160);
       if (!text) throw Object.assign(new Error('Nothing to read'), { status: 400 });
-      pushCommand({ type: 'chat-say', text, user: cleanText(body.user, 24) });
+      pushCommand({ type: 'chat-say', text, user: cleanText(body.user, 24), reply: cleanText(body.reply, 300) });
+      break;
+    }
+    case 'chat-show': {
+      // Filtered chat messages for the chat box on the stream (src/youtubeChat.js).
+      const messages = (Array.isArray(body.messages) ? body.messages : []).slice(-8)
+        .map((m) => ({ user: cleanText(m?.user, 24), text: cleanText(m?.text, 160) })).filter((m) => m.text);
+      if (!messages.length) throw Object.assign(new Error('No messages'), { status: 400 });
+      pushCommand({ type: 'chat-show', messages });
       break;
     }
     case 'chat-read':

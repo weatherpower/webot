@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { replyTo, kindOf } from '../src/personality.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
@@ -183,6 +184,11 @@ app.get('/api/overview', api(async () => {
 app.post('/api/control', api(async (req) => control(req.body || {})));
 
 app.get('/api/brain', api(async () => getJson(`${CONTROL_BASE}/warningcenter/api/v3/live/brain`)));
+// Try WeBot's personality on a made-up chat message, with the brain as it is in the editor (not saved).
+app.post('/api/brain/try', api(async (req) => {
+  const text = String(req.body?.text || '').slice(0, 160), user = String(req.body?.user || '').slice(0, 24);
+  return { kind: kindOf(text), reply: replyTo(text, user, req.body?.brain) };
+}));
 app.put('/api/brain', api(async (req) => {
   await control({ action: 'brain', brain: req.body || {} });
   return getJson(`${CONTROL_BASE}/warningcenter/api/v3/live/brain`);

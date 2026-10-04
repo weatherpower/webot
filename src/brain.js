@@ -4,6 +4,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { dataDir } from './paths.js';
+import { DEFAULT_PERSONALITY } from './personality.js';
 
 const FILE = path.join(dataDir, 'webot-brain.json');
 
@@ -19,16 +20,18 @@ export const DEFAULT_BRAIN = {
   gasEveryMinutes: 40,
   lines: {
     // {city} becomes the city and state, {name} the viewer's name.
-    forecast: ['Let’s check the forecast for {city}.', 'Time for a daily forecast. We’re heading to {city}.', 'Let’s zoom into {city} and see what the forecast looks like.', 'Here’s your forecast for {city}.'],
-    forecastRequest: '{name} asked for the forecast in {city}. Let’s take a look.',
-    gas: ['Let’s check gas prices.', 'Time for a gas price check.', 'Let’s see what it costs to fill up this week.', 'Here’s your weekly gas price update.'],
-    gasRequest: '{name} asked about gas prices around {city}.',
-    surface: ['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.']
+    forecast: ['Let’s mosey on over to {city} and see what the sky is fixin to do.', 'Time for a forecast, y’all. We’re headin to {city}.', 'Alright {city}, let’s see what you’ve got cookin.', 'Here’s your forecast for {city}. Don’t shoot the messenger.'],
+    forecastRequest: '{name} wants the forecast for {city}. Well alright, sugar, let’s take a look.',
+    gas: ['Let’s see how bad the gas pump is gonna hurt this week.', 'Gas price check, y’all. Hold onto your wallets.', 'Let’s see what it costs to fill up the truck this week.', 'Here’s your weekly gas prices. Don’t cry, it’s just money.'],
+    gasRequest: '{name} asked about gas around {city}. Let’s see how bad it is, sugar.',
+    surface: ['Here’s the national radar and the surface map, y’all.', 'Let’s check the big picture on radar.', 'Time to see what the whole country has got goin on.']
   },
   chat: {
     readAloud: true,
-    readEverySeconds: 75,
-    sameViewerMinutes: 5,
+    readEverySeconds: 45,
+    sameViewerMinutes: 3,
+    // Viewer messages show up in the chat box on the stream (only ones that pass the filter).
+    showOnScreen: true,
     requestEveryMinutes: 2,
     commandCooldownMinutes: 10,
     maxRequestsPer20Minutes: 6,
@@ -42,6 +45,8 @@ export const DEFAULT_BRAIN = {
       name: ['That’s me!', 'Yep, WeBot here.']
     }
   },
+  // WeBot's personality: a sassy Southern robot who talks back to chat (src/personality.js).
+  personality: DEFAULT_PERSONALITY,
   radio: {
     // Share of calm/chill songs that are country when the style is Mix (0 to 1).
     countryShare: 0.45,
@@ -75,12 +80,31 @@ const clean = (value, def) => {
   return def;
 };
 
+// Settings saved before WeBot got his personality still hold the old built-in values; those follow the
+// new defaults. Anything someone actually changed stays as they set it.
+const OLD_DEFAULTS = {
+  'lines.forecast': ['Let’s check the forecast for {city}.', 'Time for a daily forecast. We’re heading to {city}.', 'Let’s zoom into {city} and see what the forecast looks like.', 'Here’s your forecast for {city}.'],
+  'lines.forecastRequest': '{name} asked for the forecast in {city}. Let’s take a look.',
+  'lines.gas': ['Let’s check gas prices.', 'Time for a gas price check.', 'Let’s see what it costs to fill up this week.', 'Here’s your weekly gas price update.'],
+  'lines.gasRequest': '{name} asked about gas prices around {city}.',
+  'lines.surface': ['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.'],
+  'chat.readEverySeconds': 75,
+  'chat.sameViewerMinutes': 5
+};
+const dropOldDefaults = (saved) => {
+  for (const [p, old] of Object.entries(OLD_DEFAULTS)) {
+    const [a, b] = p.split('.');
+    if (saved?.[a] && JSON.stringify(saved[a][b]) === JSON.stringify(old)) delete saved[a][b];
+  }
+  return saved;
+};
+
 let cache = { at: 0, brain: null };
 
 export const loadBrain = async () => {
   if (cache.brain && Date.now() - cache.at < 5000) return cache.brain;
   let saved = {};
-  try { saved = JSON.parse(await fs.readFile(FILE, 'utf8')); } catch {}
+  try { saved = dropOldDefaults(JSON.parse(await fs.readFile(FILE, 'utf8'))); } catch {}
   const brain = clean(saved, DEFAULT_BRAIN);
   brain.radio.countryShare = Math.min(1, brain.radio.countryShare);
   cache = { at: Date.now(), brain };

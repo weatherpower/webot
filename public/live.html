@@ -167,6 +167,23 @@
     .reportchip svg { color: #ffc23d; }
     .reportchip small { font-family: "WP Mono"; font-size: 11px; letter-spacing: .16em; color: var(--muted); font-weight: 600; }
     .np { position: absolute; right: 300px; bottom: 104px; z-index: 11; display: none; font-family: "WP Mono"; font-size: 12px; font-weight: 700; letter-spacing: .14em; color: rgba(255,255,255,.75); padding: 5px 10px; background: rgba(9,16,30,.8); border: 1px solid rgba(255,255,255,.12); border-left: 3px solid #33d4ff; white-space: nowrap; }
+    /* Live chat box: viewer messages (filtered on the server) and WeBot's comebacks, left of WeBot. */
+    .chatbox { position: absolute; right: 288px; bottom: 140px; width: 500px; z-index: 13; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; opacity: 0; transform: translateX(40px); transition: opacity .45s, transform .45s cubic-bezier(.3,.8,.3,1); }
+    .chatbox.on { opacity: 1; transform: none; }
+    .chatbox .chh { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: rgba(9,16,30,.86); border-left: 3px solid #ff3b4a; font: 700 12px/1 "WP Mono"; letter-spacing: .18em; color: rgba(255,255,255,.75); }
+    .chatbox .chh i { width: 8px; height: 8px; border-radius: 50%; background: #ff3b4a; }
+    .chatbox .chh em { font-style: normal; color: #5ff2ff; letter-spacing: .1em; }
+    .cm { position: relative; align-self: stretch; padding: 9px 15px 11px; background: rgba(9,16,30,.93); border: 1px solid rgba(255,255,255,.12); border-left: 4px solid var(--u, #8fb7ff); box-shadow: 0 10px 26px rgba(0,0,0,.45); animation: chin .4s cubic-bezier(.3,.8,.3,1) both; }
+    .cm.old { animation: none; }
+    .cm b { display: block; font: 700 15px/1.1 "WP Display"; letter-spacing: .06em; text-transform: uppercase; color: var(--u, #8fb7ff); }
+    .cm span { display: block; margin-top: 3px; font: 600 21px/1.3 "WP Sans"; color: #fff; overflow-wrap: anywhere; }
+    .cm.hot { border-color: rgba(95,242,255,.45); border-left-color: var(--u, #8fb7ff); }
+    .cm.wb { background: linear-gradient(135deg, rgba(18,58,88,.97), rgba(9,22,40,.97)); border-color: rgba(95,242,255,.55); border-left-color: #5ff2ff; }
+    .cm.wb b { color: #5ff2ff; }
+    .cm.wb span { font-size: 22px; }
+    .cm.wb::after { content: ""; position: absolute; right: -15px; bottom: 16px; border: 9px solid transparent; border-left: 15px solid rgba(9,22,40,.97); border-right: 0; }
+    @keyframes chin { from { opacity: 0; transform: translateX(34px); } }
+    body.brb-on .chatbox { display: none; }
     .np.show { display: block; }
     .attrib { position: absolute; right: 300px; bottom: 86px; z-index: 11; font-family: "WP Mono"; font-size: 10px; color: rgba(255,255,255,.45); letter-spacing: .04em; }
     .sitemark { display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
@@ -299,6 +316,7 @@
     <div class="reportchip" id="reportchip"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span id="rc-n">0</span><small>STORM REPORTS · 3 HRS</small></div>
     <div class="cam" id="cam" aria-hidden="true"><div class="feed" id="cam-feed"></div><div class="cap"><span class="live">LIVE</span><b id="cam-name"></b><small id="cam-sub"></small></div></div>
     <div class="np" id="np"></div>
+    <div class="chatbox" id="chatbox"><div class="chh"><i></i>LIVE CHAT <em>· TYPE !FORECAST + YOUR CITY</em></div><div id="chlist" style="display:contents"></div></div>
     <div class="attrib">© OpenStreetMap · OpenFreeMap · NEXRAD &amp; MRMS via Iowa Environmental Mesonet · Alerts: NWS / SPC</div>
 
     <div class="bot" id="bot" aria-hidden="true"></div>
@@ -3206,6 +3224,7 @@
           else if (cmd.type === 'segment' && cmd.kind === 'gas') { S.forceShot = { type: 'gas' }; nextShot(true); }
           else if (cmd.type === 'chat-request' && cmd.place) queueChatRequest(cmd);
           else if (cmd.type === 'chat-say' && cmd.text) readChatMessage(cmd);
+          else if (cmd.type === 'chat-show') showChats(cmd.messages);
           else if (cmd.type === 'test-breaking') {
             const a = (cmd.key && byKey(cmd.key)) || candidates()[0];
             if (a) { S.breaking.unshift({ key: a.key, alert: a, test: true }); if (!S.inBreaking) nextShot(); }
@@ -3285,10 +3304,56 @@
     };
     const readChatMessage = (cmd) => {
       if (S.control.brb || S.inBreaking || !isCalm()) return;
-      S.chatAck = (cmd.user ? cmd.user + ': ' : 'CHAT: ') + cmd.text;
-      setTimeout(headlineNow, 0);
-      const reply = chatReply(cmd.text);
+      const reply = cmd.reply != null ? cmd.reply : chatReply(cmd.text);
+      chatAnswer(cmd.user, cmd.text, reply);
       say((cmd.user || 'A viewer') + ' says: ' + cmd.text + (reply ? ' ... ' + reply : ''), { chat: true });
+    };
+    /* ---------------- live chat box on screen ---------------- */
+    // Messages come in batches (chat is read about once a minute), so they drip in a couple of seconds apart.
+    const CH = { queue: [], rows: [], seen: new Map(), id: 0, shown: '' };
+    const chatColor = (name) => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) % 360; return 'hsl(' + h + ' 85% 70%)'; };
+    const chatKey = (user, text) => (user || '') + '|' + text;
+    const chatOn = () => !S.control.brb && !S.inBreaking && isCalm() && S.control.chatRead !== false && !document.body.classList.contains('brb-on');
+    const renderChat = (force) => {
+      const now = Date.now();
+      CH.rows = CH.rows.filter((r) => r.until > now).slice(-4);
+      const sig = CH.rows.map((r) => r.id + (r.hot ? 'h' : '')).join(',') + chatOn();
+      if (!force && sig === CH.shown) return;
+      CH.shown = sig;
+      $('chatbox').classList.toggle('on', CH.rows.length > 0 && chatOn());
+      const me = B.brain?.identity?.name || 'WeBot';
+      $('chlist').innerHTML = CH.rows.map((r) => {
+        const old = now - r.born > 600 ? ' old' : '';
+        return r.webot ? '<div class="cm wb' + old + '"><b>' + esc(me) + '</b><span>' + esc(r.text) + '</span></div>'
+          : '<div class="cm' + (r.hot ? ' hot' : '') + old + '" style="--u:' + chatColor(r.user || 'viewer') + '"><b>' + esc(r.user || 'Viewer') + '</b><span>' + esc(r.text) + '</span></div>';
+      }).join('');
+    };
+    const addChatRow = (row) => { CH.rows.push({ id: ++CH.id, born: Date.now(), ...row }); renderChat(); };
+    const showChats = (messages) => {
+      const now = Date.now();
+      for (const m of messages || []) {
+        const k = chatKey(m.user, m.text);
+        if (now - (CH.seen.get(k) || 0) < 5 * 60 * 1000) continue;
+        CH.seen.set(k, now);
+        CH.queue.push(m);
+      }
+      if (CH.seen.size > 300) CH.seen.delete(CH.seen.keys().next().value);
+      CH.queue = CH.queue.slice(-8);
+    };
+    setInterval(() => {
+      if (CH.queue.length && chatOn()) { const m = CH.queue.shift(); addChatRow({ user: m.user, text: m.text, until: Date.now() + 40000 }); }
+      else renderChat();
+    }, 2600);
+    // The message WeBot reads gets highlighted, with his answer right under it.
+    const chatAnswer = (user, text, reply) => {
+      const k = chatKey(user, text);
+      CH.queue = CH.queue.filter((m) => chatKey(m.user, m.text) !== k);
+      CH.seen.set(k, Date.now());
+      const until = Date.now() + (reply ? 34000 : 20000);
+      let row = CH.rows.find((r) => !r.webot && chatKey(r.user, r.text) === k);
+      if (row) { CH.rows = CH.rows.filter((r) => r !== row); row.until = until; row.hot = true; CH.rows.push(row); renderChat(true); }
+      else addChatRow({ user, text, hot: true, until });
+      if (reply) setTimeout(() => addChatRow({ webot: true, text: reply, until: Date.now() + 30000 }), 1400);
     };
     const scheduleChatJump = () => {
       clearTimeout(S.chatJump);
