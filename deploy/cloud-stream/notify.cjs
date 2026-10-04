@@ -128,7 +128,7 @@ const where = (home, g) => {
         if (level > (s.puterLevel || 0)) {
           s.puterLevel = level;
           await push({
-            title: level === 3 ? 'WeBot’s voice is OUT of Puter credits' : `WeBot’s Puter credits: ${pct}% left`,
+            title: level === 3 ? "WeBot's voice is OUT of Puter credits" : `WeBot's Puter credits: ${pct}% left`,
             message: level === 3 ? 'WeBot can’t talk with the Alloy voice until the credits reset. Link another Puter account in Live Control → Puter to bring his voice back.'
               : `${Math.round(left)} of ${info.monthUsageAllowance} credits left this month. To make them last, lower "Most answers in an hour" in WeBot Studio → Brain → Chat, or link a second Puter account.`,
             priority: level === 3 ? 5 : 4, tags: ['speaking_head'], click: WATCH
