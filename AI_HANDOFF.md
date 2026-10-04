@@ -27,10 +27,10 @@ Read this first. It explains what this project is, where it runs, and how to cha
 | `desktop/` | Electron shell that runs Studio and Stream House as Windows .exe programs (`npm run build`) |
 
 ## Newer features (Oct 2026)
-- Chat: WeBot answers any chat (3 per check, 15/hour, 1/min per viewer), , , , and welcomes back regulars ().
-- Segments: Rain outlook (WPC Excessive Rainfall, ), Train Cam (SouthWest RailCams, ; off because YouTube embeds ask the server to sign in).
+- Chat: WeBot answers any chat (3 per check, 15/hour, 1/min per viewer), `!forecast`, `!gas`, `!roast me`, and welcomes back regulars (`data/regulars.json`).
+- Segments: Rain outlook (WPC Excessive Rainfall, `src/wpcOutlook.js`), Train Cam (SouthWest RailCams, `src/trainCams.js`; off because YouTube embeds ask the server to sign in).
 - Map moves fade instead of zooming (CPU-drawn map). Studio and Live Control show viewers, total views and live time.
-- Every commit auto-pushes to GitHub ().
+- Every commit auto-pushes to GitHub (`.git/hooks/post-commit`).
 
 ## The cloud server
 - Contabo VPS, Ubuntu 24.04, 6 cores / 12 GB. `ssh -p 22022 root@207.244.248.128`. App in `/opt/weatherpower`.
