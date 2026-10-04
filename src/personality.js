@@ -32,6 +32,8 @@ const roastTest = (t) => (STRONG.test(t) && (AT_BOT.test(t) || (!WX.test(t) && (
 // A question even without a "?": starts with how / what / whats / is / can... (after "hey webot").
 const isQuestion = (t) => /\?/.test(t) || /^(?:(?:hey|yo|ok|so)\s+)?(?:we ?bot[\s,]+)?(how|hows|how’s|how's|what|whats|what’s|what's|when|where|wheres|why|who|whos|which|is|are|do|does|did|can|could|will|would|should|have|has)\b/i.test(String(t).trim());
 const RULES = [
+  // The Enhanced Fajita Scale: chat's name for the EF (Enhanced Fujita) tornado scale. First, so it wins over everything.
+  ['fajita', /fajita|\bfujita\b|\bEF[- ]?[0-5]\b|\bEF[- ]?scale\b|\bEF[- ]?rating\b/i],
   ['rival', /ryan\s*hall|\bryan\b|y'?all\s*-?\s*bot|yallbot|rip\s*-?\s*off|knock\s*-?\s*off|copy\s*cat|copying|copy of|wannabe|wanna be|cheap version|off\s*brand|bootleg/i],
   ['roast', roastTest],
   ['bot', /\b(are|r)\s+(you|u)\s+(a |an )?(real|bot|robot|ai|human|person|alive)\b|\bwho\s+(made|built|created|programmed)\s+(you|u|webot)|\bis\s+(this|webot|he|it)\s+(a |an )?(real|bot|robot|ai|human)\b/i],
@@ -115,6 +117,15 @@ export const DEFAULT_PERSONALITY = {
       'Boring? I’ve got radar, music and sass. What’ve you got, {name}? A chat box and a grudge?',
       'I’ve seen more personality in a partly cloudy forecast, {name}, and that’s sayin somethin.',
       'Sugar, I’ve been insulted by better. A dust devil called me short once.'
+    ],
+    // Anyone mentions the Enhanced Fajita Scale (or EF0–EF5).
+    fajita: [
+      'The Enhanced Fajita Scale, {name}! EF0 is a lukewarm tortilla, EF5 is the whole skillet sizzlin across three counties. Officially it’s Enhanced Fujita, but I’m Southern, I’m sayin fajita.',
+      'Fajita Scale, sugar: EF0 is 65 to 85 mph, EF1 86 to 110, EF2 111 to 135, EF3 136 to 165, EF4 166 to 200, and EF5 is over 200. Same as the real one, just more onions.',
+      'On the Enhanced Fajita Scale, EF0 snaps some branches, EF3 takes the roof and the queso, and EF5 takes the whole restaurant. They rate it from the damage after, not the radar, {name}.',
+      'Mr. Fujita made the scale and y’all turned it into a fajita. Honestly? An improvement. Survey crews rate the damage EF0 to EF5, and I rate the guacamole.',
+      'An EF5 fajita, {name}: winds over 200, the slab swept clean, and the skillet’s two counties over. Pray you only ever see an EF0 with extra cheese.',
+      'Enhanced Fajita Scale, hot off the griddle: the higher the number, the hotter the skillet and the worse the damage. EF2 and up is a significant tornado, {name}, so no playin.'
     ],
     // A regular comes back after 3+ hours away.
     welcomeBack: [
