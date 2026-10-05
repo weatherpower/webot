@@ -218,22 +218,54 @@ app.get('/api/config', api(async () => (WEB ? { host: config.host, web: true, co
 // The Controls page (Live Control inside Studio) opens already signed in with the controller token.
 app.get('/api/control-url', api(async () => ({ url: `${WEB ? '' : CONTROL_BASE}/warningcenter/live/control#token=${encodeURIComponent(await getToken())}` })));
 
+// Level 2 radar (radar-l2/radar_l2.py): is the worker on the PC running, and is the server's copy fresh?
+const L2_DIR = path.join(projectRoot, 'radar-l2');
+const l2Worker = async () => {
+  if (WEB) return null;
+  const r = await run('powershell', ['-NoProfile', '-Command', "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -like '*radar_l2*' } | Measure-Object).Count"], { timeout: 15000 });
+  const log = await fs.readFile(path.join(L2_DIR, 'out', 'radar.log'), 'utf8').catch(() => '');
+  return { running: Number(r.out.trim()) > 0, log: log.trim().split('\n').slice(-6) };
+};
+const radarL2 = async () => {
+  const [idx, worker] = await Promise.all([getJson(`${PUBLIC_STATUS}/radar-l2/index.json`, 8000).catch((e) => ({ error: e.message })), l2Worker().catch((e) => ({ error: e.message }))]);
+  const now = Date.now();
+  const sites = Object.values(idx.sites || {});
+  const ages = sites.map((s) => (now - Date.parse(s.frames?.[s.frames.length - 1]?.time || 0)) / 60000).filter(Number.isFinite);
+  return {
+    error: idx.error || null, generatedAt: idx.generatedAt || null, ageMin: idx.generatedAt ? (now - Date.parse(idx.generatedAt)) / 60000 : null,
+    sites: sites.length, fresh: ages.filter((a) => a < 15).length, stale: ages.filter((a) => a >= 15).length, worker
+  };
+};
 app.get('/api/overview', api(async () => {
-  const [status, server, ctl] = await Promise.allSettled([
+  const [status, server, ctl, radar] = await Promise.allSettled([
     getJson(`${STATUS_BASE}/warningcenter/api/v3/webot/status`),
     health(),
-    control({ action: 'ping' })
+    control({ action: 'ping' }),
+    radarL2()
   ]);
   const val = (p) => (p.status === 'fulfilled' ? p.value : { error: p.reason?.message || 'failed' });
   const c = val(ctl);
   return {
     status: val(status),
     server: val(server),
+    radar: val(radar),
     control: c.error ? c : { mode: c.mode, talk: c.talk, theme: c.theme, voice: c.voice, sound: c.sound, brb: c.brb, pin: c.pin, music: c.music, headlines: c.headlines, gas: c.gas, chatRead: c.chatRead, tts: c.tts, state: c.state, stream: c.stream }
   };
 }));
 
 app.post('/api/control', api(async (req) => control(req.body || {})));
+// Start / stop the Level 2 radar worker on this PC (desktop Studio only).
+app.post('/api/radar/start', api(async () => {
+  if (WEB) throw Object.assign(new Error('The radar worker runs on the owner\'s PC: start it from the desktop Studio.'), { status: 400 });
+  const cmd = path.join(L2_DIR, 'run.cmd');
+  await run('powershell', ['-NoProfile', '-Command', `Start-Process -FilePath '${cmd}' -WorkingDirectory '${L2_DIR}' -WindowStyle Minimized`], { timeout: 15000 });
+  return { ok: true };
+}));
+app.post('/api/radar/stop', api(async () => {
+  if (WEB) throw Object.assign(new Error('Stop it from the desktop Studio.'), { status: 400 });
+  await run('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'python.exe' -and $_.CommandLine -like '*radar_l2*') -or ($_.Name -eq 'cmd.exe' -and $_.CommandLine -like '*radar-l2*run.cmd*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { timeout: 20000 });
+  return { ok: true };
+}));
 
 app.get('/api/brain', api(async () => getJson(`${CONTROL_BASE}/warningcenter/api/v3/live/brain`)));
 // Try WeBot's personality on a made-up chat message, with the brain as it is in the editor (not saved).
