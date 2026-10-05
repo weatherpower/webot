@@ -23,9 +23,10 @@ REMOTE = os.environ.get('WP_REMOTE', 'root@207.244.248.128')
 REMOTE_PORT = os.environ.get('WP_SSH_PORT', '22022')
 REMOTE_DIR = '/opt/weatherpower/data/radar-l2'
 RANGE_M = 460_000.0
-SIZE = int(os.environ.get('WP_L2_SIZE', '2000'))     # pixels per side (2000 ≈ 0.46 km/px)
+SIZE = int(os.environ.get('WP_L2_SIZE', '1400'))     # pixels per side (1400 ≈ 0.66 km/px; an i5 paints 200 sites in ~5 min)
+CLEAR_AIR_EVERY = 15 * 60                              # clear-air sites (nothing much to see) repaint at most this often
 KEEP = 6                                              # frames per site
-WORKERS = max(1, (os.cpu_count() or 4) - 2)
+WORKERS = max(2, min(8, os.cpu_count() or 4))   # each worker needs ~150 MB while painting
 A = 6378137.0
 CLEAR_AIR_VCPS = {31, 32, 35}                         # nothing to see in CC/ZDR; render ref + vel only
 PRODUCTS = {'ref': b'REF', 'vel': b'VEL', 'cc': b'RHO', 'zdr': b'ZDR'}
@@ -164,10 +165,13 @@ def render(f, lat0, lon0, size, products):
     lon = np.degrees((X0 + px) / A)
     lat = np.degrees(2 * np.arctan(np.exp((Y0 - px) / A)) - math.pi / 2)
     la0, lo0 = math.radians(lat0), math.radians(lon0)
-    la = np.radians(lat)[:, None]
-    dlo = np.radians(lon)[None, :] - lo0
-    rng = (6371000.0 * 2 * np.arcsin(np.sqrt(np.sin((la - la0) / 2) ** 2 + math.cos(la0) * np.cos(la) * np.sin(dlo / 2) ** 2))).astype(np.float32)
-    az = ((np.degrees(np.arctan2(np.sin(dlo) * np.cos(la), math.cos(la0) * np.sin(la) - math.sin(la0) * np.cos(la) * np.cos(dlo))) + 360) % 360).astype(np.float32)
+    # float32 everywhere and int32 indexes: a 2000x2000 picture is 16 MB per array, and workers run side by side.
+    la = np.radians(lat).astype(np.float32)[:, None]
+    dlo = (np.radians(lon) - lo0).astype(np.float32)[None, :]
+    sla, cla = np.sin(la), np.cos(la)
+    rng = (6371000.0 * 2 * np.arcsin(np.sqrt(np.sin((la - la0) / 2) ** 2 + math.cos(la0) * cla * np.sin(dlo / 2) ** 2))).astype(np.float32)
+    az = ((np.degrees(np.arctan2(np.sin(dlo) * cla, math.cos(la0) * sla - math.sin(la0) * cla * np.cos(dlo))) + 360) % 360).astype(np.float32)
+    del la, dlo, sla, cla
     bounds = [float(np.degrees((X0 - H) / A)), float(np.degrees(2 * math.atan(math.exp((Y0 - H) / A)) - math.pi / 2)),
               float(np.degrees((X0 + H) / A)), float(np.degrees(2 * math.atan(math.exp((Y0 + H) / A)) - math.pi / 2))]
     images, tilts = {}, {}
@@ -180,15 +184,16 @@ def render(f, lat0, lon0, size, products):
         if not g:
             continue
         azs, data, first, width = g
-        idx = np.searchsorted(azs, az) % len(azs)
-        prev = (idx - 1) % len(azs)
-        d1 = np.abs((azs[idx] - az + 180) % 360 - 180)
-        d2 = np.abs((azs[prev] - az + 180) % 360 - 180)
-        ray = np.where(d1 <= d2, idx, prev)
-        gate = np.floor((rng - first) / width).astype(np.int64)
+        idx = (np.searchsorted(azs, az) % len(azs)).astype(np.int32)
+        prev = ((idx - 1) % len(azs)).astype(np.int32)
+        closer = np.abs((azs[idx] - az + 180) % 360 - 180) <= np.abs((azs[prev] - az + 180) % 360 - 180)
+        ray = np.where(closer, idx, prev)
+        del idx, prev, closer
+        gate = np.floor((rng - first) / width).astype(np.int32)
         valid = (gate >= 0) & (gate < data.shape[1]) & (rng <= RANGE_M)
         vals = np.full(az.shape, np.nan, dtype=np.float32)
         vals[valid] = data[ray[valid], gate[valid]]
+        del ray, gate, valid
         if name == 'vel':
             vals *= MS_TO_KT
         images[name] = palette_image(vals, name)
@@ -211,7 +216,7 @@ def vcp_of(f):
 
 def work(args):
     """One site, in a worker process: find the newest volume, paint it if its lowest tilts are in."""
-    site, hint, seen = args
+    site, hint, seen, prev_vcp = args
     import warnings
     warnings.filterwarnings('ignore')
     from metpy.io import Level2File
@@ -223,6 +228,8 @@ def work(args):
         stamp = stamp_of(names[0])
         if stamp == seen:
             return {'site': site, 'vol': vol, 'status': 'same'}
+        if prev_vcp in CLEAR_AIR_VCPS and seen and (datetime.now(timezone.utc) - datetime.fromisoformat(seen.replace('Z', '+00:00'))).total_seconds() < CLEAR_AIR_EVERY:
+            return {'site': site, 'vol': vol, 'status': 'clear-air wait'}
         f = Level2File(download(site, vol, names))
         if not (lowest_sweep(f, b'REF') and lowest_sweep(f, b'VEL')):
             return {'site': site, 'vol': vol, 'status': 'not ready'}
@@ -282,7 +289,7 @@ def main():
         while True:
             t0 = time.time()
             new, counts = [], {}
-            futures = [pool.submit(work, (s, state['vols'].get(s), state['seen'].get(s))) for s in sites]
+            futures = [pool.submit(work, (s, state['vols'].get(s), state['seen'].get(s), index['sites'].get(s, {}).get('vcp'))) for s in sites]
             for fut in as_completed(futures):
                 r = fut.result()
                 counts[r['status'].split(':')[0]] = counts.get(r['status'].split(':')[0], 0) + 1
