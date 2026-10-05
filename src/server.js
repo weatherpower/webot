@@ -631,6 +631,8 @@ const startServer = async () => {
     // Read-only weather data for the website, passed through from the main server (same JSON, nothing private).
     const PUBLIC_API = /^\/warningcenter\/api\/v3\/(alerts|alerts\.geojson|wis|nice|wpc|surface|headlines|tropics|gas|radar|config|forecast\/city)$/;
     mountSite(pub, { port: config.port, express });
+    // Level 2 (NEXRAD-resolution) radar images, made by radar-l2/radar_l2.py on the owner's PC and copied into data/radar-l2.
+    pub.use('/radar-l2', express.static(path.join(publicDir, '..', 'data', 'radar-l2'), { maxAge: '20s', index: false }));
     pub.get(PUBLIC_API, async (req, res) => {
       try {
         const r = await fetch(`http://127.0.0.1:${config.port}${req.originalUrl}`, { signal: AbortSignal.timeout(20000) });

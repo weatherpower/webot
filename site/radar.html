@@ -14,7 +14,7 @@
   <section style="padding:14px 0 0"><div class="wrap">
     <div class="sec-head" style="margin-bottom:10px"><h2>Radar &amp; warnings</h2><p id="sub">Live radar, the last hour, with every warning drawn on it.</p><a class="more" href="https://weatherpower.app/radar" target="_blank" rel="noopener">Full radar app ↗</a></div>
     <div class="map tall" id="map">
-      <div class="mapbar"><button class="btn sm on" id="b-play">⏸ Pause</button><button class="btn sm on" id="b-warn">Warnings</button><button class="btn sm" id="b-spc">Day 1 outlook</button><button class="btn sm" id="b-me">📍 My spot</button><span class="btn sm" id="time" style="cursor:default">—</span></div>
+      <div class="mapbar"><button class="btn sm on" id="b-play">⏸ Pause</button><button class="btn sm on" id="b-warn">Warnings</button><button class="btn sm" id="b-spc">Day 1 outlook</button><span class="btn sm" id="l2-prod" style="padding:0;overflow:hidden"><button class="btn sm on" data-p="ref" style="border:0">Reflectivity</button><button class="btn sm" data-p="vel" style="border:0">Velocity</button><button class="btn sm" data-p="cc" style="border:0">CC</button><button class="btn sm" data-p="zdr" style="border:0">ZDR</button></span><span class="btn sm" id="l2-info" style="cursor:default" hidden>—</span><button class="btn sm" id="b-me">📍 My spot</button><span class="btn sm" id="time" style="cursor:default">—</span></div>
       <div class="legend" id="legend"></div>
     </div>
   </div></section>
@@ -22,7 +22,7 @@
     <div class="s8 panel"><h3>Active warnings <span class="r" id="warn-n"></span></h3><ul class="list" id="warn-list"><li><i></i><span class="dim">Loading…</span><span></span></li></ul></div>
     <div class="s4 stack">
       <div class="panel" id="outlook"><h3>Day 1 severe outlook</h3><div class="mid" id="spc-nat">—</div><div class="dim" id="spc-sub" style="margin-top:6px;font-size:13px">From the Storm Prediction Center in Norman, Oklahoma.</div></div>
-      <div class="panel"><h3>Reading the map</h3><p class="dim" style="margin:0;font-size:13.5px">Radar colors go green (light rain) → yellow → red (heavy) → purple (hail). Warning boxes are drawn in the NWS color for that warning: red for tornado, orange for severe thunderstorm, green for flash flood. Click a box for the details.</p></div>
+      <div class="panel"><h3>Reading the map</h3><p class="dim" style="margin:0 0 8px;font-size:13.5px"><b class="cyan">Zoom in</b> for NEXRAD-resolution Level 2 radar (0.25 km, straight from the radar site, under a minute old) with reflectivity, velocity, correlation coefficient and ZDR. Zoomed out, you see the national composite.</p><p class="dim" style="margin:0;font-size:13.5px">Radar colors go green (light rain) → yellow → red (heavy) → purple (hail). Warning boxes are drawn in the NWS color for that warning: red for tornado, orange for severe thunderstorm, green for flash flood. Click a box for the details.</p></div>
     </div>
   </div></section>
 
@@ -81,6 +81,35 @@
       map.addLayer({ id: 'spc-fill', type: 'fill', source: 'spc', layout: { visibility: 'none' }, paint: { 'fill-color': ['coalesce', ['get', 'fill'], '#888'], 'fill-opacity': .22 } }, map.getLayer('warn-fill') ? 'warn-fill' : labels);
       map.addLayer({ id: 'spc-line', type: 'line', source: 'spc', layout: { visibility: 'none' }, paint: { 'line-color': ['coalesce', ['get', 'stroke'], '#888'], 'line-width': 1.5 } }, map.getLayer('warn-fill') ? 'warn-fill' : labels);
     };
+    // Level 2: one image per site and product from /radar-l2/index.json (radar-l2/radar_l2.py on the owner's PC).
+    let L2 = null, prod = 'ref';
+    const l2Coords = (b) => [[b[0], b[3]], [b[2], b[3]], [b[2], b[1]], [b[0], b[1]]];
+    const loadL2 = async () => {
+      L2 = await getJson('/radar-l2/index.json');
+      const labels = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+      for (const [site, s] of Object.entries(L2.sites || {})) {
+        const fr = s.frames[s.frames.length - 1];
+        if (!fr?.files?.[prod]) continue;
+        const url = '/radar-l2/' + fr.files[prod] + '?t=' + fr.time;
+        if (map.getSource('l2-' + site)) map.getSource('l2-' + site).updateImage({ url, coordinates: l2Coords(s.bounds) });
+        else {
+          map.addSource('l2-' + site, { type: 'image', url, coordinates: l2Coords(s.bounds) });
+          map.addLayer({ id: 'l2-' + site, type: 'raster', source: 'l2-' + site, minzoom: 6.5, paint: { 'raster-opacity': .85, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' } }, map.getLayer('warn-fill') ? 'warn-fill' : labels);
+        }
+      }
+      l2Info();
+    };
+    const l2Info = () => {
+      if (!L2 || map.getZoom() < 6.5) { $('l2-info').hidden = true; frames.forEach((f, i) => map.getLayer('r' + i) && map.setLayoutProperty('r' + i, 'visibility', 'visible')); return; }
+      const c = map.getCenter();
+      const near = Object.entries(L2.sites).map(([k, s]) => ({ k, s, d: Math.hypot(s.lat - c.lat, (s.lon - c.lng) * Math.cos(c.lat * Math.PI / 180)) })).sort((a, b) => a.d - b.d)[0];
+      const covered = near && near.d < 4;
+      $('l2-info').hidden = !covered;
+      if (covered) { const fr = near.s.frames[near.s.frames.length - 1]; $('l2-info').textContent = `Level 2 · ${near.k} · ${clock(fr.time)} · ${near.s.tilts?.[prod] ?? 0.5}°`; }
+      // the national composite gets out of the way where a site covers the view
+      frames.forEach((f, i) => map.getLayer('r' + i) && map.setLayoutProperty('r' + i, 'visibility', covered ? 'none' : 'visible'));
+    };
+    $('l2-prod').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; prod = b.dataset.p; $('l2-prod').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); loadL2().catch(() => {}); });
     const toggle = (btn, layers) => { btn.classList.toggle('on'); const v = btn.classList.contains('on') ? 'visible' : 'none'; layers.forEach((l) => map.getLayer(l) && map.setLayoutProperty(l, 'visibility', v)); };
     $('b-play').addEventListener('click', () => { playing = !playing; $('b-play').textContent = playing ? '⏸ Pause' : '▶ Play'; $('b-play').classList.toggle('on', playing); if (!playing) { fi = frames.length - 1; show(); } });
     $('b-warn').addEventListener('click', () => toggle($('b-warn'), ['warn-fill', 'warn-line']));
@@ -96,6 +125,9 @@
         await loadWarnings().catch((e) => console.warn(e));
         await loadRadar().catch((e) => console.warn(e));
         await loadSpc().then(() => { if ($('b-spc').classList.contains('on')) ['spc-fill', 'spc-line'].forEach((l) => map.setLayoutProperty(l, 'visibility', 'visible')); }).catch((e) => console.warn(e));
+        await loadL2().catch(() => {});
+        map.on('moveend', l2Info); map.on('zoomend', l2Info);
+        setInterval(() => loadL2().catch(() => {}), 45000);
         timer = setInterval(tick, 450);
         setInterval(() => loadRadar().catch(() => {}), 120000);
         setInterval(() => loadWarnings().catch(() => {}), 60000);
