@@ -233,9 +233,14 @@ def work(args):
             return {'site': site, 'vol': vol, 'status': 'same'}
         if prev_vcp in CLEAR_AIR_VCPS and seen and (datetime.now(timezone.utc) - datetime.fromisoformat(seen.replace('Z', '+00:00'))).total_seconds() < CLEAR_AIR_EVERY:
             return {'site': site, 'vol': vol, 'status': 'clear-air wait'}
-        f = Level2File(download(site, vol, names))
-        if not (lowest_sweep(f, b'REF') and lowest_sweep(f, b'VEL')):
-            return {'site': site, 'vol': vol, 'status': 'not ready'}
+        # Only the first chunks hold the lowest tilts we paint: fetch ~2 MB of a 5 MB volume, not all of it.
+        f = None
+        for limit in (12, 24, len(names)):
+            f = Level2File(download(site, vol, names[:limit]))
+            if lowest_sweep(f, b'REF') and lowest_sweep(f, b'VEL'):
+                break
+            if limit >= len(names):
+                return {'site': site, 'vol': vol, 'status': 'not ready'}
         vcp = vcp_of(f)
         products = ['ref', 'vel'] if vcp in CLEAR_AIR_VCPS else list(PRODUCTS)
         lat0, lon0 = site_latlon(f)
