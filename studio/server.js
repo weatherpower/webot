@@ -263,7 +263,8 @@ app.post('/api/radar/start', api(async () => {
 }));
 app.post('/api/radar/stop', api(async () => {
   if (WEB) throw Object.assign(new Error('Stop it from the desktop Studio.'), { status: 400 });
-  await run('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'python.exe' -and $_.CommandLine -like '*radar_l2*') -or ($_.Name -eq 'cmd.exe' -and $_.CommandLine -like '*radar-l2*run.cmd*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { timeout: 20000 });
+  // Kill the whole tree (the loop window, the Python loop and its worker processes), or the workers live on.
+  await run('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'python.exe' -and $_.CommandLine -like '*radar_l2*') -or ($_.Name -eq 'cmd.exe' -and $_.CommandLine -like '*radar-l2*run.cmd*') } | ForEach-Object { taskkill /T /F /PID $_.ProcessId 2>$null | Out-Null }"], { timeout: 20000 });
   return { ok: true };
 }));
 

@@ -113,9 +113,12 @@ def download(site, vol, names):
     for old in os.listdir(os.path.join(OUT, '_cache', site)):
         if old != vol:
             d = os.path.join(OUT, '_cache', site, old)
-            for fn in os.listdir(d):
-                os.remove(os.path.join(d, fn))
-            os.rmdir(d)
+            try:
+                for fn in os.listdir(d):
+                    os.remove(os.path.join(d, fn))
+                os.rmdir(d)
+            except OSError:
+                pass   # another worker may be cleaning the same folder
     buf.seek(0)
     return buf
 
@@ -290,8 +293,12 @@ def main():
             t0 = time.time()
             new, counts = [], {}
             futures = [pool.submit(work, (s, state['vols'].get(s), state['seen'].get(s), index['sites'].get(s, {}).get('vcp'))) for s in sites]
+            done_n = 0
             for fut in as_completed(futures):
                 r = fut.result()
+                done_n += 1
+                if done_n % 50 == 0:
+                    log(f'  {done_n}/{len(sites)} sites checked, {time.time() - t0:.0f}s')
                 counts[r['status'].split(':')[0]] = counts.get(r['status'].split(':')[0], 0) + 1
                 if r.get('vol'):
                     state['vols'][r['site']] = r['vol']
