@@ -3,96 +3,109 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WeatherPower Live · 24/7 weather with WeBot</title>
-  <meta name="description" content="A 24/7 live weather stream hosted by WeBot, plus free tools: warnings, the Weather Intensity Score, Porch Weather and more.">
+  <title>WeatherPower · Live severe weather coverage, radar and free alerts</title>
+  <meta name="description" content="24/7 live weather coverage with WeBot, live radar with every warning, free phone alerts for your spot, Porch Weather and more.">
   <meta name="theme-color" content="#070b14">
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/site.css?v=2">
 </head>
 <body>
   <div class="ticker calm" id="ticker"><div class="wrap"><span class="tag" id="tk-tag">QUIET</span><span class="txt" id="tk-txt">Checking the latest warnings…</span><span class="n" id="tk-n"></span></div></div>
 
   <section class="hero"><div class="wrap grid">
     <div class="s7">
-      <h1>Weather, <span>live</span>, all day and all night</h1>
-      <p class="lead">WeBot watches the whole country around the clock: every warning, the radar, the models and the tropics, with a little Southern sass. Pull up a chair.</p>
+      <div class="k" style="margin-bottom:6px">Happening now</div>
+      <h1 id="headline">Loading the weather…</h1>
+      <p class="lead" id="headsub"></p>
       <div class="player" id="player"><div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font:600 12px 'WP Mono';letter-spacing:.14em">LOADING THE STREAM…</div></div>
-      <div class="row" style="margin-top:12px"><a class="btn primary" id="yt-link" href="https://www.youtube.com" target="_blank" rel="noopener">▶ Watch on YouTube</a><a class="btn" href="/webot">WeBot tracker</a><span class="dim" style="font-size:13px">Type <b>!forecast</b> or <b>!gas</b> with a city in chat. Or <b>!roast me</b>, if you dare.</span></div>
+      <div class="row" style="margin-top:10px"><a class="btn primary" href="https://www.youtube.com" data-yt="live" target="_blank" rel="noopener">▶ Watch live on YouTube</a><a class="btn" href="/webot">WeBot tracker</a><span class="dim" style="font-size:13px">Type <b>!forecast</b> or <b>!gas</b> with a city in chat.</span></div>
     </div>
-    <div class="s5 stack">
-      <div class="panel">
-        <h3>Weather Intensity Score <span class="r" id="wis-at"></span></h3>
-        <div class="row" style="align-items:baseline;gap:14px"><span class="wis-score ok" id="wis">—</span><span class="mid" id="wis-l"></span></div>
-        <div class="gauge"><i id="wis-pin" style="left:0"></i></div>
-        <div class="row" style="justify-content:space-between"><span class="k">quiet</span><span class="k" id="wis-trend"></span><span class="k">extreme</span></div>
-        <p class="dim" style="margin:10px 0 0;font-size:13px">One number for how wild the weather is right now, from every active NWS alert. WeBot starts talking on his own at 100.</p>
-      </div>
-      <div class="panel">
-        <h3>WeBot right now <span class="r" id="now-at"></span></h3>
-        <div class="k" id="now-k">—</div>
-        <div class="mid" id="now-t" style="margin:4px 0 8px">—</div>
-        <div class="bar"><i id="now-bar" style="width:0"></i></div>
-        <div class="stats" style="margin-top:14px">
-          <div class="stat"><span class="k">Watching</span><b id="st-v">—</b></div>
-          <div class="stat"><span class="k">Total views</span><b id="st-tv">—</b></div>
-          <div class="stat"><span class="k">Live for</span><b id="st-up">—</b></div>
-        </div>
+    <div class="s5">
+      <div class="tiles">
+        <a class="tile" href="#local" id="t-local"><span class="k">Local</span><b id="lc-name">Set your location</b><small id="lc-sub">Your risk, warnings and porch score.</small><span class="ic">📍</span></a>
+        <a class="tile" href="/radar#outlook" id="t-spc"><span class="k">Day 1 severe risk</span><b id="spc-nat">—</b><small id="spc-sub">From the Storm Prediction Center.</small><span class="ic">⛈️</span></a>
+        <a class="tile" href="/radar" id="t-warn"><span class="k">Active warnings</span><b id="warn-n">—</b><small id="warn-sub">Tornado, severe, flood and more.</small><span class="ic">⚠️</span></a>
+        <a class="tile" href="/radar"><span class="k">Radar</span><b>Live radar</b><small>Every warning drawn on the map.</small><span class="ic">🛰️</span></a>
+        <a class="tile" href="/submit"><span class="k">Send us your storm</span><b>Your photos</b><small>On the stream, with credit.</small><span class="ic">📸</span></a>
+        <a class="tile" href="/alerts"><span class="k">Phone alerts</span><b>Free pings</b><small>When a warning covers your spot.</small><span class="ic">📳</span></a>
       </div>
     </div>
   </div></section>
 
-  <section><div class="wrap grid">
-    <div class="s7">
-      <div class="sec-head"><h2>Active warnings</h2><p>Across the country, worst first.</p><a class="more" href="https://weatherpower.app/radar" target="_blank" rel="noopener">Open the radar ↗</a></div>
-      <div class="panel"><ul class="list" id="warn-list"><li><i></i><span class="dim">Loading…</span><span></span></li></ul></div>
+  <section id="local"><div class="wrap grid">
+    <div class="s4 panel"><h3>Your spot <span class="r" id="lc-change"><a href="#" id="lc-edit">change</a></span></h3>
+      <div id="lc-pick"></div>
+      <div id="lc-body" hidden>
+        <div class="mid" id="lc-title">—</div>
+        <div class="stats" style="margin-top:12px">
+          <div class="stat"><span class="k">Severe risk</span><b id="lc-spc" style="font-size:18px">—</b></div>
+          <div class="stat"><span class="k">Warnings here</span><b id="lc-warn">—</b></div>
+          <div class="stat"><span class="k">Porch today</span><b id="lc-porch" style="font-size:18px">—</b></div>
+        </div>
+        <ul class="list" id="lc-list" style="margin-top:10px"></ul>
+      </div></div>
+    <div class="s4 panel">
+      <h3>Weather Intensity Score <span class="r" id="wis-at"></span></h3>
+      <div class="row" style="align-items:baseline;gap:14px"><span class="wis-score ok" id="wis">—</span><span class="mid" id="wis-l"></span></div>
+      <div class="gauge"><i id="wis-pin" style="left:0"></i></div>
+      <div class="row" style="justify-content:space-between"><span class="k" id="wis-trend"></span><span class="k" id="wis-pct"></span></div>
+      <p class="dim" style="margin:10px 0 0;font-size:13px">One number for how wild the weather is, from every active NWS alert. WeBot starts talking on his own at 100.</p>
     </div>
-    <div class="s5">
-      <div class="sec-head"><h2>Porch Weather</h2><p>Nicest spots today.</p><a class="more" href="/nice">The whole map →</a></div>
-      <div class="panel"><ol class="rank" id="nice-top"><li><span class="dim">Loading…</span></li></ol>
-        <div class="sep"></div>
-        <div id="nice-home" class="dim">—</div></div>
+    <div class="s4 panel">
+      <h3>WeBot right now <span class="r" id="now-at"></span></h3>
+      <div class="k" id="now-k">—</div>
+      <div class="mid" id="now-t" style="margin:4px 0 8px">—</div>
+      <div class="bar"><i id="now-bar" style="width:0"></i></div>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><span class="k">Watching</span><b id="st-v">—</b></div>
+        <div class="stat"><span class="k">Total views</span><b id="st-tv">—</b></div>
+        <div class="stat"><span class="k">Live for</span><b id="st-up">—</b></div>
+      </div>
+      <div id="said" style="margin-top:12px"></div>
     </div>
   </div></section>
 
   <section><div class="wrap">
-    <div class="sec-head"><h2>Helpful weather tools</h2><p>Free, no account, no nonsense.</p><a class="more" href="/tools">All tools →</a></div>
+    <div class="sec-head"><h2>Active warnings</h2><p>Across the country, worst first.</p><a class="more" href="/radar">On the map →</a></div>
+    <div class="panel"><ul class="list" id="warn-list"><li><i></i><span class="dim">Loading…</span><span></span></li></ul></div>
+  </div></section>
+
+  <section><div class="wrap">
+    <div class="sec-head"><h2>Porch Weather</h2><p>The good side of the forecast: the nicest places today.</p><a class="more" href="/nice">Open Porch Weather →</a></div>
+    <div class="best3" id="best3"></div>
+  </div></section>
+
+  <section><div class="wrap">
+    <div class="sec-head"><h2>Today's outlook</h2><p>Written by WeBot from the numbers, updated every few minutes.</p></div>
+    <div class="posts" id="posts"></div>
+  </div></section>
+
+  <section><div class="wrap">
+    <div class="sec-head"><h2>Free weather tools</h2><p>No account, no nonsense.</p><a class="more" href="/tools">All tools →</a></div>
     <div class="cards">
-      <a class="card" href="https://weatherpower.app/radar" target="_blank" rel="noopener"><div class="ic">🛰️</div><b>Live radar</b><p>Interactive radar with warnings, storm tracks and more on weatherpower.app.</p></a>
-      <a class="card" href="/nice"><div class="ic">🪑</div><b>Porch Weather</b><p>WeBot's 7-day rating of how nice it'll be outside, for 390 cities.</p></a>
-      <a class="card" href="/webot"><div class="ic">🤖</div><b>WeBot tracker</b><p>What he's showing, what he said, who's watching and what he's keeping an eye on.</p></a>
-      <a class="card" href="/tools#wis"><div class="ic">📈</div><b>Weather Intensity Score</b><p>How the WIS works and what the numbers mean.</p></a>
-      <a class="card" href="/tools#scales"><div class="ic">🌪️</div><b>EF scale &amp; hurricane categories</b><p>The real numbers, WeBot-approved (he calls it the fajita scale).</p></a>
-      <a class="card" href="/tools#safety"><div class="ic">🛡️</div><b>Storm safety</b><p>Watch vs. warning, where to shelter, and why you never drive through water.</p></a>
+      <a class="card" href="/radar"><div class="ic">🛰️</div><b>Radar &amp; warnings</b><p>Live radar loop with every warning drawn on it, plus the day's severe outlook.</p></a>
+      <a class="card" href="/alerts"><div class="ic">📳</div><b>Phone alerts</b><p>A free ping when a warning covers your spot. No account, no email.</p></a>
+      <a class="card" href="/nice"><div class="ic">🪑</div><b>Porch Weather</b><p>WeBot's 7-day rating of how nice it'll be outside, painted on the map.</p></a>
+      <a class="card" href="/submit"><div class="ic">📸</div><b>Send us your storm</b><p>Your photos and reports, shown on the stream.</p></a>
+      <a class="card" href="/webot"><div class="ic">🤖</div><b>WeBot tracker</b><p>What he's showing, what he said, and the warnings he's watching.</p></a>
+      <a class="card" href="/tools#scales"><div class="ic">🌪️</div><b>Scales &amp; safety</b><p>EF scale, hurricane categories, watch vs. warning, what to do.</p></a>
     </div>
   </div></section>
 
-  <section><div class="wrap grid">
-    <div class="s8 panel"><h3>About WeatherPower</h3>
-      <p style="margin:0 0 10px">WeatherPower Live is a passion project from Idabel, Oklahoma, built by one person who loves weather. WeBot reads real NWS alerts, real radar and real forecasts, and the whole thing runs on an $11 server and open-source code.</p>
-      <p class="dim" style="margin:0">It is not a Ryan Hall, Y'all copy and isn't trying to be. If you like it, the best support is watching, chatting, and sharing.</p>
-      <div class="row" style="margin-top:12px"><a class="btn" href="/about">Our story</a><a class="btn" href="https://github.com/weatherpower/webot" target="_blank" rel="noopener">GitHub</a><a class="btn" href="https://weatherpower.app/radar" target="_blank" rel="noopener">Support ↗</a></div>
-    </div>
-    <div class="s4 panel"><h3>WeBot last said</h3><div id="said" class="stack"><span class="dim">—</span></div></div>
-  </div></section>
-
-  <script src="/site.js"></script>
+  <script src="/site.js?v=2"></script>
   <script>
-    const KINDS = { alert: 'Top alert', pinned: 'Pinned alert', think: 'Model check', models: 'Weather models', national: 'National radar', outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', forecast: 'Daily forecast', gas: 'Gas prices', rain: 'Rain outlook', train: 'Train cam' };
-    // Stream embed + YouTube links from the server's public config.
-    getJson('/site-config.json').then((c) => {
-      if (c.channelId) {
-        $('player').innerHTML = `<iframe src="https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(c.channelId)}&autoplay=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="WeatherPower Live"></iframe>`;
-        const live = `https://www.youtube.com/channel/${encodeURIComponent(c.channelId)}/live`;
-        $('yt-link').href = live; $('live-btn').href = live;
-      }
-    }).catch(() => {});
+    let ALERTS = null, SPCF = null, NICE = null;
+    const spot = () => WPSpot.get();
+    getJson('/site-config.json').then((c) => { if (c.channelId) $('player').innerHTML = `<iframe src="https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(c.channelId)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="WeatherPower Live"></iframe>`; }).catch(() => {});
+
     document.addEventListener('wp-status', (e) => {
       const s = e.detail;
       if (s.wis) {
         $('wis').textContent = s.wis.score; $('wis-l').textContent = s.wis.label;
         $('wis').className = 'wis-score ' + (s.wis.score >= 100 ? 'bad' : s.wis.score >= 60 ? 'warn' : 'ok');
         $('wis-pin').style.left = Math.min(100, s.wis.score / 3.4) + '%';
-        $('wis-trend').textContent = s.wis.trend == null ? '' : (s.wis.trend > 0 ? '▲ rising' : s.wis.trend < 0 ? '▼ easing' : '— steady');
+        $('wis-trend').textContent = s.wis.trend == null ? '' : s.wis.trend > 0 ? '▲ rising' : s.wis.trend < 0 ? '▼ easing' : '— steady';
+        $('wis-pct').textContent = Math.round(s.wis.score) + '% of WeBot\'s talk threshold';
         $('wis-at').textContent = 'updated ' + clock(s.generatedAt);
       }
       const n = s.now || s.last;
@@ -102,32 +115,93 @@
       $('now-at').textContent = s.playing ? '♪ ' + s.playing : '';
       $('st-v').textContent = num(s.chat?.viewers); $('st-tv').textContent = num(s.chat?.totalViews);
       $('st-up').textContent = s.chat?.startedAt ? dur(Date.now() - Date.parse(s.chat.startedAt)) : '—';
-      const said = (s.said || []).slice(0, 3);
-      $('said').innerHTML = said.length ? said.map((x) => `<div class="quote">“${esc(x.text)}”<small>${esc(ago(x.at))}</small></div>`).join('') : '<span class="dim">Nothing yet.</span>';
+      const said = (s.said || [])[0];
+      $('said').innerHTML = said ? `<div class="quote">“${esc(said.text)}”<small>${esc(ago(said.at))}</small></div>` : '';
+      headline();
     });
+
+    const spcMax = (features) => features.map((f) => f.properties?.LABEL).filter((l) => SPC[l]).sort((a, b) => SPC_ORDER.indexOf(b) - SPC_ORDER.indexOf(a))[0] || null;
+    const headline = () => {
+      const s = window.WPStatus, t = s?.tallies || {}, list = ALERTS?.alerts || [];
+      const states = (ev) => [...new Set(list.filter((a) => new RegExp(ev, 'i').test(a.event)).flatMap((a) => a.states || []))].slice(0, 4).join(', ');
+      const nat = SPCF ? spcMax(SPCF) : null;
+      let h, sub;
+      if (t.tor > 0) { h = `${t.tor} tornado warning${t.tor > 1 ? 's' : ''} in effect`; sub = `Tornado warnings for ${states('tornado') || 'parts of the country'}. WeBot is on it live.`; }
+      else if (t.svr > 0) { h = `Severe thunderstorm warnings: ${states('severe thunderstorm') || 'in effect'}`; sub = `${t.svr} severe thunderstorm warning${t.svr > 1 ? 's' : ''} right now.`; }
+      else if (t.ffw > 0) { h = `Flash flooding: ${states('flash flood') || 'warnings in effect'}`; sub = `${t.ffw} flash flood warning${t.ffw > 1 ? 's' : ''} active. Turn around, don't drown.`; }
+      else if (nat && SPC_ORDER.indexOf(nat) >= 2) { h = `${SPC[nat][0]} of severe storms today`; sub = 'The Storm Prediction Center has severe weather in the outlook. Keep an eye on the radar.'; }
+      else { const b = NICE?.top?.[0]?.[0]; h = 'Quiet across the country'; sub = b ? `No warnings worth losing sleep over. Nicest porch in America today: ${b.name}, ${b.state}.` : 'No warnings worth losing sleep over.'; }
+      $('headline').textContent = h; $('headsub').textContent = sub;
+    };
+
     const loadWarnings = async () => {
       try {
-        const b = await getJson(API + '/alerts?group=warnings');
-        const list = (b.alerts || []).slice(0, 8);
+        ALERTS = await getJson(API + '/alerts?group=warnings');
+        const list = (ALERTS.alerts || []).slice(0, 10);
         $('warn-list').innerHTML = list.length ? list.map((a) => `<li><i style="background:${esc(a.color || '#888')}"></i><div><b>${esc(a.eventLabel || a.event)}</b><small>${esc(a.place || a.area || '')}${a.states?.length ? ' · ' + esc(a.states.join(', ')) : ''}</small></div><small>${esc(left(a.expiresAt))}</small></li>`).join('')
           : '<li><i style="background:var(--green)"></i><div><b>No warnings right now</b><small>Enjoy it while it lasts.</small></div><span></span></li>';
-        const top = list[0];
+        const top = list[0], n = ALERTS.counts?.warnings || 0;
         $('ticker').className = 'ticker' + (top ? '' : ' calm');
         $('tk-tag').textContent = top ? 'WARNING' : 'QUIET';
-        $('tk-txt').textContent = top ? `${top.eventLabel || top.event} · ${top.place || top.area || ''}` : 'No warnings in effect across the country right now.';
-        $('tk-n').textContent = (b.counts?.warnings || 0) + ' active';
+        $('tk-txt').textContent = top ? `${top.eventLabel || top.event} · ${top.place || top.area || ''}${top.expiresAt ? ' · ' + left(top.expiresAt) : ''}` : 'No warnings in effect across the country right now.';
+        $('tk-n').textContent = n + ' active';
+        $('warn-n').textContent = n; $('t-warn').classList.toggle('hot', n > 25);
+        headline(); local(); posts();
       } catch { $('tk-txt').textContent = 'Warnings are loading slowly. Try again in a minute.'; }
+    };
+    const loadSpc = async () => {
+      try {
+        SPCF = (await getJson('/api/spc/day1')).features || [];
+        const nat = spcMax(SPCF);
+        $('spc-nat').textContent = nat ? SPC[nat][0] : 'No severe risk';
+        $('spc-nat').style.color = nat && SPC_ORDER.indexOf(nat) >= 2 ? SPC[nat][1] : '';
+        $('spc-sub').textContent = nat ? 'Highest category anywhere today.' : 'Nothing in the Day 1 outlook.';
+        $('t-spc').classList.toggle('hot', nat && SPC_ORDER.indexOf(nat) >= 3);
+        headline(); local(); posts();
+      } catch { $('spc-nat').textContent = '—'; }
     };
     const loadNice = async () => {
       try {
-        const b = await getJson(API + '/nice');
-        $('nice-top').innerHTML = (b.top?.[0] || []).slice(0, 5).map((c) => `<li><div><b style="font:700 15px/1.2 'WP Display';letter-spacing:.03em">${esc(c.name)}, ${esc(c.state)}</b><br><small class="dim">${esc(c.tier)}</small></div><span class="sc" style="color:${esc(b.tiers.find((t) => t.tier === c.tier)?.color || '#fff')}">${c.score}</span></li>`).join('');
-        const h = b.home?.days?.[0];
-        if (h) $('nice-home').innerHTML = `<span class="k">Idabel, OK today</span><br><b style="color:${esc(h.color)}">${esc(h.tier)}</b> · ${h.score}/100 · ${h.hi}°/${h.lo}° · rain ${h.pop}% · wind ${h.wind} mph`;
-      } catch { $('nice-top').innerHTML = '<li><span class="dim">Porch Weather is warming up. Check back in a minute.</span></li>'; }
+        NICE = await getJson(API + '/nice');
+        $('best3').innerHTML = (NICE.top[0] || []).slice(0, 3).map((c, i) => `<a href="/nice"><span class="sc" style="color:${esc(NICE.tiers.find((t) => t.tier === c.tier)?.color)}">${Math.round(c.score)}</span><span class="n">#${i + 1}</span><b>${esc(c.name)}, ${esc(c.state)}</b><span class="dim">${esc(c.tier)}</span></a>`).join('');
+        headline(); local(); posts();
+      } catch { $('best3').innerHTML = '<div class="dim">Porch Weather is warming up. Check back in a minute.</div>'; }
     };
-    loadWarnings(); loadNice();
-    setInterval(loadWarnings, 60000);
+
+    // Your spot: severe risk, warnings covering it, porch score at the nearest city.
+    const local = () => {
+      const s = spot();
+      if (!s) { $('lc-name').textContent = 'Set your location'; $('lc-sub').textContent = 'Your risk, warnings and porch score.'; $('lc-body').hidden = true; $('lc-pick').hidden = false; return; }
+      $('lc-body').hidden = false; $('lc-pick').hidden = true;
+      $('lc-name').textContent = s.name; $('lc-title').textContent = s.name + ', ' + s.state;
+      const pt = [s.lon, s.lat];
+      const risk = SPCF ? spcMax(SPCF.filter((f) => inGeometry(pt, f.geometry))) : null;
+      $('lc-spc').textContent = SPCF ? (risk ? SPC[risk][0] : 'None today') : '—'; $('lc-spc').style.color = risk && SPC_ORDER.indexOf(risk) >= 2 ? SPC[risk][1] : '';
+      const near = NICE ? NICE.cities.map((c) => ({ c, d: Math.hypot(c.lat - s.lat, (c.lon - s.lon) * Math.cos(s.lat * Math.PI / 180)) })).sort((a, b) => a.d - b.d)[0]?.c : null;
+      const pd = near?.days?.[0];
+      $('lc-porch').textContent = pd ? pd.tier + ' ' + Math.round(pd.score) : '—'; $('lc-porch').style.color = pd?.color || '';
+      getJson(API + '/alerts.geojson').then((fc) => {
+        const here = (fc.features || []).filter((f) => f.properties?.group === 'warnings' && inGeometry(pt, f.geometry));
+        $('lc-warn').textContent = here.length; $('lc-warn').className = here.length ? 'bad' : 'ok';
+        $('lc-list').innerHTML = here.slice(0, 5).map((f) => `<li><i style="background:${esc(f.properties.color || '#888')}"></i><div><b>${esc(f.properties.event)}</b><small>${esc(f.properties.area || '')}</small></div><small>${esc(left(f.properties.expiresAt))}</small></li>`).join('');
+        $('lc-sub').textContent = here.length ? `${here.length} warning${here.length > 1 ? 's' : ''} covering you right now` : (risk ? SPC[risk][0] + ' today' : 'No warnings for you right now') + (pd ? ' · porch: ' + pd.tier : '');
+        $('t-local').classList.toggle('hot', here.length > 0);
+      }).catch(() => {});
+    };
+    WPSpot.picker($('lc-pick'), (s) => { WPSpot.set(s); local(); });
+    $('lc-edit').addEventListener('click', (e) => { e.preventDefault(); $('lc-body').hidden = true; $('lc-pick').hidden = false; $('lc-pick').querySelector('input').focus(); });
+
+    // "Today's outlook": short posts WeBot writes from the data (templates, no AI).
+    const posts = () => {
+      const t = window.WPStatus?.tallies || {}, nat = SPCF ? spcMax(SPCF) : null, n = ALERTS?.counts?.warnings ?? null, b = NICE?.top?.[0]?.[0], h = NICE?.home?.days?.[0];
+      const out = [];
+      if (SPCF) out.push(['Severe', nat ? `${SPC[nat][0]} today` : 'No severe risk today', nat ? `The Storm Prediction Center has a ${SPC[nat][0].toLowerCase()} somewhere in the country today. ${SPC_ORDER.indexOf(nat) >= 3 ? 'That is a real deal: have a plan, charge your phone, and keep the stream on.' : SPC_ORDER.indexOf(nat) === 2 ? 'A few storms could get strong. Hail and wind are the main threats.' : 'Mostly garden-variety storms, maybe a strong one or two.'}` : 'The Day 1 outlook is clean. No organized severe weather expected anywhere today.']);
+      if (n != null) out.push(['Warnings', n ? `${n} warnings on the board` : 'A quiet board', n ? `${t.tor || 0} tornado, ${t.svr || 0} severe thunderstorm and ${t.ffw || 0} flash flood warnings right now, plus ${t.watches || 0} watches. The list above has them worst first.` : 'Not a single warning in effect across the whole country. Soak it up.']);
+      if (b) out.push(['Porch', `Best porch: ${b.name}, ${b.state}`, `${b.name} takes the top spot at ${Math.round(b.score)} out of 100, a ${b.tier} day. ${h ? `Back home in Idabel it's ${h.tier} at ${Math.round(h.score)}: ${h.hi}°, rain chance ${h.pop}%.` : ''}`]);
+      $('posts').innerHTML = out.map(([k, h, p]) => `<div class="post"><span class="k"><span>${k}</span><span class="faint">${clock(new Date().toISOString())}</span></span><h4>${esc(h)}</h4><p>${esc(p)}</p></div>`).join('');
+    };
+    loadWarnings(); loadSpc(); loadNice();
+    setInterval(loadWarnings, 60000); setInterval(loadSpc, 600000);
   </script>
 </body>
 </html>

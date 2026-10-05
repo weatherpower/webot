@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Send Us Your Storm · WeatherPower</title>
+  <meta name="description" content="Send your storm photos, videos and reports to WeatherPower Live. We show them on the stream with credit.">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/site.css?v=2">
+</head>
+<body>
+  <section class="hero"><div class="wrap grid">
+    <div class="s7">
+      <div class="k">Your photos, on the stream</div>
+      <h1>Send us <span>your storm</span></h1>
+      <p class="lead">Hail on the porch, a shelf cloud over the pasture, the creek over the road. Send it in and WeBot shows it live, with your name on it.</p>
+      <form class="panel" id="form">
+        <div class="field"><label for="name">Your name or handle</label><input type="text" id="name" maxlength="40" placeholder="dragonoftexas"></div>
+        <div class="field"><label>Where</label><div id="pick"></div></div>
+        <div class="field"><label for="text">What you saw</label><textarea id="text" maxlength="600" placeholder="Quarter-size hail for about five minutes, trees down on Highway 70…"></textarea></div>
+        <div class="field"><label for="link">Photo or video link (optional)</label><input type="url" id="link" placeholder="https://… (Imgur, Google Photos, YouTube, X)"><span class="faint" style="font-size:12px">Upload to any photo site and paste the link. Direct uploads are coming.</span></div>
+        <div class="row"><button class="btn primary" type="submit" id="go">Send it in</button><span class="dim" id="msg" style="font-size:13.5px"></span></div>
+      </form>
+    </div>
+    <div class="s5 stack">
+      <div class="panel"><h3>The rules</h3><ul style="margin:0;padding-left:18px;color:var(--dim);font-size:14px"><li>Your photo, taken by you. We credit the name you give.</li><li>Stay safe. No photo is worth driving into a storm.</li><li>Tell us where and roughly when.</li><li>By sending, you let WeatherPower show it on the stream and the site.</li></ul></div>
+      <div class="panel"><h3>Reports help too</h3><p class="dim" style="margin:0;font-size:14px">No photo? A plain report is still gold: hail size, wind damage, flooding, snow depth. WeBot reads the good ones on air. For official reports, the National Weather Service wants them too: find your local office at weather.gov.</p></div>
+    </div>
+  </div></section>
+  <script src="/site.js?v=2"></script>
+  <script>
+    let spot = WPSpot.get();
+    const input = WPSpot.picker($('pick'), (s) => { spot = s; WPSpot.set(s); });
+    if (spot) input.value = spot.name + ', ' + spot.state;
+    $('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('go').disabled = true; $('msg').textContent = 'Sending…';
+      try {
+        await postJson('/api/submit', { name: $('name').value, place: input.value || (spot ? spot.name + ', ' + spot.state : ''), text: $('text').value, link: $('link').value });
+        $('form').reset(); $('msg').textContent = 'Got it. Thank you! WeBot will take a look.';
+      } catch (err) { $('msg').textContent = err.message; }
+      $('go').disabled = false;
+    });
+  </script>
+</body>
+</html>

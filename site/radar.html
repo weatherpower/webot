@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radar &amp; Warnings · WeatherPower</title>
+  <meta name="description" content="Live national radar loop with every NWS warning drawn on the map, plus today's severe weather outlook.">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="/site.css?v=2">
+</head>
+<body>
+  <section style="padding:14px 0 0"><div class="wrap">
+    <div class="sec-head" style="margin-bottom:10px"><h2>Radar &amp; warnings</h2><p id="sub">Live radar, the last hour, with every warning drawn on it.</p><a class="more" href="https://weatherpower.app/radar" target="_blank" rel="noopener">Full radar app ↗</a></div>
+    <div class="map tall" id="map">
+      <div class="mapbar"><button class="btn sm on" id="b-play">⏸ Pause</button><button class="btn sm on" id="b-warn">Warnings</button><button class="btn sm" id="b-spc">Day 1 outlook</button><button class="btn sm" id="b-me">📍 My spot</button><span class="btn sm" id="time" style="cursor:default">—</span></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div></section>
+  <section id="warnings"><div class="wrap grid">
+    <div class="s8 panel"><h3>Active warnings <span class="r" id="warn-n"></span></h3><ul class="list" id="warn-list"><li><i></i><span class="dim">Loading…</span><span></span></li></ul></div>
+    <div class="s4 stack">
+      <div class="panel" id="outlook"><h3>Day 1 severe outlook</h3><div class="mid" id="spc-nat">—</div><div class="dim" id="spc-sub" style="margin-top:6px;font-size:13px">From the Storm Prediction Center in Norman, Oklahoma.</div></div>
+      <div class="panel"><h3>Reading the map</h3><p class="dim" style="margin:0;font-size:13.5px">Radar colors go green (light rain) → yellow → red (heavy) → purple (hail). Warning boxes are drawn in the NWS color for that warning: red for tornado, orange for severe thunderstorm, green for flash flood. Click a box for the details.</p></div>
+    </div>
+  </div></section>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="/site.js?v=2"></script>
+  <script>
+    let map = null, frames = [], fi = 0, playing = true, timer = null;
+    const spot = WPSpot.get();
+    const loadRadar = async () => {
+      const r = await getJson(API + '/radar');
+      const list = (r.reflectivity || []).slice(-12);
+      if (!map.isStyleLoaded()) return;
+      // One raster source per frame; only the current one is visible.
+      frames.forEach((f, i) => { if (!list.some((n) => n.tiles === f.tiles)) { if (map.getLayer('r' + i)) map.removeLayer('r' + i); if (map.getSource('r' + i)) map.removeSource('r' + i); } });
+      frames = list;
+      const below = map.getLayer('warn-fill') ? 'warn-fill' : undefined;
+      list.forEach((f, i) => {
+        if (map.getSource('r' + i)) { if (map.getSource('r' + i).tiles?.[0] !== f.tiles) { map.removeLayer('r' + i); map.removeSource('r' + i); } else return; }
+        map.addSource('r' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256, maxzoom: 10, attribution: 'NEXRAD via Iowa Environmental Mesonet' });
+        map.addLayer({ id: 'r' + i, type: 'raster', source: 'r' + i, paint: { 'raster-opacity': 0, 'raster-opacity-transition': { duration: 0 }, 'raster-fade-duration': 0 } }, below);
+      });
+      fi = frames.length - 1; show();
+    };
+    const show = () => {
+      frames.forEach((f, i) => map.getLayer('r' + i) && map.setPaintProperty('r' + i, 'raster-opacity', i === fi ? .85 : 0));
+      $('time').textContent = frames[fi] ? clock(frames[fi].time) + (fi === frames.length - 1 ? ' · latest' : '') : '—';
+    };
+    const tick = () => { if (!playing || !frames.length) return; fi = (fi + 1) % frames.length; show(); };
+    const loadWarnings = async () => {
+      const [fc, b] = await Promise.all([getJson(API + '/alerts.geojson'), getJson(API + '/alerts?group=warnings')]);
+      const warn = { type: 'FeatureCollection', features: (fc.features || []).filter((f) => f.properties?.group === 'warnings') };
+      if (map.getSource('warn')) map.getSource('warn').setData(warn);
+      else {
+        map.addSource('warn', { type: 'geojson', data: warn });
+        const labels = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+        map.addLayer({ id: 'warn-fill', type: 'fill', source: 'warn', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': .18 } }, labels);
+        map.addLayer({ id: 'warn-line', type: 'line', source: 'warn', paint: { 'line-color': ['get', 'color'], 'line-width': 2 } }, labels);
+        map.on('click', 'warn-fill', (e) => { const p = e.features[0].properties; new maplibregl.Popup({ closeButton: false }).setLngLat(e.lngLat).setHTML(`<b style="font:700 15px 'WP Display';letter-spacing:.03em;color:${p.color}">${esc(p.event)}</b><br><span style="color:#9aa7c0">${esc(p.area || '')}</span><br>${esc(left(p.expiresAt))}`).addTo(map); });
+        map.on('mouseenter', 'warn-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'warn-fill', () => { map.getCanvas().style.cursor = ''; });
+      }
+      const list = (b.alerts || []).slice(0, 30);
+      $('warn-n').textContent = (b.counts?.warnings || 0) + ' active';
+      $('warn-list').innerHTML = list.length ? list.map((a) => `<li><i style="background:${esc(a.color || '#888')}"></i><div><b>${esc(a.eventLabel || a.event)}</b><small>${esc(a.place || a.area || '')}${a.states?.length ? ' · ' + esc(a.states.join(', ')) : ''}</small></div><small>${esc(left(a.expiresAt))}</small></li>`).join('') : '<li><i style="background:var(--green)"></i><div><b>No warnings right now</b><small>Enjoy it while it lasts.</small></div><span></span></li>';
+      const seen = [...new Map(warn.features.map((f) => [f.properties.event, f.properties.color])).entries()].slice(0, 6);
+      $('legend').innerHTML = seen.map(([e, c]) => `<div><i style="background:${esc(c)}"></i>${esc(e)}</div>`).join('') || '<div>No warnings on the map</div>';
+    };
+    const loadSpc = async () => {
+      const fc = await getJson('/api/spc/day1');
+      const feats = (fc.features || []).filter((f) => SPC[f.properties?.LABEL]);
+      const nat = feats.map((f) => f.properties.LABEL).sort((a, b) => SPC_ORDER.indexOf(b) - SPC_ORDER.indexOf(a))[0];
+      $('spc-nat').textContent = nat ? SPC[nat][0] : 'No severe risk today'; $('spc-nat').style.color = nat ? SPC[nat][1] : '';
+      if (map.getSource('spc')) { map.getSource('spc').setData(fc); return; }
+      map.addSource('spc', { type: 'geojson', data: fc });
+      const labels = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+      map.addLayer({ id: 'spc-fill', type: 'fill', source: 'spc', layout: { visibility: 'none' }, paint: { 'fill-color': ['coalesce', ['get', 'fill'], '#888'], 'fill-opacity': .22 } }, map.getLayer('warn-fill') ? 'warn-fill' : labels);
+      map.addLayer({ id: 'spc-line', type: 'line', source: 'spc', layout: { visibility: 'none' }, paint: { 'line-color': ['coalesce', ['get', 'stroke'], '#888'], 'line-width': 1.5 } }, map.getLayer('warn-fill') ? 'warn-fill' : labels);
+    };
+    const toggle = (btn, layers) => { btn.classList.toggle('on'); const v = btn.classList.contains('on') ? 'visible' : 'none'; layers.forEach((l) => map.getLayer(l) && map.setLayoutProperty(l, 'visibility', v)); };
+    $('b-play').addEventListener('click', () => { playing = !playing; $('b-play').textContent = playing ? '⏸ Pause' : '▶ Play'; $('b-play').classList.toggle('on', playing); if (!playing) { fi = frames.length - 1; show(); } });
+    $('b-warn').addEventListener('click', () => toggle($('b-warn'), ['warn-fill', 'warn-line']));
+    $('b-spc').addEventListener('click', () => toggle($('b-spc'), ['spc-fill', 'spc-line']));
+    $('b-me').addEventListener('click', () => { const s = WPSpot.get(); if (s) map.flyTo({ center: [s.lon, s.lat], zoom: 7 }); else location.href = '/#local'; });
+    if (location.hash === '#outlook') $('b-spc').classList.add('on');
+    (async () => {
+      const cfg = await getJson(API + '/config').catch(() => ({}));
+      map = new maplibregl.Map({ container: 'map', style: cfg.darkStyleUrl || 'https://tiles.openfreemap.org/styles/dark', center: spot ? [spot.lon, spot.lat] : [-96.5, 38.5], zoom: spot ? 6 : 3.6, attributionControl: { compact: true } });
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+      map.on('error', (e) => { if (/style/i.test(e.error?.message || '') && !map.getSource('warn')) map.setStyle('https://tiles.openfreemap.org/styles/dark'); });
+      map.on('load', async () => {
+        await loadWarnings().catch((e) => console.warn(e));
+        await loadRadar().catch((e) => console.warn(e));
+        await loadSpc().then(() => { if ($('b-spc').classList.contains('on')) ['spc-fill', 'spc-line'].forEach((l) => map.setLayoutProperty(l, 'visibility', 'visible')); }).catch((e) => console.warn(e));
+        timer = setInterval(tick, 450);
+        setInterval(() => loadRadar().catch(() => {}), 120000);
+        setInterval(() => loadWarnings().catch(() => {}), 60000);
+      });
+    })();
+  </script>
+</body>
+</html>

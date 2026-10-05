@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Free Phone Alerts · WeatherPower</title>
+  <meta name="description" content="A free push alert on your phone the moment a tornado, severe thunderstorm or flood warning covers your exact spot. No account, no email.">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/site.css?v=2">
+</head>
+<body>
+  <section class="hero"><div class="wrap grid">
+    <div class="s7">
+      <div class="k">Free · no account · no email · your exact spot</div>
+      <h1>Warning alerts on <span>your phone</span></h1>
+      <p class="lead">The second the National Weather Service puts a warning over your spot, your phone buzzes. It runs on <b>ntfy</b>, a free open-source push app, so we never need your number or your email.</p>
+      <div class="panel"><div class="steps">
+        <div class="step"><b>Pick your spot</b><div id="pick"></div><div class="dim" id="picked" style="margin-top:6px;font-size:13px">Nothing picked yet.</div></div>
+        <div class="step"><b>What should buzz?</b><div class="kinds" id="kinds"><button data-k="all" class="on">Every warning</button><button data-k="tornado">Tornado only</button><button data-k="severe">Tornado + severe</button><button data-k="flood">Floods</button><button data-k="winter">Winter</button></div></div>
+        <div class="step"><b>Get the ntfy app and subscribe to your topic</b>
+          <p class="dim" style="margin:0 0 8px;font-size:13.5px">Install <a href="https://ntfy.sh/" target="_blank" rel="noopener">ntfy</a> (free, <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a> · <a href="https://apps.apple.com/us/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a>), tap <b>+</b>, and subscribe to this topic. It's yours alone; keep it private.</p>
+          <div class="topic" id="topic">—</div>
+          <div class="row" style="margin-top:8px"><button class="btn sm" id="b-copy">Copy topic</button><a class="btn sm" id="b-web" href="#" target="_blank" rel="noopener">Open in browser instead</a></div></div>
+        <div class="step"><b>Turn it on</b><div class="row"><button class="btn primary" id="b-go" disabled>Turn on alerts</button><button class="btn" id="b-off" hidden>Turn off</button><span class="dim" id="msg" style="font-size:13.5px"></span></div></div>
+      </div></div>
+    </div>
+    <div class="s5 stack">
+      <div class="panel"><h3>What you'll get</h3><div class="quote" style="border-left-color:var(--red)">Tornado Warning for Idabel, OK<small>Tornado Warning includes Idabel, OK until 4:45 PM CT. Take cover if it is a tornado warning. From WeatherPower.</small></div>
+        <p class="dim" style="margin:10px 0 0;font-size:13.5px">We check the NWS every two minutes and ping your topic once per warning. Nothing else, ever. Turn it off anytime from this page on the same phone.</p></div>
+      <div class="panel"><h3>Why ntfy?</h3><p class="dim" style="margin:0;font-size:13.5px">Texts cost money and emails get buried. ntfy is a free, open-source notification service: you subscribe to a topic name, we post to it, your phone buzzes. We never see your number, your email or your name. Your spot and topic are the only things saved.</p></div>
+      <div class="note">This is a backup, not your only line of defense. Keep Wireless Emergency Alerts on and a weather radio nearby. We can miss a warning if our server is down.</div>
+    </div>
+  </div></section>
+
+  <script src="/site.js?v=2"></script>
+  <script>
+    let spot = WPSpot.get(), kind = 'all';
+    const saved = () => { try { return JSON.parse(localStorage.getItem('wp-alerts') || 'null'); } catch { return null; } };
+    const topic = saved()?.topic || 'wp-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 12);
+    $('topic').textContent = topic; $('b-web').href = 'https://ntfy.sh/' + topic;
+    const refresh = () => { $('picked').textContent = spot ? 'Alerts for ' + spot.name + ', ' + spot.state : 'Nothing picked yet.'; $('b-go').disabled = !spot; const s = saved(); $('b-off').hidden = !s; if (s) { $('msg').textContent = 'On for ' + s.place + ' (' + s.kind + '). Test ping sent to your topic.'; } };
+    const input = WPSpot.picker($('pick'), (s) => { spot = s; WPSpot.set(s); refresh(); });
+    if (spot) input.value = spot.name + ', ' + spot.state;
+    $('kinds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; kind = b.dataset.k; $('kinds').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); });
+    $('b-copy').addEventListener('click', () => { navigator.clipboard?.writeText(topic); $('b-copy').textContent = 'Copied'; });
+    $('b-go').addEventListener('click', async () => {
+      $('b-go').disabled = true; $('msg').textContent = 'Saving…';
+      try {
+        await postJson('/api/alerts/subscribe', { topic, lat: spot.lat, lon: spot.lon, place: spot.name + ', ' + spot.state, kind });
+        try { localStorage.setItem('wp-alerts', JSON.stringify({ topic, place: spot.name + ', ' + spot.state, kind })); } catch {}
+        refresh(); $('msg').textContent = 'Alerts are on for ' + spot.name + '. A test ping just went to your topic: if your phone buzzed, you\'re set.';
+      } catch (e) { $('msg').textContent = e.message; $('b-go').disabled = false; }
+    });
+    $('b-off').addEventListener('click', async () => { await postJson('/api/alerts/unsubscribe', { topic }).catch(() => {}); try { localStorage.removeItem('wp-alerts'); } catch {} $('msg').textContent = 'Alerts are off.'; refresh(); $('b-go').disabled = !spot; });
+    refresh();
+  </script>
+</body>
+</html>

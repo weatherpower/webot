@@ -7,7 +7,7 @@
   <meta name="description" content="Free weather tools from WeatherPower: live radar, the Weather Intensity Score, Porch Weather, the EF scale, hurricane categories and storm safety.">
   <meta name="theme-color" content="#070b14">
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/site.css?v=2">
 </head>
 <body>
   <section class="hero" style="padding-bottom:0"><div class="wrap">
@@ -18,14 +18,14 @@
 
   <section><div class="wrap">
     <div class="cards">
-      <a class="card" href="https://weatherpower.app/radar" target="_blank" rel="noopener"><div class="ic">🛰️</div><b>Live radar ↗</b><p>Interactive radar on weatherpower.app with warnings, storm tracks and lightning.</p></a>
+      <a class="card" href="/radar"><div class="ic">🛰️</div><b>Radar &amp; warnings</b><p>Live radar loop with every warning drawn on it, plus the Day 1 severe outlook.</p></a>
       <a class="card" href="/nice"><div class="ic">🪑</div><b>Porch Weather</b><p>WeBot's 7-day "how nice is it outside" map and rankings for 390 cities.</p></a>
       <a class="card" href="/webot"><div class="ic">🤖</div><b>WeBot tracker</b><p>What's on the stream right now, what he said, and the warnings he's watching.</p></a>
       <a class="card" href="#wis"><div class="ic">📈</div><b>Weather Intensity Score</b><p>Right now: <span id="wis-inline" class="cyan">—</span>. How it works, below.</p></a>
       <a class="card" href="#scales"><div class="ic">🌪️</div><b>Scales &amp; categories</b><p>EF scale, hurricane categories, and watch vs. warning.</p></a>
       <a class="card" href="#safety"><div class="ic">🛡️</div><b>Storm safety</b><p>The short version of what to do when it gets bad.</p></a>
-      <a class="card" href="/tools#soon"><div class="ic">📸</div><b>Send your storm <span class="chip soon">soon</span></b><p>Your photos and reports on the stream.</p></a>
-      <a class="card" href="/tools#soon"><div class="ic">📬</div><b>Warning alerts <span class="chip soon">soon</span></b><p>A ping when a warning hits your spot.</p></a>
+      <a class="card" href="/submit"><div class="ic">📸</div><b>Send us your storm</b><p>Your photos and reports, shown on the stream with credit.</p></a>
+      <a class="card" href="/alerts"><div class="ic">📳</div><b>Phone alerts</b><p>A free push alert when a warning covers your exact spot.</p></a>
     </div>
   </div></section>
 
@@ -77,9 +77,8 @@
     <div class="s4 panel"><h3>⚡ Lightning &amp; heat</h3><ul style="margin:0;padding-left:18px;color:var(--dim)"><li>When thunder roars, go indoors. Wait 30 minutes after the last rumble.</li><li>Heat index over 100: water, shade, and check on older folks and pets.</li><li>Never leave kids or pets in a parked car.</li></ul></div>
   </div></section>
 
-  <section id="soon"><div class="wrap"><div class="note">Coming soon: send your storm photos to the stream, and free warning alerts for your exact spot. Follow the channel for updates.</div></div></section>
-
-  <script src="/site.js"></script>
+  
+  <script src="/site.js?v=2"></script>
   <script>
     document.addEventListener('wp-status', (e) => {
       const w = e.detail.wis;

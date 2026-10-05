@@ -1,4 +1,5 @@
 import express from 'express';
+import { mountSite } from './siteExtras.js';
 import compression from 'compression';
 import path from 'node:path';
 import { config, readiness } from './config.js';
@@ -628,7 +629,8 @@ const startServer = async () => {
       res.json({ channelId: process.env.YOUTUBE_CHANNEL_ID || '', videoId: process.env.YOUTUBE_VIDEO_ID || '', home: { lat: config.forecast.lat, lon: config.forecast.lon, city: config.forecast.city, state: config.forecast.state } });
     });
     // Read-only weather data for the website, passed through from the main server (same JSON, nothing private).
-    const PUBLIC_API = /^\/warningcenter\/api\/v3\/(alerts|wis|nice|wpc|surface|headlines|tropics|gas|forecast\/city)$/;
+    const PUBLIC_API = /^\/warningcenter\/api\/v3\/(alerts|alerts\.geojson|wis|nice|wpc|surface|headlines|tropics|gas|radar|config|forecast\/city)$/;
+    mountSite(pub, { port: config.port, express });
     pub.get(PUBLIC_API, async (req, res) => {
       try {
         const r = await fetch(`http://127.0.0.1:${config.port}${req.originalUrl}`, { signal: AbortSignal.timeout(20000) });

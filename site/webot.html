@@ -7,7 +7,7 @@
   <meta name="description" content="What WeBot is showing on the stream right now, what he said last, who's watching and what weather he's keeping an eye on.">
   <meta name="theme-color" content="#070b14">
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/site.css?v=2">
 </head>
 <body>
   <section class="hero"><div class="wrap grid">
@@ -43,9 +43,8 @@
     </div>
   </div></section>
 
-  <script src="/site.js"></script>
+  <script src="/site.js?v=2"></script>
   <script>
-    const KINDS = { alert: 'Top alert', pinned: 'Pinned alert', think: 'Model check', models: 'Weather models', national: 'National radar', outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', forecast: 'Daily forecast', gas: 'Gas prices', rain: 'Rain outlook', train: 'Train cam' };
     document.addEventListener('wp-status', (e) => {
       const s = e.detail, on = s.onAir && !s.brb;
       $('onair-dot').style.background = on ? 'var(--red)' : s.brb ? 'var(--amber)' : 'var(--faint)';

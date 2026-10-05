@@ -1,4 +1,4 @@
-/* WeatherPower public website. Same look as the stream and Studio: dark, cyan, Oswald/Inter/Plex Mono. */
+/* WeatherPower public website: dark, cyan, Oswald / Inter / Plex Mono, same look as the stream. */
 @font-face { font-family: "WP Display"; src: url("/warningcenter/public/assets/fonts/oswald-latin.woff2") format("woff2"); font-weight: 200 700; font-display: swap; }
 @font-face { font-family: "WP Sans"; src: url("/warningcenter/public/assets/fonts/inter-latin.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "WP Mono"; src: url("/warningcenter/public/assets/fonts/ibm-plex-mono-500-latin.woff2") format("woff2"); font-weight: 500; font-display: swap; }
@@ -12,24 +12,30 @@
 [hidden] { display: none !important; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.55 "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
-a { color: var(--cyan); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--cyan); text-decoration: none; } a:hover { text-decoration: underline; }
 img { max-width: 100%; }
-.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 
 /* header */
-.top { position: sticky; top: 0; z-index: 30; background: rgba(7, 11, 20, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
-.top .wrap { display: flex; align-items: center; gap: 14px; height: 60px; }
+.top { position: sticky; top: 0; z-index: 30; background: rgba(7, 11, 20, .94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 10px; height: 62px; position: relative; }
 .logo { display: flex; align-items: center; gap: 10px; color: #fff; }
 .logo img { width: 34px; height: 34px; }
 .logo b { font: 700 20px/1 "WP Display"; letter-spacing: .06em; text-transform: uppercase; }
 .logo small { display: block; font: 600 9px/1 "WP Mono"; letter-spacing: .3em; color: var(--cyan); margin-top: 3px; }
-nav.main { display: flex; gap: 2px; margin-left: 10px; }
-nav.main a { padding: 8px 12px; color: var(--dim); font: 600 12px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; border-bottom: 2px solid transparent; }
-nav.main a:hover { color: #fff; text-decoration: none; }
-nav.main a.on { color: #fff; border-bottom-color: var(--cyan); }
+nav.main { display: flex; gap: 2px; margin-left: 14px; }
+nav.main > a, nav.main .dd > a { display: block; padding: 10px 12px; color: var(--dim); font: 600 12px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; border-bottom: 2px solid transparent; }
+nav.main > a:hover, nav.main .dd > a:hover { color: #fff; text-decoration: none; }
+nav.main > a.on, nav.main .dd.on > a { color: #fff; border-bottom-color: var(--cyan); }
+nav.main .dd { position: relative; }
+nav.main .dd > a::after { content: " ▾"; color: var(--faint); }
+nav.main .dd .menu { display: none; position: absolute; left: 0; top: 100%; min-width: 220px; background: var(--panel); border: 1px solid var(--line-2); padding: 6px 0; box-shadow: 0 16px 40px rgba(0, 0, 0, .5); }
+nav.main .dd:hover .menu, nav.main .dd.open .menu { display: block; }
+nav.main .menu a { display: block; padding: 10px 14px; color: var(--text); font: 500 13px/1.3 "WP Sans"; }
+nav.main .menu a small { display: block; color: var(--faint); font-size: 11px; }
+nav.main .menu a:hover { background: var(--cyan-dim); text-decoration: none; }
 .spacer { flex: 1; }
-.live-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--red); color: #fff; font: 700 12px/1 "WP Display"; letter-spacing: .14em; text-transform: uppercase; }
+.live-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--red); color: #fff; font: 700 12px/1 "WP Display"; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
 .live-btn i { width: 8px; height: 8px; background: #fff; border-radius: 50%; animation: pulse 1.6s infinite; }
 .live-btn.off { background: var(--panel-2); color: var(--dim); } .live-btn.off i { animation: none; background: var(--faint); }
 .live-btn:hover { text-decoration: none; filter: brightness(1.1); }
@@ -45,8 +51,8 @@ nav.main a.on { color: #fff; border-bottom-color: var(--cyan); }
 .ticker .n { margin-left: auto; color: var(--dim); white-space: nowrap; }
 .ticker.calm { background: var(--panel); } .ticker.calm .tag { background: var(--green); color: #052; }
 
-/* sections */
-section { padding: 34px 0; }
+/* layout bits */
+section { padding: 30px 0; }
 .sec-head { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 16px; }
 .sec-head h2 { margin: 0; font: 700 26px/1 "WP Display"; letter-spacing: .04em; text-transform: uppercase; }
 .sec-head p { margin: 0; color: var(--dim); }
@@ -70,15 +76,25 @@ section { padding: 34px 0; }
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--panel-2); border: 1px solid var(--line-2); color: #fff; font: 600 12px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
 .btn:hover { border-color: var(--cyan); text-decoration: none; }
 .btn.primary { background: var(--cyan); color: #04202c; border-color: var(--cyan); }
+.btn.sm { padding: 7px 10px; font-size: 11px; }
+.btn:disabled { opacity: .5; cursor: default; }
 .chip { display: inline-block; padding: 4px 8px; border: 1px solid var(--line-2); font: 600 11px/1 "WP Mono"; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
 
-/* hero */
-.hero { padding: 40px 0 10px; }
-.hero h1 { margin: 0 0 8px; font: 700 clamp(34px, 5vw, 56px)/1 "WP Display"; letter-spacing: .03em; text-transform: uppercase; }
+/* hero + tiles (home) */
+.hero { padding: 26px 0 10px; }
+.hero h1 { margin: 0 0 8px; font: 700 clamp(28px, 4vw, 44px)/1.05 "WP Display"; letter-spacing: .03em; text-transform: uppercase; }
 .hero h1 span { color: var(--cyan); }
-.hero p.lead { margin: 0 0 18px; color: var(--dim); font-size: 17px; max-width: 640px; }
+.hero p.lead { margin: 0 0 16px; color: var(--dim); font-size: 16px; max-width: 680px; }
 .player { position: relative; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--line); overflow: hidden; }
 .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { display: block; position: relative; background: var(--panel); border: 1px solid var(--line); padding: 14px; color: inherit; min-height: 118px; transition: border-color .15s; }
+.tile:hover { border-color: var(--cyan); text-decoration: none; }
+.tile .k { display: block; margin-bottom: 6px; }
+.tile b { display: block; font: 700 24px/1 "WP Display"; letter-spacing: .02em; text-transform: uppercase; }
+.tile small { display: block; color: var(--dim); margin-top: 5px; font-size: 12.5px; }
+.tile .ic { position: absolute; right: 12px; top: 10px; font-size: 20px; opacity: .8; }
+.tile.hot { border-color: rgba(255, 59, 74, .5); background: linear-gradient(135deg, #2a0d14, var(--panel)); }
 .stat { display: grid; gap: 4px; }
 .stat b { font: 700 28px/1 "WP Display"; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -86,7 +102,7 @@ section { padding: 34px 0; }
 .gauge { height: 10px; background: linear-gradient(90deg, #3ee08f, #ffd23f 35%, #ffb020 55%, #ff3b4a 80%, #b100ff); position: relative; margin: 10px 0 6px; }
 .gauge i { position: absolute; top: -4px; width: 4px; height: 18px; background: #fff; box-shadow: 0 0 6px #000; transform: translateX(-50%); }
 
-/* lists */
+/* lists, posts */
 .list { list-style: none; margin: 0; padding: 0; }
 .list li { display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
 .list li:first-child { border-top: 0; }
@@ -100,26 +116,40 @@ section { padding: 34px 0; }
 .rank .sc { font: 700 18px/1 "WP Display"; }
 .quote { background: var(--panel-2); border-left: 3px solid var(--violet); padding: 10px 12px; font-size: 15px; }
 .quote small { display: block; margin-top: 4px; color: var(--faint); font: 500 11px/1 "WP Mono"; }
+.posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.post { background: var(--panel); border: 1px solid var(--line); padding: 16px 18px; }
+.post .k { display: flex; gap: 10px; margin-bottom: 8px; }
+.post h4 { margin: 0 0 8px; font: 700 19px/1.15 "WP Display"; letter-spacing: .02em; text-transform: uppercase; }
+.post p { margin: 0; color: var(--dim); font-size: 14px; }
+.best3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.best3 a { display: block; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--cyan); padding: 14px; color: inherit; }
+.best3 a:hover { text-decoration: none; border-color: var(--cyan); }
+.best3 .n { font: 600 11px/1 "WP Mono"; color: var(--faint); letter-spacing: .14em; }
+.best3 b { display: block; font: 700 22px/1.1 "WP Display"; letter-spacing: .02em; text-transform: uppercase; margin: 6px 0 2px; }
+.best3 .sc { font: 700 34px/1 "WP Display"; float: right; }
 
-/* cards grid */
+/* cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
 .card { display: block; background: var(--panel); border: 1px solid var(--line); padding: 18px; color: inherit; transition: border-color .15s, transform .15s; }
 .card:hover { border-color: var(--cyan); text-decoration: none; transform: translateY(-2px); }
 .card .ic { font-size: 26px; margin-bottom: 10px; }
 .card b { display: block; font: 700 18px/1.1 "WP Display"; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 6px; }
 .card p { margin: 0; color: var(--dim); font-size: 13.5px; }
-.card .soon { float: right; }
 
-/* nice weather */
+/* maps */
 .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-bottom: 14px; }
 .tabs button { all: unset; cursor: pointer; flex: none; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); text-align: center; min-width: 96px; }
 .tabs button.on { border-color: var(--cyan); background: var(--cyan-dim); }
 .tabs b { display: block; font: 700 14px/1 "WP Display"; letter-spacing: .04em; text-transform: uppercase; }
 .tabs small { display: block; margin-top: 5px; font: 600 10px/1 "WP Mono"; letter-spacing: .06em; }
-.map { height: 560px; background: #0a0f1c; border: 1px solid var(--line); position: relative; }
-.legend { position: absolute; left: 12px; bottom: 12px; z-index: 5; background: rgba(7, 11, 20, .9); border: 1px solid var(--line); padding: 10px 12px; font: 600 11px/1.8 "WP Mono"; letter-spacing: .06em; }
+.map { height: 600px; background: #0a0f1c; border: 1px solid var(--line); position: relative; }
+.map.tall { height: calc(100vh - 170px); min-height: 480px; }
+.legend { position: absolute; left: 12px; bottom: 28px; z-index: 5; background: rgba(7, 11, 20, .9); border: 1px solid var(--line); padding: 10px 12px; font: 600 11px/1.8 "WP Mono"; letter-spacing: .06em; }
 .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; }
-.maplibregl-popup-content { background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--line-2); font: 500 13px/1.4 "WP Sans"; padding: 10px 12px !important; }
+.mapbar { position: absolute; left: 12px; top: 12px; z-index: 5; display: flex; gap: 6px; flex-wrap: wrap; }
+.mapbar .btn { background: rgba(7, 11, 20, .92); }
+.mapbar .btn.on { border-color: var(--cyan); color: var(--cyan); }
+.maplibregl-popup-content { background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--line-2); font: 500 13px/1.4 "WP Sans"; padding: 10px 12px !important; max-width: 280px; }
 .maplibregl-popup-tip { border-top-color: var(--panel) !important; }
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .week div { background: var(--panel-2); padding: 8px 4px; text-align: center; border-top: 3px solid var(--faint); }
@@ -131,8 +161,27 @@ table.t th { text-align: left; font: 600 10px/1 "WP Mono"; letter-spacing: .16em
 table.t td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.t td:first-child { font: 700 15px/1.2 "WP Display"; letter-spacing: .03em; white-space: nowrap; }
 .prose { max-width: 820px; } .prose p { color: var(--dim); } .prose h2 { font: 700 24px/1 "WP Display"; letter-spacing: .04em; text-transform: uppercase; margin: 28px 0 10px; }
-.prose h3 { font: 700 17px/1.2 "WP Display"; letter-spacing: .03em; text-transform: uppercase; margin: 20px 0 6px; }
 .note { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--amber); padding: 12px 14px; color: var(--dim); font-size: 14px; }
+
+/* forms */
+.field { display: grid; gap: 6px; margin-bottom: 14px; }
+.field label { font: 600 10px/1 "WP Mono"; letter-spacing: .18em; color: var(--faint); text-transform: uppercase; }
+input[type=text], input[type=url], input[type=search], select, textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text); padding: 10px 12px; font: inherit; font-size: 16px; outline: none; border-radius: 0; }
+input:focus, select:focus, textarea:focus { border-color: var(--cyan); }
+textarea { min-height: 120px; resize: vertical; }
+.picker { position: relative; }
+.picker .res { position: absolute; left: 0; right: 0; top: 100%; z-index: 10; background: var(--panel); border: 1px solid var(--line-2); max-height: 240px; overflow: auto; }
+.picker .res button { all: unset; display: block; width: 100%; padding: 9px 12px; cursor: pointer; }
+.picker .res button:hover { background: var(--cyan-dim); }
+.picker .res small { color: var(--faint); margin-left: 6px; }
+.steps { counter-reset: s; display: grid; gap: 12px; }
+.step { position: relative; padding-left: 44px; }
+.step::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px; display: grid; place-items: center; background: var(--cyan); color: #04202c; font: 700 15px/1 "WP Display"; }
+.step b { display: block; font: 700 16px/1.2 "WP Display"; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 4px; }
+.kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+.kinds button { all: unset; cursor: pointer; padding: 8px 12px; border: 1px solid var(--line-2); font: 600 12px/1 "WP Mono"; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.kinds button.on { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+.topic { font: 600 18px/1 "WP Mono"; background: var(--panel-2); padding: 10px 12px; border: 1px dashed var(--line-2); word-break: break-all; }
 
 /* footer */
 footer { border-top: 1px solid var(--line); margin-top: 30px; padding: 26px 0 40px; color: var(--dim); font-size: 13px; }
@@ -144,21 +193,23 @@ footer .fine { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-t
 @media (max-width: 900px) {
   .s3, .s4, .s5, .s6, .s7, .s8 { grid-column: span 12; }
   footer .wrap { grid-template-columns: 1fr; }
+  .best3 { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  body { font-size: 15px; }
   .burger { display: grid; }
-  nav.main { display: none; position: absolute; left: 0; right: 0; top: 60px; flex-direction: column; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 0; margin: 0; }
+  nav.main { display: none; position: absolute; left: 0; right: 0; top: 62px; flex-direction: column; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 0; margin: 0; }
   nav.main.open { display: flex; }
-  nav.main a { padding: 14px 20px; border-bottom: 0; border-left: 3px solid transparent; font-size: 13px; }
-  nav.main a.on { border-left-color: var(--cyan); background: var(--cyan-dim); }
+  nav.main > a, nav.main .dd > a { padding: 14px 20px; border-bottom: 0; border-left: 3px solid transparent; font-size: 13px; }
+  nav.main > a.on { border-left-color: var(--cyan); background: var(--cyan-dim); }
+  nav.main .dd .menu { position: static; display: block; border: 0; box-shadow: none; padding: 0 0 6px 20px; background: transparent; }
   .live-btn span { display: none; }
-  .hero { padding-top: 22px; }
-  section { padding: 24px 0; }
-  .stats { grid-template-columns: repeat(3, 1fr); gap: 8px; } .stat b { font-size: 22px; }
-  .map { height: 420px; }
+  .hero { padding-top: 18px; }
+  section { padding: 22px 0; }
+  .stats { gap: 8px; } .stat b { font-size: 22px; }
+  .map { height: 440px; } .map.tall { height: calc(100vh - 130px); }
   .tabs button { min-width: 84px; padding: 8px 10px; }
   .wis-score { font-size: 52px; }
+  .tile { min-height: 100px; padding: 12px; } .tile b { font-size: 20px; }
   .sec-head { flex-wrap: wrap; } .sec-head p { flex-basis: 100%; order: 3; font-size: 13px; }
   .panel h3 { flex-wrap: wrap; } .panel h3 .r { margin-left: 0; flex-basis: 100%; }
 }
