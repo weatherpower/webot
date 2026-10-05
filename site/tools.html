@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Tools · WeatherPower</title>
+  <meta name="description" content="Free weather tools from WeatherPower: live radar, the Weather Intensity Score, Porch Weather, the EF scale, hurricane categories and storm safety.">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <section class="hero" style="padding-bottom:0"><div class="wrap">
+    <div class="k">Free · no account · no nonsense</div>
+    <h1>Weather <span>tools</span></h1>
+    <p class="lead">Everything WeBot uses on the stream, for you to use at home.</p>
+  </div></section>
+
+  <section><div class="wrap">
+    <div class="cards">
+      <a class="card" href="https://weatherpower.app/radar" target="_blank" rel="noopener"><div class="ic">🛰️</div><b>Live radar ↗</b><p>Interactive radar on weatherpower.app with warnings, storm tracks and lightning.</p></a>
+      <a class="card" href="/nice"><div class="ic">🪑</div><b>Porch Weather</b><p>WeBot's 7-day "how nice is it outside" map and rankings for 390 cities.</p></a>
+      <a class="card" href="/webot"><div class="ic">🤖</div><b>WeBot tracker</b><p>What's on the stream right now, what he said, and the warnings he's watching.</p></a>
+      <a class="card" href="#wis"><div class="ic">📈</div><b>Weather Intensity Score</b><p>Right now: <span id="wis-inline" class="cyan">—</span>. How it works, below.</p></a>
+      <a class="card" href="#scales"><div class="ic">🌪️</div><b>Scales &amp; categories</b><p>EF scale, hurricane categories, and watch vs. warning.</p></a>
+      <a class="card" href="#safety"><div class="ic">🛡️</div><b>Storm safety</b><p>The short version of what to do when it gets bad.</p></a>
+      <a class="card" href="/tools#soon"><div class="ic">📸</div><b>Send your storm <span class="chip soon">soon</span></b><p>Your photos and reports on the stream.</p></a>
+      <a class="card" href="/tools#soon"><div class="ic">📬</div><b>Warning alerts <span class="chip soon">soon</span></b><p>A ping when a warning hits your spot.</p></a>
+    </div>
+  </div></section>
+
+  <section id="wis"><div class="wrap grid">
+    <div class="s4 panel"><h3>Weather Intensity Score</h3>
+      <div class="row" style="align-items:baseline;gap:14px"><span class="wis-score ok" id="wis-now">—</span><span class="mid" id="wis-l"></span></div>
+      <div class="dim" id="wis-h" style="margin-top:8px">—</div></div>
+    <div class="s8 prose"><h2 style="margin-top:0">What the WIS means</h2>
+      <p>The Weather Intensity Score adds up every active National Weather Service alert in the country, weighted by how dangerous it is. A tornado emergency counts for far more than a frost advisory. Watches, warnings and advisories all count, and the score is capped so one giant outbreak doesn't blow the scale.</p>
+      <table class="t"><thead><tr><th>Score</th><th>Label</th><th>What it feels like</th></tr></thead><tbody>
+        <tr><td class="ok">0–59</td><td>Quiet / Monitoring</td><td>Normal day. Advisories and the odd flood warning.</td></tr>
+        <tr><td class="warn">60–99</td><td>Active</td><td>Severe storms or flooding somewhere, watches up.</td></tr>
+        <tr><td class="bad">100–199</td><td>Severe</td><td>Tornado and severe warnings stacking up. WeBot starts talking on his own at 100.</td></tr>
+        <tr><td style="color:#b100ff">200+</td><td>Extreme</td><td>Outbreak. Tornado emergencies or PDS warnings. Pay attention.</td></tr>
+      </tbody></table></div>
+  </div></section>
+
+  <section id="scales"><div class="wrap grid">
+    <div class="s6 panel"><h3>Enhanced Fujita scale <span class="r">WeBot calls it the fajita scale</span></h3>
+      <table class="t"><thead><tr><th>Rating</th><th>Winds</th><th>Damage</th></tr></thead><tbody>
+        <tr><td>EF0</td><td>65–85 mph</td><td>Branches snapped, shingles peeled, signs down.</td></tr>
+        <tr><td>EF1</td><td>86–110 mph</td><td>Roofs stripped, mobile homes overturned, windows broken.</td></tr>
+        <tr><td>EF2</td><td>111–135 mph</td><td>Roofs torn off, mobile homes destroyed, big trees snapped.</td></tr>
+        <tr><td>EF3</td><td>136–165 mph</td><td>Whole stories of well-built homes destroyed, trains overturned.</td></tr>
+        <tr><td>EF4</td><td>166–200 mph</td><td>Well-built homes leveled, cars thrown.</td></tr>
+        <tr><td>EF5</td><td>200+ mph</td><td>Homes swept off their foundations. Total destruction.</td></tr>
+      </tbody></table>
+      <p class="dim" style="margin:10px 0 0;font-size:13px">Tornadoes are rated from the damage after, not the radar. EF2 and up is a "significant" tornado.</p></div>
+    <div class="s6 stack">
+      <div class="panel"><h3>Hurricane categories (Saffir-Simpson)</h3>
+        <table class="t"><thead><tr><th>Cat</th><th>Winds</th><th>Damage</th></tr></thead><tbody>
+          <tr><td>1</td><td>74–95 mph</td><td>Some damage. Power outages for days.</td></tr>
+          <tr><td>2</td><td>96–110 mph</td><td>Extensive damage. Near-total power loss.</td></tr>
+          <tr><td>3</td><td>111–129 mph</td><td>Major. Devastating damage.</td></tr>
+          <tr><td>4</td><td>130–156 mph</td><td>Major. Catastrophic damage, weeks without power.</td></tr>
+          <tr><td>5</td><td>157+ mph</td><td>Major. Most homes destroyed, areas uninhabitable for months.</td></tr>
+        </tbody></table>
+        <p class="dim" style="margin:10px 0 0;font-size:13px">Water kills more people than wind: hide from wind, run from water.</p></div>
+      <div class="panel"><h3>Watch vs. warning</h3>
+        <p style="margin:0 0 6px"><b class="warn">Watch</b>: the ingredients are there. Be ready, check your plan, charge your phone.</p>
+        <p style="margin:0"><b class="bad">Warning</b>: it's happening or about to. Take cover now.</p>
+        <p class="dim" style="margin:8px 0 0;font-size:13px">WeBot's version: a watch is the groceries on the counter; a warning is supper on the table.</p></div>
+    </div>
+  </div></section>
+
+  <section id="safety"><div class="wrap grid">
+    <div class="s4 panel"><h3>🌪️ Tornado</h3><ul style="margin:0;padding-left:18px;color:var(--dim)"><li>Lowest floor, interior room, away from windows. Basement or storm shelter is best.</li><li>Put on a helmet (yes, really) and sturdy shoes.</li><li>Mobile homes and cars aren't safe. Leave early for a sturdy building.</li><li>Keep a weather radio and turn your phone alerts up at night.</li></ul></div>
+    <div class="s4 panel"><h3>🌊 Flooding</h3><ul style="margin:0;padding-left:18px;color:var(--dim)"><li><b class="cyan">Turn around, don't drown.</b> Six inches of moving water can knock you down; a foot floats a car.</li><li>Most flood deaths happen in vehicles, often at night.</li><li>Get to higher ground early. Don't wait for the water.</li></ul></div>
+    <div class="s4 panel"><h3>⚡ Lightning &amp; heat</h3><ul style="margin:0;padding-left:18px;color:var(--dim)"><li>When thunder roars, go indoors. Wait 30 minutes after the last rumble.</li><li>Heat index over 100: water, shade, and check on older folks and pets.</li><li>Never leave kids or pets in a parked car.</li></ul></div>
+  </div></section>
+
+  <section id="soon"><div class="wrap"><div class="note">Coming soon: send your storm photos to the stream, and free warning alerts for your exact spot. Follow the channel for updates.</div></div></section>
+
+  <script src="/site.js"></script>
+  <script>
+    document.addEventListener('wp-status', (e) => {
+      const w = e.detail.wis;
+      if (!w) return;
+      $('wis-now').textContent = w.score; $('wis-l').textContent = w.label; $('wis-inline').textContent = w.score + ' · ' + w.label;
+      $('wis-now').className = 'wis-score ' + (w.score >= 100 ? 'bad' : w.score >= 60 ? 'warn' : 'ok');
+      $('wis-h').textContent = w.trend == null ? '' : w.trend > 0 ? 'Rising over the last half hour.' : w.trend < 0 ? 'Easing over the last half hour.' : 'Holding steady.';
+    });
+  </script>
+</body>
+</html>

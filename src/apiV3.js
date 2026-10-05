@@ -25,6 +25,7 @@ import { getHeadlines } from './headlines.js';
 import { gasSegment } from './gasPrices.js';
 import { trainCams } from './trainCams.js';
 import { wpcOutlook } from './wpcOutlook.js';
+import { niceSummary } from './nice.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
 
@@ -422,6 +423,10 @@ export const apiV3Router = () => {
   // or near ?lat=&lon=&name=&state= for a viewer request.
   // SouthWest RailCams live cams for the Train Cam segment (src/trainCams.js).
   // WPC Excessive Rainfall Outlooks, days 1-3 (src/wpcOutlook.js).
+  // Porch Weather: WeatherPower's own nice-weather score for a few hundred cities, 7 days (src/nice.js).
+  router.get('/nice', async (req, res, next) => {
+    try { res.set('Cache-Control', 'public, max-age=300'); res.json(await niceSummary()); } catch (error) { next(error); }
+  });
   router.get('/wpc', async (req, res, next) => {
     try { res.json(await wpcOutlook()); } catch (error) { next(error); }
   });

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeBot Tracker · WeatherPower</title>
+  <meta name="description" content="What WeBot is showing on the stream right now, what he said last, who's watching and what weather he's keeping an eye on.">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <section class="hero"><div class="wrap grid">
+    <div class="s4" style="text-align:center"><img src="/warningcenter/public/assets/webot.png" alt="WeBot" style="width:min(260px,70%);filter:drop-shadow(0 0 30px rgba(51,212,255,.35))">
+      <div class="mid" style="margin-top:8px">WeBot</div><div class="k">AI weather bot · not a Ryan copy</div></div>
+    <div class="s8 stack">
+      <div class="panel">
+        <h3><span id="onair-dot" style="width:10px;height:10px;background:var(--faint);display:inline-block"></span> <span id="onair">Checking…</span><span class="r" id="beat"></span></h3>
+        <div class="k" id="now-k">—</div>
+        <div class="big" id="now-t" style="margin:6px 0 4px">—</div>
+        <div class="dim" id="now-sub" style="min-height:22px"></div>
+        <div class="bar" style="margin-top:10px"><i id="now-bar" style="width:0"></i></div>
+        <div class="row" style="justify-content:space-between;margin-top:6px"><span class="k" id="now-start"></span><span class="k" id="now-left"></span></div>
+        <div class="sep"></div>
+        <div class="k" style="margin-bottom:8px">Up next</div><div class="row" id="next"></div>
+      </div>
+      <div class="stats">
+        <div class="panel stat"><span class="k">Watching now</span><b id="st-v">—</b></div>
+        <div class="panel stat"><span class="k">Total views</span><b id="st-tv">—</b></div>
+        <div class="panel stat"><span class="k">Live for</span><b id="st-up">—</b></div>
+      </div>
+    </div>
+  </div></section>
+
+  <section><div class="wrap grid">
+    <div class="s6 panel"><h3>What WeBot said</h3><div id="said" class="stack"><span class="dim">—</span></div></div>
+    <div class="s6 stack">
+      <div class="panel"><h3>What he's keeping an eye on <span class="r" id="watch-n"></span></h3><ul class="list" id="watch"><li><i></i><span class="dim">—</span><span></span></li></ul></div>
+      <div class="panel"><h3>Weather Intensity Score</h3><div class="row" style="align-items:baseline;gap:14px"><span class="wis-score ok" id="wis">—</span><span class="mid" id="wis-l"></span></div>
+        <div class="row" style="margin-top:10px;gap:14px" id="tallies"></div></div>
+      <div class="panel"><h3>Mode</h3><div class="row" id="mode"></div>
+        <p class="dim" style="margin:10px 0 0;font-size:13px">WeBot runs the show himself. The owner can take over from WeBot Studio: pin an alert, change the segment, make him talk, or put a hat on him.</p></div>
+    </div>
+  </div></section>
+
+  <script src="/site.js"></script>
+  <script>
+    const KINDS = { alert: 'Top alert', pinned: 'Pinned alert', think: 'Model check', models: 'Weather models', national: 'National radar', outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', forecast: 'Daily forecast', gas: 'Gas prices', rain: 'Rain outlook', train: 'Train cam' };
+    document.addEventListener('wp-status', (e) => {
+      const s = e.detail, on = s.onAir && !s.brb;
+      $('onair-dot').style.background = on ? 'var(--red)' : s.brb ? 'var(--amber)' : 'var(--faint)';
+      $('onair').textContent = on ? 'On air' : s.brb ? 'Be right back' : 'Off air';
+      $('beat').textContent = s.beatAt ? 'heartbeat ' + ago(s.beatAt) : '';
+      const n = s.now || s.last;
+      $('now-k').textContent = (KINDS[n?.type] || n?.type || '') + (s.pinned ? ' · PINNED' : '');
+      $('now-t').textContent = s.brb ? (s.brb.message || 'Be right back') : n?.k || n?.title || (on ? 'Live' : 'The stream is down');
+      $('now-sub').textContent = n?.title && n?.k && n.title !== n.k ? n.title : '';
+      if (n?.start && n?.end) { const a = Date.parse(n.start), b = Date.parse(n.end); $('now-bar').style.width = Math.min(100, (Date.now() - a) / (b - a) * 100) + '%'; $('now-start').textContent = 'started ' + clock(n.start); $('now-left').textContent = Date.now() < b ? 'next in ' + dur(b - Date.now()) : 'wrapping up'; }
+      $('next').innerHTML = (s.upNext || []).slice(0, 4).map((k, i) => `<span class="chip">${i + 1} · ${esc(KINDS[k] || k)}</span>`).join('') || '<span class="dim">—</span>';
+      $('st-v').textContent = num(s.chat?.viewers); $('st-tv').textContent = num(s.chat?.totalViews);
+      $('st-up').textContent = s.chat?.startedAt ? dur(Date.now() - Date.parse(s.chat.startedAt)) : '—';
+      const said = (s.said || []).slice(0, 8);
+      $('said').innerHTML = said.length ? said.map((x) => `<div class="quote">“${esc(x.text)}”<small>${esc(clock(x.at))} · ${esc(ago(x.at))}</small></div>`).join('') : '<span class="dim">Nothing yet.</span>';
+      const w = s.watching || [];
+      $('watch-n').textContent = w.length ? w.length + ' warnings' : '';
+      $('watch').innerHTML = w.length ? w.map((a) => `<li><i style="background:${esc(a.color || '#888')}"></i><div><b>${esc(a.label)}${a.count > 1 ? ' ×' + a.count : ''}</b><small>${esc(a.place)}${a.states?.length ? ' · ' + esc(a.states.join(', ')) : ''}</small></div><small>${esc(left(a.expiresAt))}</small></li>`).join('')
+        : '<li><i style="background:var(--green)"></i><div><b>Nothing scary</b><small>No warnings on the board.</small></div><span></span></li>';
+      if (s.wis) { $('wis').textContent = s.wis.score; $('wis-l').textContent = s.wis.label; $('wis').className = 'wis-score ' + (s.wis.score >= 100 ? 'bad' : s.wis.score >= 60 ? 'warn' : 'ok'); }
+      const t = s.tallies || {};
+      $('tallies').innerHTML = [['tor', 'Tornado'], ['svr', 'Severe'], ['ffw', 'Flash flood'], ['watches', 'Watches']].filter(([k]) => t[k] != null).map(([k, l]) => `<div class="stat"><span class="k">${l}</span><b style="font-size:22px">${t[k]}</b></div>`).join('');
+      $('mode').innerHTML = [['Show', s.mode === 'auto' ? 'Auto (WeBot picks)' : 'Owner picked: ' + s.mode], ['Voice', s.voice || (on ? 'on' : '—')], ['Talk', { auto: 'Quiet until WIS 100', on: 'Talking', off: 'Quiet' }[s.talk] || s.talk], ['Chat', s.chat?.enabled ? 'Answering chat' : 'Chat off']].map(([k, v]) => `<div class="stat"><span class="k">${k}</span><b style="font-size:16px;font-family:'WP Display';text-transform:uppercase;letter-spacing:.03em">${esc(v)}</b></div>`).join('');
+    });
+  </script>
+</body>
+</html>

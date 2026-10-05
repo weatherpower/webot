@@ -25,6 +25,7 @@ Read this first. It explains what this project is, where it runs, and how to cha
 | `deploy/cloud-stream/` | `run.sh` (stream), `notify.cjs` + `notify-cron.sh` (ntfy phone alerts), `snapshot.cjs` |
 | `studio/` | **WeBot Studio**: local control-room app (port 7777) that manages the server over SSH |
 | `house/` | **WeatherPower Stream House**: warning-map + OBS overlay app for the owner's own streams (port 7788) |
+| `site/` | **Public website** (http://207.244.248.128/): home, WeBot tracker, Porch Weather (`src/nice.js`, Open-Meteo, our own tiers), tools, about. Served by the public status listener in `src/server.js`, which also passes through read-only API routes. Old status page moved to /status. |
 | `deploy/studio-web/` | **Studio on the web**: https://207-244-248-128.sslip.io (Caddy HTTPS + sign-in with the controller token, STUDIO_WEB=1; runs server commands locally instead of SSH; no code/deploy/firewall). Update: `cd /opt/weatherpower/deploy/studio-web && docker compose up -d --build` |
 | `desktop/` | Electron shell that runs Studio and Stream House as Windows .exe programs (`npm run build`) |
 

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Porch Weather · WeatherPower</title>
+  <meta name="description" content="WeBot's 7-day rating of how nice it'll be outside, for 390 US cities: from Porch Perfect to Stay In.">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <section class="hero" style="padding-bottom:0"><div class="wrap">
+    <div class="k">The good side of the forecast</div>
+    <h1>Porch <span>Weather</span></h1>
+    <p class="lead" id="lead">How nice will it be to sit outside? WeBot rates 390 cities every hour, seven days out, from <b style="color:#ffd23f">Porch Perfect</b> down to <b style="color:#5a6478">Stay In</b>.</p>
+    <div class="tabs" id="tabs"></div>
+  </div></section>
+
+  <section style="padding-top:0"><div class="wrap grid">
+    <div class="s8">
+      <div class="map" id="map"><div class="legend" id="legend"></div></div>
+      <p class="faint" style="font-size:12px;margin:8px 0 0">Click a city for the details. Scores are WeBot's own, from Open-Meteo forecasts: temperature, humidity, clouds, rain chance and wind. A likely-wet day can't score above Fair; dangerous heat is always Stay In.</p>
+    </div>
+    <div class="s4 stack">
+      <div class="panel"><h3 id="home-h">Idabel, OK</h3>
+        <div class="row" style="align-items:baseline;gap:12px"><span class="big" id="home-sc">—</span><span class="mid" id="home-tier"></span></div>
+        <div class="dim" id="home-line" style="margin:4px 0 12px">—</div>
+        <div class="week" id="home-week"></div></div>
+      <div class="panel"><h3>Nicest cities <span class="r" id="rank-day"></span></h3><ol class="rank" id="rank"></ol></div>
+    </div>
+  </div></section>
+
+  <section style="padding-top:0"><div class="wrap grid">
+    <div class="s7 panel"><h3>WeBot's porch report <span class="r" id="disc-at"></span></h3><div class="disc" id="disc">—</div></div>
+    <div class="s5 panel"><h3>How the tiers work</h3>
+      <table class="t"><thead><tr><th>Tier</th><th>Means</th></tr></thead><tbody>
+        <tr><td style="color:#ffd23f">Porch Perfect</td><td>90+ and nothing wrong: comfy temps, dry air, clear sky, no rain, light wind.</td></tr>
+        <tr><td style="color:#3ee08f">Mighty Fine</td><td>80+. One little thing off, like a few clouds or a breeze.</td></tr>
+        <tr><td style="color:#33d4ff">Nice</td><td>70+. Good porch day. Maybe grab a sweater or a fan.</td></tr>
+        <tr><td style="color:#8b6cff">Fair</td><td>55+. It'll do. Warm, muggy, cloudy or a rain chance.</td></tr>
+        <tr><td style="color:#8a94a8">Stay In</td><td>Under 55, likely rain, or dangerous heat. WeBot's staying inside and so should you.</td></tr>
+      </tbody></table></div>
+  </div></section>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="/site.js"></script>
+  <script>
+    let B = null, day = 0, map = null;
+    const DAYN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayLabel = (i) => (i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : DAYN[new Date(B.days[i].date + 'T12:00:00').getDay()]);
+    const color = (tier) => B.tiers.find((t) => t.tier === tier)?.color || '#888';
+    const best = (i) => { const c = B.counts[i]; return B.tiers.find((t) => c[t.tier] > 0)?.tier || 'Stay In'; };
+    const geo = () => ({ type: 'FeatureCollection', features: B.cities.filter((c) => c.days[day]).map((c) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lon, c.lat] }, properties: { name: c.name + ', ' + c.state, ...c.days[day], color: c.days[day].color } })) });
+    const render = () => {
+      $('tabs').innerHTML = B.days.map((d, i) => `<button class="${i === day ? 'on' : ''}" data-i="${i}"><b>${dayLabel(i)}</b><small style="color:${color(best(i))}">● ${best(i)}</small></button>`).join('');
+      const top = B.top[day] || [];
+      $('rank-day').textContent = dayLabel(day).toLowerCase();
+      $('rank').innerHTML = top.map((c) => `<li><div><b style="font:700 15px/1.2 'WP Display';letter-spacing:.03em">${esc(c.name)}, ${esc(c.state)}</b><br><small class="dim">${esc(c.tier)}</small></div><span class="sc" style="color:${color(c.tier)}">${c.score}</span></li>`).join('');
+      const h = B.home, hd = h?.days[day];
+      if (hd) {
+        $('home-h').textContent = h.name + ', ' + h.state + ' · ' + dayLabel(day);
+        $('home-sc').textContent = hd.score; $('home-sc').style.color = hd.color; $('home-tier').textContent = hd.tier;
+        $('home-line').textContent = `${hd.hi}° / ${hd.lo}° · rain ${hd.pop}% · clouds ${hd.cloud}% · wind ${hd.wind} mph` + (hd.dew != null ? ` · dew point ${hd.dew}°` : '');
+        $('home-week').innerHTML = h.days.map((d, i) => d ? `<div style="border-top-color:${d.color}"><small>${dayLabel(i).slice(0, 3)}</small><b>${Math.round(d.score)}</b><small>${d.hi}°</small></div>` : '<div></div>').join('');
+      }
+      const c = B.counts[day], n = B.cities.length, pct = (k) => Math.round(c[k] / n * 100);
+      const leader = top[0];
+      $('disc').textContent = [
+        `${dayLabel(day)}: ${pct('Porch Perfect') + pct('Mighty Fine')}% of the cities I watch are Mighty Fine or better, ${pct('Nice')}% are Nice, ${pct('Fair')}% are Fair, and ${pct('Stay In')}% are Stay In days.`,
+        leader ? `Best porch in the country is ${leader.name}, ${leader.state} at ${leader.score}. ${top.slice(1, 4).map((x) => x.name + ', ' + x.state).join(' and ')} aren't far behind.` : '',
+        hd ? `Back home in ${h.name}: ${hd.tier} at ${hd.score}. ${hd.pop >= 40 ? 'Rain chance of ' + hd.pop + '% is the problem.' : hd.cloud >= 60 ? 'It\'s the clouds holding us back.' : hd.dew != null && hd.dew >= 65 ? 'Muggy air is the problem; dew point ' + hd.dew + '.' : hd.hi >= 88 ? 'Too hot for a porch, sugar.' : hd.hi <= 50 ? 'Bring a blanket.' : 'Not bad at all.'}` : '',
+        'Automated from the forecast, no promises. Tier names are WeBot\'s. Always check the real forecast before you plan the cookout.'
+      ].filter(Boolean).join('\n\n');
+      $('disc-at').textContent = 'updated ' + clock(B.generatedAt);
+      if (map?.getSource('cities')) map.getSource('cities').setData(geo());
+    };
+    $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { day = Number(b.dataset.i); render(); } });
+    const start = async () => {
+      B = await getJson(API + '/nice');
+      $('legend').innerHTML = B.tiers.map((t) => `<div><i style="background:${t.color}"></i>${t.tier}</div>`).join('');
+      map = new maplibregl.Map({ container: 'map', style: 'https://tiles.openfreemap.org/styles/dark', center: [-96.5, 38.5], zoom: 3.3, attributionControl: { compact: true } });
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+      map.on('load', () => {
+        map.addSource('cities', { type: 'geojson', data: geo() });
+        map.addLayer({ id: 'glow', type: 'circle', source: 'cities', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 9, 6, 22], 'circle-color': ['get', 'color'], 'circle-opacity': .18, 'circle-blur': 1 } });
+        map.addLayer({ id: 'dots', type: 'circle', source: 'cities', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 4, 6, 9], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#070b14', 'circle-stroke-width': 1 } });
+        map.on('click', 'dots', (e) => {
+          const p = e.features[0].properties;
+          new maplibregl.Popup({ closeButton: false }).setLngLat(e.features[0].geometry.coordinates).setHTML(`<b style="font:700 15px 'WP Display';letter-spacing:.03em">${esc(p.name)}</b><br><span style="color:${p.color};font-weight:700">${esc(p.tier)}</span> · ${p.score}/100<br><span style="color:#9aa7c0">${p.hi}°/${p.lo}° · rain ${p.pop}% · clouds ${p.cloud}% · wind ${p.wind} mph</span>`).addTo(map);
+        });
+        map.on('mouseenter', 'dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'dots', () => { map.getCanvas().style.cursor = ''; });
+      });
+      render();
+    };
+    start().catch((e) => { $('disc').textContent = 'Porch Weather is warming up (' + e.message + '). Try again in a minute.'; });
+  </script>
+</body>
+</html>

@@ -620,7 +620,24 @@ const startServer = async () => {
     pub.disable('x-powered-by');
     pub.use(compression());
     const page = (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(publicDir, 'webot.html')); };
-    pub.get(['/', '/webot', '/warningcenter/webot'], page);
+    // The public WeatherPower website (site/): home, WeBot tracker, Porch Weather, tools, about.
+    const siteDir = path.join(publicDir, '..', 'site');
+    pub.use(express.static(siteDir, { extensions: ['html'], index: 'index.html', maxAge: '5m' }));
+    pub.get('/site-config.json', (req, res) => {
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json({ channelId: process.env.YOUTUBE_CHANNEL_ID || '', videoId: process.env.YOUTUBE_VIDEO_ID || '', home: { lat: config.forecast.lat, lon: config.forecast.lon, city: config.forecast.city, state: config.forecast.state } });
+    });
+    // Read-only weather data for the website, passed through from the main server (same JSON, nothing private).
+    const PUBLIC_API = /^\/warningcenter\/api\/v3\/(alerts|wis|nice|wpc|surface|headlines|tropics|gas|forecast\/city)$/;
+    pub.get(PUBLIC_API, async (req, res) => {
+      try {
+        const r = await fetch(`http://127.0.0.1:${config.port}${req.originalUrl}`, { signal: AbortSignal.timeout(20000) });
+        res.status(r.status).set('Cache-Control', 'public, max-age=10').type('application/json').send(await r.text());
+      } catch (e) {
+        res.status(503).json({ ok: false, error: e.message });
+      }
+    });
+    pub.get(['/status', '/warningcenter/webot'], page);
     pub.get('/warningcenter/api/v3/webot/status', async (req, res) => {
       try {
         res.set('Cache-Control', 'public, max-age=3');
