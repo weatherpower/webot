@@ -1,17 +1,18 @@
-"""WeatherPower Level 2 radar: NEXRAD-resolution radar images, made on a PC and pushed to the cloud server.
+"""WeatherPower Level 2 radar: NEXRAD-resolution radar for every site, made on a PC and pushed to the cloud server.
 
-For each radar site it finds the newest Level 2 volume on NOAA's public feed (noaa-nexrad-level2 on AWS,
-free, no key), decodes it with MetPy, and paints the lowest tilt of four products (reflectivity, velocity,
-correlation coefficient, differential reflectivity) as a square PNG in Web Mercator, so the website drops
-it straight on the map (site/radar.html). Then it copies the PNGs and an index.json to the server over scp.
+For each radar site it finds the newest Level 2 volume on NOAA/Unidata's free real-time chunk feed, decodes it
+with MetPy, and paints the lowest tilt of up to four products (reflectivity, velocity, correlation coefficient,
+differential reflectivity) as a square palette PNG in Web Mercator, so the website drops it straight on the
+map (site/radar.html). Sites render in parallel on all cores; changed files go to the server in one tar over ssh.
 
-    python radar_l2.py --once --sites KSRX           # one pass, for testing
-    python radar_l2.py --loop --sites KSRX,KSHV,KTLX  # keep going (run.cmd does this)
+    python radar_l2.py --once --sites KSRX,KTLX     # one pass for a few sites (testing)
+    python radar_l2.py --loop                       # every site, forever (run.cmd does this)
 
 Needs: pip install metpy pillow. Uses the same ssh key and port as WeBot Studio.
 """
-import argparse, io, json, math, os, re, subprocess, sys, time, urllib.request, xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
+import argparse, io, json, math, os, subprocess, sys, tarfile, time, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime, timezone
 import numpy as np
 from PIL import Image
 
@@ -21,59 +22,83 @@ BUCKET = 'https://unidata-nexrad-level2-chunks.s3.amazonaws.com'   # NOAA/Unidat
 REMOTE = os.environ.get('WP_REMOTE', 'root@207.244.248.128')
 REMOTE_PORT = os.environ.get('WP_SSH_PORT', '22022')
 REMOTE_DIR = '/opt/weatherpower/data/radar-l2'
-RANGE_M = 460_000.0           # how far out we paint (full Level 2 range)
-SIZE = int(os.environ.get('WP_L2_SIZE', '2400'))   # image pixels per side (2400 ≈ 0.38 km/px)
-KEEP = 6                      # frames per site kept for the loop
-A = 6378137.0                 # Web Mercator radius
-
-# Color tables: (value, (r, g, b)) stops, linear between. Below the first stop is transparent.
+RANGE_M = 460_000.0
+SIZE = int(os.environ.get('WP_L2_SIZE', '2000'))     # pixels per side (2000 ≈ 0.46 km/px)
+KEEP = 6                                              # frames per site
+WORKERS = max(1, (os.cpu_count() or 4) - 2)
+A = 6378137.0
+CLEAR_AIR_VCPS = {31, 32, 35}                         # nothing to see in CC/ZDR; render ref + vel only
+PRODUCTS = {'ref': b'REF', 'vel': b'VEL', 'cc': b'RHO', 'zdr': b'ZDR'}
+MS_TO_KT = 1.943844
+# Color ramps: (value, (r, g, b)) stops; below the first stop is transparent.
 RAMPS = {
     'ref': [(5, (4, 233, 231)), (10, (1, 159, 244)), (15, (3, 0, 244)), (20, (2, 253, 2)), (25, (1, 197, 1)), (30, (0, 142, 0)), (35, (253, 248, 2)), (40, (229, 188, 0)), (45, (253, 149, 0)), (50, (253, 0, 0)), (55, (212, 0, 0)), (60, (188, 0, 0)), (65, (248, 0, 253)), (70, (152, 84, 198)), (75, (255, 255, 255))],
     'vel': [(-70, (16, 97, 16)), (-40, (0, 200, 0)), (-10, (150, 255, 150)), (0, (110, 110, 110)), (10, (255, 150, 150)), (40, (200, 0, 0)), (70, (100, 0, 0))],
     'cc': [(0.2, (0, 0, 0)), (0.5, (90, 90, 90)), (0.8, (0, 0, 200)), (0.9, (0, 200, 255)), (0.95, (0, 255, 0)), (0.98, (255, 255, 0)), (1.0, (255, 0, 0)), (1.05, (255, 255, 255))],
     'zdr': [(-2, (100, 100, 100)), (0, (0, 0, 160)), (1, (0, 200, 255)), (2, (0, 255, 0)), (3, (255, 255, 0)), (4, (255, 120, 0)), (6, (255, 0, 0)), (8, (255, 0, 255))],
 }
-PRODUCTS = {'ref': b'REF', 'vel': b'VEL', 'cc': b'RHO', 'zdr': b'ZDR'}
-MS_TO_KT = 1.943844
+# 63 palette colors per product (index 0 = transparent)
+PALETTES = {}
+for _name, _ramp in RAMPS.items():
+    _xs = np.array([v for v, _ in _ramp], dtype=np.float32)
+    _cols = np.array([c for _, c in _ramp], dtype=np.float32)
+    _lv = np.linspace(_xs[0], _xs[-1], 63)
+    _pal = [0, 0, 0] + [int(round(np.interp(l, _xs, _cols[:, ch]))) for l in _lv for ch in range(3)]
+    PALETTES[_name] = (float(_xs[0]), float(_xs[-1]), _pal + [0] * (768 - len(_pal)))
 
 def log(*a):
-    print(datetime.now().strftime('%H:%M:%S'), *a, flush=True)
+    line = datetime.now().strftime('%H:%M:%S') + ' ' + ' '.join(str(x) for x in a)
+    print(line, flush=True)
+    try:
+        p = os.path.join(OUT, 'radar.log')
+        if os.path.exists(p) and os.path.getsize(p) > 400_000:
+            os.replace(p, p + '.old')
+        with open(p, 'a', encoding='utf-8') as fh:
+            fh.write(line + '\n')
+    except OSError:
+        pass
 
-def list_keys(prefix):
-    keys, token = [], ''
-    while True:
-        url = f"{BUCKET}/?list-type=2&prefix={prefix}&max-keys=1000" + (f"&continuation-token={urllib.parse.quote(token)}" if token else '')
-        with urllib.request.urlopen(url, timeout=30) as r:
-            root = ET.fromstring(r.read())
-        ns = {'s': root.tag.split('}')[0].strip('{')}
-        keys += [k.text for k in root.findall('.//s:Key', ns)]
-        token = root.findtext('s:NextContinuationToken', default='', namespaces=ns)
-        if not token:
-            return keys
+def s3_list(params):
+    url = f"{BUCKET}/?list-type=2&" + urllib.parse.urlencode(params)
+    with urllib.request.urlopen(url, timeout=30) as r:
+        root = ET.fromstring(r.read())
+    ns = {'s': root.tag.split('}')[0].strip('{')}
+    return ([k.text for k in root.findall('.//s:Key', ns)], [p.text for p in root.findall('.//s:CommonPrefixes/s:Prefix', ns)], root.findtext('s:NextContinuationToken', default='', namespaces=ns))
 
-# The real-time feed is in chunks: <site>/<volume 1..999>/<YYYYMMDD-HHMMSS>-<nnn>-<S|I|E>. A volume's chunks
-# concatenated in order are a normal Level 2 file, and the lowest tilts arrive first, so we can paint a volume
-# about a minute after it starts instead of waiting five for it to finish.
-VOLS = {}   # site -> current volume number (so we only list one or two prefixes a minute, not the whole site)
-def newest_volume(site):
-    if site not in VOLS:
-        t = time.time()
-        keys = list_keys(f"{site}/")
-        if not keys:
-            return None
-        VOLS[site] = max(keys, key=lambda k: k.split('/')[2]).split('/')[1]
-        log(site, 'scanned', len(keys), 'chunks in', round(time.time() - t, 1), 's; current volume', VOLS[site])
+def all_sites():
+    """Every radar site in the feed (the bucket's top-level folders)."""
+    _, prefixes, _ = s3_list({'delimiter': '/', 'max-keys': '1000'})
+    return sorted(p.strip('/') for p in prefixes if len(p.strip('/')) == 4)
+
+def volume_chunks(site, vol):
+    keys, _, _ = s3_list({'prefix': f"{site}/{vol}/", 'max-keys': '200'})
+    return sorted(k.split('/')[2] for k in keys)
+
+def newest_volume(site, hint):
+    """(volume, chunk names). Volumes number 1..999 and wrap; the feed keeps a window of them, so the newest
+    is the one whose successor is missing. With a hint we only look at that volume and the next."""
+    if hint:
+        best = None
+        for v in (hint, str(int(hint) % 999 + 1)):
+            names = volume_chunks(site, v)
+            if names and (best is None or names[0] > best[1][0]):
+                best = (v, names)
+        if best:
+            return best
+    _, prefixes, _ = s3_list({'prefix': f"{site}/", 'delimiter': '/', 'max-keys': '1000'})
+    vols = {int(p.split('/')[1]) for p in prefixes}
+    if not vols:
+        return None
+    ends = [v for v in vols if (v % 999 + 1) not in vols] if len(vols) < 999 else list(vols)
     best = None
-    for v in (VOLS[site], str(int(VOLS[site]) % 999 + 1)):
-        names = sorted(k.split('/')[2] for k in list_keys(f"{site}/{v}/"))
+    for v in ends[:6]:
+        names = volume_chunks(site, str(v))
         if names and (best is None or names[0] > best[1][0]):
-            best = (v, names)
-    if best:
-        VOLS[site] = best[0]
+            best = (str(v), names)
     return best
 
 def download(site, vol, names):
-    """The volume so far, as one file (chunks are cached: they never change)."""
+    """The volume so far, as one file (chunks are cached; they never change)."""
     cdir = os.path.join(OUT, '_cache', site, vol)
     os.makedirs(cdir, exist_ok=True)
     buf = io.BytesIO()
@@ -84,7 +109,6 @@ def download(site, vol, names):
                 fh.write(r.read())
         with open(p, 'rb') as fh:
             buf.write(fh.read())
-    # old volumes' chunks are not needed any more
     for old in os.listdir(os.path.join(OUT, '_cache', site)):
         if old != vol:
             d = os.path.join(OUT, '_cache', site, old)
@@ -99,7 +123,6 @@ def stamp_of(name):
     return f"{d[:4]}-{d[4:6]}-{d[6:]}T{t[:2]}:{t[2:4]}:{t[4:]}Z"
 
 def sweep_grid(sweep, prod):
-    """One sweep's product as (azimuths sorted, 2-D data [ray, gate], first_gate_m, gate_width_m)."""
     rays = [r for r in sweep if prod in r[4]]
     if not rays:
         return None
@@ -111,60 +134,52 @@ def sweep_grid(sweep, prod):
         d = np.ma.filled(np.asarray(r[4][prod][1], dtype=np.float32), np.nan)
         data[i, :d.size] = d
     az = np.array([r[0].az_angle for r in rays], dtype=np.float32)
-    # MetPy reports gate spacing in km (0.25 for super-res); we work in meters.
     first, width = float(hdr0.first_gate), float(hdr0.gate_width)
-    if width < 10:
+    if width < 10:            # MetPy reports km; we work in meters
         first, width = first * 1000, width * 1000
     return az, data, first, width
 
 def lowest_sweep(f, prod):
-    # Volumes scan bottom-up, so the first sweep with the product is the lowest tilt that has it
-    # (the long-range surveillance cut for reflectivity, the Doppler cut for velocity).
+    # Volumes scan bottom-up: the first full sweep with the product is the lowest tilt that has it.
     for s in f.sweeps:
         if s and prod in s[0][4] and len(s) >= 300:
             return (s[0][0].el_angle, s)
     return None
 
-def colorize(vals, ramp):
-    xs = np.array([v for v, _ in ramp], dtype=np.float32)
-    cols = np.array([c for _, c in ramp], dtype=np.float32)
-    rgba = np.zeros(vals.shape + (4,), dtype=np.uint8)
-    ok = np.isfinite(vals) & (vals >= xs[0])
-    v = np.clip(vals[ok], xs[0], xs[-1])
-    for ch in range(3):
-        rgba[..., ch][ok] = np.interp(v, xs, cols[:, ch]).astype(np.uint8)
-    rgba[..., 3][ok] = 255
-    return rgba
+def palette_image(vals, name):
+    lo, hi, pal = PALETTES[name]
+    idx = np.zeros(vals.shape, dtype=np.uint8)
+    ok = np.isfinite(vals) & (vals >= lo)
+    idx[ok] = 1 + np.rint((np.clip(vals[ok], lo, hi) - lo) / (hi - lo) * 62).astype(np.uint8)
+    im = Image.fromarray(idx, 'P')
+    im.putpalette(pal)
+    return im
 
-def render(f, lat0, lon0, size):
-    """Inverse-map every output pixel (Web Mercator square around the site) to (azimuth, range) and sample."""
+def render(f, lat0, lon0, size, products):
     k = 1 / math.cos(math.radians(lat0))
     H = RANGE_M * k
     X0 = math.radians(lon0) * A
     Y0 = math.log(math.tan(math.pi / 4 + math.radians(lat0) / 2)) * A
     px = (np.arange(size, dtype=np.float64) + 0.5) / size * 2 * H - H
-    X = X0 + px[None, :]
-    Y = Y0 - px[:, None]
-    lon = np.degrees(X / A)
-    lat = np.degrees(2 * np.arctan(np.exp(Y / A)) - math.pi / 2)
+    lon = np.degrees((X0 + px) / A)
+    lat = np.degrees(2 * np.arctan(np.exp((Y0 - px) / A)) - math.pi / 2)
     la0, lo0 = math.radians(lat0), math.radians(lon0)
-    la, lo = np.radians(lat), np.radians(lon)
-    dlo = lo - lo0
-    rng = 6371000.0 * 2 * np.arcsin(np.sqrt(np.sin((la - la0) / 2) ** 2 + math.cos(la0) * np.cos(la) * np.sin(dlo / 2) ** 2))
-    az = (np.degrees(np.arctan2(np.sin(dlo) * np.cos(la), math.cos(la0) * np.sin(la) - math.sin(la0) * np.cos(la) * np.cos(dlo))) + 360) % 360
+    la = np.radians(lat)[:, None]
+    dlo = np.radians(lon)[None, :] - lo0
+    rng = (6371000.0 * 2 * np.arcsin(np.sqrt(np.sin((la - la0) / 2) ** 2 + math.cos(la0) * np.cos(la) * np.sin(dlo / 2) ** 2))).astype(np.float32)
+    az = ((np.degrees(np.arctan2(np.sin(dlo) * np.cos(la), math.cos(la0) * np.sin(la) - math.sin(la0) * np.cos(la) * np.cos(dlo))) + 360) % 360).astype(np.float32)
     bounds = [float(np.degrees((X0 - H) / A)), float(np.degrees(2 * math.atan(math.exp((Y0 - H) / A)) - math.pi / 2)),
               float(np.degrees((X0 + H) / A)), float(np.degrees(2 * math.atan(math.exp((Y0 + H) / A)) - math.pi / 2))]
     images, tilts = {}, {}
-    for name, prod in PRODUCTS.items():
-        found = lowest_sweep(f, prod)
+    for name in products:
+        found = lowest_sweep(f, PRODUCTS[name])
         if not found:
             continue
         el, sweep = found
-        g = sweep_grid(sweep, prod)
+        g = sweep_grid(sweep, PRODUCTS[name])
         if not g:
             continue
         azs, data, first, width = g
-        # nearest ray by azimuth (with wrap-around), nearest gate by range
         idx = np.searchsorted(azs, az) % len(azs)
         prev = (idx - 1) % len(azs)
         d1 = np.abs((azs[idx] - az + 180) % 360 - 180)
@@ -175,105 +190,132 @@ def render(f, lat0, lon0, size):
         vals = np.full(az.shape, np.nan, dtype=np.float32)
         vals[valid] = data[ray[valid], gate[valid]]
         if name == 'vel':
-            vals = vals * MS_TO_KT
-        images[name] = Image.fromarray(colorize(vals, RAMPS[name]), 'RGBA')
+            vals *= MS_TO_KT
+        images[name] = palette_image(vals, name)
         tilts[name] = round(float(el), 1)
     return images, tilts, bounds
 
 def site_latlon(f):
-    ray = f.sweeps[0][0]
-    for part in ray[1:4]:
+    for part in f.sweeps[0][0][1:4]:
         if hasattr(part, 'lat') and hasattr(part, 'lon'):
             return float(part.lat), float(part.lon)
     raise RuntimeError('No site position in the file')
 
-def process(site, vol, names, index):
+def vcp_of(f):
+    info = getattr(f, 'vcp_info', None)
+    for attr in ('num', 'pattern_num', 'vcp'):
+        v = getattr(info, attr, None)
+        if isinstance(v, (int, np.integer)):
+            return int(v)
+    return None
+
+def work(args):
+    """One site, in a worker process: find the newest volume, paint it if its lowest tilts are in."""
+    site, hint, seen = args
+    import warnings
+    warnings.filterwarnings('ignore')
     from metpy.io import Level2File
-    t0 = time.time()
-    f = Level2File(download(site, vol, names))
-    if not (lowest_sweep(f, b'REF') and lowest_sweep(f, b'VEL')):
-        return None   # the lowest tilts haven't all arrived yet; try again next minute
-    lat0, lon0 = site_latlon(f)
-    stamp = stamp_of(names[0])
-    images, tilts, bounds = render(f, lat0, lon0, SIZE)
-    sdir = os.path.join(OUT, site)
-    os.makedirs(sdir, exist_ok=True)
-    files = {}
-    for name, im in images.items():
-        fn = f"{site}_{stamp.replace(':', '').replace('-', '')}_{name}.png"
-        im.save(os.path.join(sdir, fn), optimize=True)
-        files[name] = f"{site}/{fn}"
-    entry = index['sites'].setdefault(site, {'lat': lat0, 'lon': lon0, 'bounds': bounds, 'frames': []})
-    entry.update({'lat': lat0, 'lon': lon0, 'bounds': bounds, 'tilts': tilts})
-    entry['frames'] = [fr for fr in entry['frames'] if fr['time'] != stamp] + [{'time': stamp, 'files': files}]
-    entry['frames'] = entry['frames'][-KEEP:]
-    keep = {os.path.basename(p) for fr in entry['frames'] for p in fr['files'].values()}
-    for fn in os.listdir(sdir):
-        if fn.endswith('.png') and fn not in keep:
-            os.remove(os.path.join(sdir, fn))
-    log(f"{site} {stamp} rendered {list(files)} tilts {tilts} in {time.time() - t0:.1f}s")
-    return list(files.values())
+    try:
+        found = newest_volume(site, hint)
+        if not found:
+            return {'site': site, 'status': 'no volumes'}
+        vol, names = found
+        stamp = stamp_of(names[0])
+        if stamp == seen:
+            return {'site': site, 'vol': vol, 'status': 'same'}
+        f = Level2File(download(site, vol, names))
+        if not (lowest_sweep(f, b'REF') and lowest_sweep(f, b'VEL')):
+            return {'site': site, 'vol': vol, 'status': 'not ready'}
+        vcp = vcp_of(f)
+        products = ['ref', 'vel'] if vcp in CLEAR_AIR_VCPS else list(PRODUCTS)
+        lat0, lon0 = site_latlon(f)
+        images, tilts, bounds = render(f, lat0, lon0, SIZE, products)
+        sdir = os.path.join(OUT, site)
+        os.makedirs(sdir, exist_ok=True)
+        files = {}
+        for name, im in images.items():
+            fn = f"{site}_{stamp.replace(':', '').replace('-', '')}_{name}.png"
+            im.save(os.path.join(sdir, fn), transparency=0, compress_level=6)
+            files[name] = f"{site}/{fn}"
+        return {'site': site, 'vol': vol, 'status': 'rendered', 'stamp': stamp, 'lat': lat0, 'lon': lon0, 'bounds': bounds, 'tilts': tilts, 'vcp': vcp, 'files': files}
+    except Exception as e:
+        return {'site': site, 'vol': hint, 'status': 'failed: ' + repr(e)[:160]}
 
 def upload(new_files, index):
-    if not new_files:
-        return
+    """Changed PNGs + index.json in one tar over ssh; the server then drops frames the index no longer lists."""
     index['generatedAt'] = datetime.now(timezone.utc).isoformat()
     with open(os.path.join(OUT, 'index.json'), 'w') as fh:
         json.dump(index, fh)
-    sites = sorted({p.split('/')[0] for p in new_files})
-    ssh = ['ssh', '-p', REMOTE_PORT, '-o', 'BatchMode=yes', REMOTE]
-    subprocess.run(ssh + [' '.join(f"mkdir -p {REMOTE_DIR}/{s};" for s in sites)], check=False, timeout=60)
-    for s in sites:
-        paths = [os.path.join(OUT, p) for p in new_files if p.startswith(s + '/')]
-        subprocess.run(['scp', '-P', REMOTE_PORT, '-o', 'BatchMode=yes', '-q', *paths, f"{REMOTE}:{REMOTE_DIR}/{s}/"], check=False, timeout=300)
-    subprocess.run(['scp', '-P', REMOTE_PORT, '-o', 'BatchMode=yes', '-q', os.path.join(OUT, 'index.json'), f"{REMOTE}:{REMOTE_DIR}/index.json"], check=False, timeout=60)
-    # keep the server tidy: only the frames the index knows about
-    keep = ' '.join(sorted({os.path.basename(p) for s in index['sites'].values() for fr in s['frames'] for p in fr['files'].values()}))
-    subprocess.run(ssh + [f"cd {REMOTE_DIR} && for f in */*.png; do case \" {keep} \" in *\" $(basename $f) \"*) ;; *) rm -f \"$f\";; esac; done"], check=False, timeout=60)
-    log('uploaded', len(new_files), 'files')
+    keep = sorted({os.path.basename(p) for s in index['sites'].values() for fr in s['frames'] for p in fr['files'].values()})
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode='w') as tar:
+        for p in new_files:
+            tar.add(os.path.join(OUT, p), arcname=p)
+        tar.add(os.path.join(OUT, 'index.json'), arcname='index.json')
+        k = ('\n'.join(keep) + '\n').encode()
+        ti = tarfile.TarInfo('keep.txt'); ti.size = len(k)
+        tar.addfile(ti, io.BytesIO(k))
+    cmd = (f"mkdir -p {REMOTE_DIR} && cd {REMOTE_DIR} && tar -xf - && "
+           "ls */*.png 2>/dev/null | xargs -r -n1 basename | sort > have.txt && sort keep.txt > k.txt && "
+           "comm -23 have.txt k.txt | while read f; do rm -f */\"$f\"; done; rm -f have.txt k.txt keep.txt")
+    r = subprocess.run(['ssh', '-p', REMOTE_PORT, '-o', 'BatchMode=yes', REMOTE, cmd], input=buf.getvalue(), capture_output=True, timeout=600)
+    if r.returncode:
+        raise RuntimeError(r.stderr.decode(errors='replace')[-200:])
+    log('uploaded', len(new_files), 'files,', round(len(buf.getvalue()) / 1e6, 1), 'MB')
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--sites', default='KSRX,KSHV,KTLX,KFWS,KLZK')
+    ap.add_argument('--sites', default='all')
     ap.add_argument('--once', action='store_true')
     ap.add_argument('--loop', action='store_true')
-    ap.add_argument('--every', type=int, default=60)
+    ap.add_argument('--every', type=int, default=30)
     ap.add_argument('--no-upload', action='store_true')
+    ap.add_argument('--workers', type=int, default=WORKERS)
     args = ap.parse_args()
-    sites = [s.strip().upper() for s in args.sites.split(',') if s.strip()]
     os.makedirs(OUT, exist_ok=True)
-    ipath = os.path.join(OUT, 'index.json')
+    ipath, spath = os.path.join(OUT, 'index.json'), os.path.join(OUT, 'state.json')
     index = json.load(open(ipath)) if os.path.exists(ipath) else {'sites': {}}
-    seen = {s: (index['sites'].get(s, {}).get('frames') or [{}])[-1].get('time') for s in sites}
-    while True:
-        new = []
-        for site in sites:
-            try:
-                found = newest_volume(site)
-                if not found:
-                    log(site, 'no volumes found'); continue
-                vol, names = found
-                stamp = stamp_of(names[0])
-                if seen.get(site) == stamp:
+    state = json.load(open(spath)) if os.path.exists(spath) else {'vols': {}, 'seen': {}}
+    sites = all_sites() if args.sites == 'all' else [s.strip().upper() for s in args.sites.split(',') if s.strip()]
+    log(len(sites), 'sites,', args.workers, 'workers, image', SIZE, 'px')
+    with ProcessPoolExecutor(max_workers=args.workers) as pool:
+        while True:
+            t0 = time.time()
+            new, counts = [], {}
+            futures = [pool.submit(work, (s, state['vols'].get(s), state['seen'].get(s))) for s in sites]
+            for fut in as_completed(futures):
+                r = fut.result()
+                counts[r['status'].split(':')[0]] = counts.get(r['status'].split(':')[0], 0) + 1
+                if r.get('vol'):
+                    state['vols'][r['site']] = r['vol']
+                if r['status'].startswith('failed'):
+                    log(r['site'], r['status'])
+                if r['status'] != 'rendered':
                     continue
-                made = process(site, vol, names, index)
-                if made is None:
-                    continue
-                new += made
-                seen[site] = stamp
-            except Exception as e:
-                log(site, 'failed:', repr(e)[:200])
-        if new and not args.no_upload:
-            try:
-                upload(new, index)
-            except Exception as e:
-                log('upload failed:', repr(e)[:200])
-        elif new:
-            with open(ipath, 'w') as fh:
-                json.dump(index, fh)
-        if not args.loop:
-            break
-        time.sleep(args.every)
+                state['seen'][r['site']] = r['stamp']
+                e = index['sites'].setdefault(r['site'], {'frames': []})
+                e.update({'lat': r['lat'], 'lon': r['lon'], 'bounds': r['bounds'], 'tilts': r['tilts'], 'vcp': r['vcp']})
+                e['frames'] = ([fr for fr in e['frames'] if fr['time'] != r['stamp']] + [{'time': r['stamp'], 'files': r['files']}])[-KEEP:]
+                keep = {os.path.basename(p) for fr in e['frames'] for p in fr['files'].values()}
+                sdir = os.path.join(OUT, r['site'])
+                for fn in os.listdir(sdir):
+                    if fn.endswith('.png') and fn not in keep:
+                        os.remove(os.path.join(sdir, fn))
+                new += list(r['files'].values())
+            with open(spath, 'w') as fh:
+                json.dump(state, fh)
+            if new and not args.no_upload:
+                try:
+                    upload(new, index)
+                except Exception as e:
+                    log('upload failed:', repr(e)[:200])
+            else:
+                with open(ipath, 'w') as fh:
+                    json.dump(index, fh)
+            log(f"cycle {time.time() - t0:.0f}s:", counts)
+            if not args.loop:
+                break
+            time.sleep(max(5, args.every - (time.time() - t0)))
 
 if __name__ == '__main__':
     main()
