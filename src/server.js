@@ -86,6 +86,7 @@ app.use((req, res, next) => {
     || req.path.startsWith('/cards/')
     || req.path.startsWith('/api/warnings/rendered/')
     || req.path.startsWith('/api/v3/')
+    || req.path.startsWith('/radar-l2/')
   );
   // Live control is token-checked in its own handler, which refuses to run without a configured token.
   const isPublicShortRequest = req.method === 'POST' && (req.path === '/api/v3/short/request' || req.path === '/api/v3/live/control');
