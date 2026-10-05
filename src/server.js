@@ -99,6 +99,8 @@ app.use((req, res, next) => {
 });
 app.use('/public', express.static(publicDir, { maxAge: '1h' }));
 app.use('/cards', express.static(cardsDir, { maxAge: '1h' }));
+// Level 2 radar images (radar-l2/radar_l2.py on the owner's PC → data/radar-l2) for the stream page.
+app.use('/radar-l2', express.static(path.join(publicDir, '..', 'data', 'radar-l2'), { maxAge: '20s', index: false }));
 
 app.get('/', (req, res) => {
   if (config.publicWarningCenterOnly) {
