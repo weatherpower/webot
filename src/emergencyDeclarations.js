@@ -4,7 +4,17 @@
 // emergencies are separate, so state providers are added from official state
 // emergency-management / governor sources. Florida is the first state provider.
 const FEMA_URL = 'https://www.fema.gov/api/open/v1/DisasterDeclarationsSummaries';
-const FLORIDA_NEWS_URL = 'https://www.floridadisaster.org/news-media/';
+const FLORIDA_INDEX_URLS = [
+  'https://www.floridadisaster.org/news-media/',
+  'https://www.floridadisaster.org/news-media/news/',
+  'https://www.flgov.com/eog/news',
+  'https://www.flgov.com/eog/news/executive-orders'
+];
+// Keep the current official article as a bootstrap while the index pages update.
+// It naturally ages out of the requested time window.
+const FLORIDA_BOOTSTRAP_URLS = [
+  'https://www.floridadisaster.org/news-media/news/icymi-governor-ron-desantis-issues-executive-order-in-preparation-for-tropical-depression-nine/'
+];
 const HEADERS = {
   Accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
   'User-Agent': 'weatherpower.app WeatherPower Live contact@weatherpower.app'
@@ -105,26 +115,42 @@ const federalDeclarations = async (windowDays) => {
   return [...grouped.values()];
 };
 
-const floridaStateEmergency = async (windowDays) => {
-  const html = await fetchTimed(FLORIDA_NEWS_URL);
-  const text = htmlText(html);
+const absoluteUrl = (href, base) => {
+  try {
+    const url = new URL(decodeHtml(href), base);
+    if (!['www.floridadisaster.org', 'floridadisaster.org', 'www.flgov.com', 'flgov.com'].includes(url.hostname)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+};
 
-  // FDEM publishes current governor state-of-emergency announcements on its News & Media page.
-  // Example wording: "Executive Order 26-202 declaring a state of emergency for 25 Florida counties
-  // in preparation for Tropical Depression Nine..."
+const linksFromHtml = (html, base) => {
+  const out = [];
+  for (const m of String(html || '').matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const label = htmlText(m[2]);
+    if (!/state of emergency|issues executive order|emergency management/i.test(label)) continue;
+    const url = absoluteUrl(m[1], base);
+    if (url && !out.includes(url)) out.push(url);
+  }
+  return out;
+};
+
+const parseFloridaEmergencyPage = (html, sourceUrl, windowDays) => {
+  const text = htmlText(html);
   const declaration = text.match(
     /Executive Order\s+([0-9]{2,4}-\d{1,3})\s+declaring a state of emergency for\s+(\d+)\s+Florida counties\s+in preparation for\s+([^,.]+)(?:,|\.)/i
   );
-  if (!declaration) return [];
+  if (!declaration) return null;
 
   const orderNumber = clean(declaration[1], 24);
   const expectedAreas = Number(declaration[2]) || 0;
   const incidentType = clean(declaration[3], 100);
   const declarationDate = parseUsDate(text);
-  if (!declarationDate) return [];
+  if (!declarationDate) return null;
 
   const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
-  if (Date.parse(declarationDate) < cutoff) return [];
+  if (Date.parse(declarationDate) < cutoff) return null;
 
   const countyMatch = text.match(
     /State of Emergency for the following counties:\s*([A-Za-z .,'-]+?)\.\s*(?:To continue|Visit|Updated:|$)/i
@@ -133,11 +159,13 @@ const floridaStateEmergency = async (windowDays) => {
     ? countyMatch[1].split(',').map((s) => clean(s.replace(/\band\s+/i, ''), 80)).filter(Boolean)
     : [];
 
-  return [{
+  return {
     id: `FL-EO-${orderNumber}`,
     sourceType: 'state',
-    source: 'Florida Division of Emergency Management',
-    sourceUrl: FLORIDA_NEWS_URL,
+    source: sourceUrl.includes('floridadisaster.org')
+      ? 'Florida Division of Emergency Management'
+      : 'Executive Office of the Governor of Florida',
+    sourceUrl,
     orderNumber,
     state: 'FL',
     title: clean(`State of Emergency — ${incidentType}`, 120),
@@ -148,7 +176,37 @@ const floridaStateEmergency = async (windowDays) => {
     designatedAreas: counties,
     areaCount: counties.length || expectedAreas,
     fresh: Date.now() - Date.parse(declarationDate) < 48 * 60 * 60 * 1000
-  }];
+  };
+};
+
+const floridaStateEmergency = async (windowDays) => {
+  const pages = new Map();
+  const candidates = [...FLORIDA_BOOTSTRAP_URLS];
+
+  for (const url of FLORIDA_INDEX_URLS) {
+    try {
+      const html = await fetchTimed(url);
+      pages.set(url, html);
+      for (const candidate of linksFromHtml(html, url)) {
+        if (!candidates.includes(candidate) && candidates.length < 10) candidates.push(candidate);
+      }
+      const direct = parseFloridaEmergencyPage(html, url, windowDays);
+      if (direct) return [direct];
+    } catch {
+      // One official Florida page being unavailable should not take out the whole emergency feed.
+    }
+  }
+
+  for (const url of candidates) {
+    try {
+      const html = pages.get(url) || await fetchTimed(url);
+      const item = parseFloridaEmergencyPage(html, url, windowDays);
+      if (item) return [item];
+    } catch {
+      // Keep trying the remaining official source pages.
+    }
+  }
+  return [];
 };
 
 export const emergencyDeclarations = async ({ days = 45 } = {}) => {
