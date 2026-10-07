@@ -76,6 +76,18 @@ const renderOverview = (o) => {
   $('s-subs').textContent = st.chat?.subscribers != null ? Number(st.chat.subscribers).toLocaleString() : '—';
   S.liveSince = st.chat?.startedAt ? Date.parse(st.chat.startedAt) : null;
   tickUptime();
+// Level 2 radar: the server's copy and the worker on this PC.
+  const l2 = o.radar || {};
+  const stale = l2.error || l2.ageMin == null || l2.ageMin > 15, warnish = !stale && l2.ageMin > 6;
+  $('o-l2-dot').className = 'dot ' + (stale ? 'bad' : warnish ? 'warn' : 'ok');
+  $('o-l2-state').textContent = l2.error ? 'No radar data on the server' : stale ? 'STALE: not updating' : warnish ? 'Slow' : 'Updating';
+  $('o-l2-age').textContent = l2.generatedAt ? 'last upload ' + ago(l2.generatedAt) : '';
+  $('o-l2-sites').textContent = l2.sites ?? '—'; $('o-l2-fresh').textContent = l2.fresh ?? '—'; $('o-l2-stale').textContent = l2.stale ?? '—';
+  $('o-l2-stale').className = 'big ' + (l2.stale > 20 ? 'bad' : l2.stale > 0 ? 'warn' : '');
+  const w = l2.worker;
+  $('o-l2-worker').innerHTML = w == null ? '<span class="dim">Check from the desktop Studio</span>' : w.error ? `<span class="bad">${esc(w.error)}</span>` : w.running ? '<span class="ok">● running</span>' : '<span class="bad">● not running</span>';
+  $('o-l2-start').hidden = !w || w.running; $('o-l2-stop').hidden = !w || !w.running;
+  $('o-l2-log').textContent = (w?.log || []).join('\n');
   if (!srv.error) {
     const cpuPct = pct(srv.container.cpu, srv.container.cpuLimit);
     $('s-cpu').textContent = Math.round(cpuPct) + '%';
@@ -207,6 +219,9 @@ const tickUptime = () => {
   $('s-uptime').textContent = d ? d + 'D ' + h + 'H' : h ? h + 'H ' + (m % 60) + 'M' : (m % 60) + 'M';
 };
 setInterval(tickUptime, 30000);
+
+$('o-l2-start').addEventListener('click', async () => { try { await call('POST', '/api/radar/start'); toast('Level 2 radar worker started'); setTimeout(loadOverview, 3000); } catch (e) { toast(e.message, 'bad'); } });
+$('o-l2-stop').addEventListener('click', async () => { if (!(await confirmBox('Stop the Level 2 radar?', 'The site keeps the last frames and falls back to the national radar.', 'Stop it'))) return; try { await call('POST', '/api/radar/stop'); toast('Stopped'); setTimeout(loadOverview, 2000); } catch (e) { toast(e.message, 'bad'); } });
 
 /* ---------------- controls (everything from Live Control, inside Studio) ---------------- */
 pages.controls = { enter: async () => {
