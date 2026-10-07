@@ -164,8 +164,60 @@ const tickSeg = () => {
   const left = Math.round((b - Date.now()) / 1000);
   $('o-left').textContent = left > 0 ? 'NEXT IN ' + (left >= 60 ? Math.floor(left / 60) + 'M ' + (left % 60) + 'S' : left + 'S') : 'WRAPPING UP';
 };
+const renderChatCommands = (feed = {}) => {
+  const rows = Array.isArray(feed.commands) ? feed.commands : [];
+  const queued = rows.filter((r) => r.status === 'queued' || r.status === 'manual').length;
+  const rejected = rows.filter((r) => r.status === 'rejected').length;
+  const failed = rows.filter((r) => r.status === 'failed').length;
+  const times = rows.map((r) => Number(r.responseMs)).filter(Number.isFinite);
+  $('chatmon-total').textContent = rows.length;
+  $('chatmon-queued').textContent = queued;
+  $('chatmon-rejected').textContent = rejected;
+  $('chatmon-failed').textContent = failed;
+  $('chatmon-response').textContent = times.length ? (times.reduce((a, b) => a + b, 0) / times.length / 1000).toFixed(1) + 's' : '—';
+  $('chatmon-state').textContent = feed.enabled ? (feed.live ? 'reading live chat' : 'waiting for live chat') : 'chat commands off';
+
+  const status = (r) => {
+    if (r.status === 'manual') return '<span class="chatmon-status manual">Manual queued</span>';
+    if (r.status === 'queued') return '<span class="chatmon-status queued">Queued</span>';
+    if (r.status === 'failed') return '<span class="chatmon-status failed">Failed</span>';
+    if (r.status === 'rejected') return '<span class="chatmon-status rejected">Rejected</span>';
+    return '<span class="chatmon-status received">Received</span>';
+  };
+  $('chatmon-body').innerHTML = rows.map((r) => {
+    const place = r.place ? [r.place.name, r.place.state].filter(Boolean).join(', ') : (r.query || '—');
+    const retry = r.place && ['rejected', 'failed'].includes(r.status)
+      ? `<button class="btn sm" data-chat-retry="${esc(r.id)}">Answer now</button>`
+      : '';
+    const result = status(r) + (r.reason ? `<div class="faint chatmon-reason">${esc(r.reason)}</div>` : '');
+    const response = Number.isFinite(Number(r.responseMs)) ? (Number(r.responseMs) / 1000).toFixed(1) + 's' : '—';
+    return `<tr>
+      <td><span class="mono">${esc(clock(r.at))}</span></td>
+      <td>${esc(r.user || 'Viewer')}</td>
+      <td><b class="mono">!${esc(r.kind === 'gas' ? 'gas' : 'forecast')}</b><div class="faint">${esc(r.query || '')}</div></td>
+      <td>${esc(place)}</td>
+      <td>${result}</td>
+      <td class="mono">${esc(response)}</td>
+      <td>${retry}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">No viewer commands yet.</td></tr>';
+};
+
 const loadOverview = async () => {
-  try { renderOverview(await call('GET', '/api/overview')); } catch (e) { $('s-onair-t').textContent = 'STUDIO ERROR'; toast(e.message, 'bad'); }
+  try {
+    const [overview, commands] = await Promise.all([
+      call('GET', '/api/overview'),
+      call('GET', '/api/chat-commands').catch((e) => ({ error: e.message, commands: [] }))
+    ]);
+    renderOverview(overview);
+    if (commands.error) {
+      $('chatmon-state').textContent = commands.error;
+      renderChatCommands({ commands: [] });
+    } else renderChatCommands(commands);
+  } catch (e) {
+    $('s-onair-t').textContent = 'STUDIO ERROR';
+    toast(e.message, 'bad');
+  }
 };
 setInterval(() => { if (!document.hidden) loadOverview(); }, 10000);
 setInterval(tickSeg, 1000);
@@ -190,6 +242,21 @@ $('c-brb').addEventListener('click', async () => {
 const sayIt = () => { const t = $('c-say').value.trim(); if (t) act({ action: 'say', text: t }, 'Sent to WeBot').then(() => { $('c-say').value = ''; }); };
 $('c-say-btn').addEventListener('click', sayIt);
 $('c-say').addEventListener('keydown', (e) => { if (e.key === 'Enter') sayIt(); });
+
+// Chat Command Monitor: manually queue a command that was rejected or failed automatically.
+$('chatmon-body').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-chat-retry]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    await call('POST', '/api/chat-commands/retry', { id: b.dataset.chatRetry });
+    toast('Viewer request queued manually');
+    setTimeout(loadOverview, 500);
+  } catch (err) {
+    toast(err.message, 'bad');
+  }
+  b.disabled = false;
+});
 
 // snapshot
 const snap = async () => {
