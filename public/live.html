@@ -3859,8 +3859,11 @@
           const last = st.last;
           if (!last?.start || Date.now() - Date.parse(last.end || last.start) > 15 * 60 * 1000) return;
           S.kinds = [...(st.recent || []).slice(0, 5).reverse().map((h) => h.type)].filter(Boolean).slice(-6);
-          S.plan = (st.lastPlan || []).filter((k) => k !== 'pinned');
-          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'emergency', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
+          S.plan = (st.lastPlan || []).filter((k) => k !== 'pinned' && k !== 'emergency');
+          // Emergency declarations are event-style cut-ins, not a resumable segment. If the page/server
+          // refreshes after one airs, move on instead of replaying the same declaration again.
+          if (last.type === 'emergency') return;
+          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
           else if (last.type) S.plan.unshift(last.type);
         } catch {}
       };
