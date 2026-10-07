@@ -281,6 +281,25 @@ API: `GET /api/v3/live` (tallies, index + history, control state, storm reports)
 "mode" | "voice" | "sound" | "banner" | "say" | "next" | "test-breaking" | "reload" | "ping" }`.
 Stream state is stored in `data/live-control.json` and `data/live-index.json`.
 
+### FEMA emergency declaration segment
+
+The 24/7 show now includes a **Federal Emergency Declarations** segment backed by the official
+FEMA OpenFEMA `DisasterDeclarationsSummaries` feed. It looks at recent `EM` declarations,
+groups FEMA's per-area rows into one declaration per state/disaster, and:
+
+- shades affected states directly on the live MapLibre map;
+- shows the declaration state, incident type and signed date;
+- gives declarations signed in the last 24 hours extra rotation weight;
+- has WeBot announce the update using FEMA-specific wording;
+- respects **State focus**, so a focused stream only shows declarations for that state;
+- can be forced from Live Control / WeBot Studio with the **Emergencies** show mode.
+
+This is deliberately labeled **FEMA / federal emergency declaration** on air. It does not claim to
+be a complete nationwide feed of every governor-issued state emergency, because there is no single
+authoritative national governor-declaration API.
+
+API: `GET /api/v3/emergencies[?days=45]`. The default window is 45 days, cached for 10 minutes.
+
 ### WeBot thinks and checks the models
 
 The stream doesn't only track warnings. In its rotation WeBot zooms out, thinks (eyes glancing
