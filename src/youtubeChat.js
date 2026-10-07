@@ -113,7 +113,7 @@ const state = {
   enabled: false, videoId: '', chatId: '', pageToken: '', primed: false, viewers: null, viewersAt: 0,
   subscribers: null, subscribersAt: 0,
   lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: [],
-  lastReadAt: 0, readUsers: new Map()
+  lastReadAt: 0, readUsers: new Map(), commandSeq: 0, commandLog: []
 };
 const ptDay = () => new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
 const spend = (units) => {
@@ -361,6 +361,36 @@ const roastRequest = async (message) => {
   console.log('[chat] roast request');
 };
 
+// Recent viewer commands for WeBot Studio. This is intentionally in-memory only: it is an
+// operations monitor, not a permanent archive of viewers' chat.
+const commandStart = (message, kind, query) => {
+  const publishedAt = message.snippet?.publishedAt || new Date().toISOString();
+  const entry = {
+    id: String(Date.now()) + '-' + (++state.commandSeq),
+    at: publishedAt,
+    receivedAt: new Date().toISOString(),
+    user: safeName(message.authorDetails?.displayName) || 'Viewer',
+    kind,
+    query: String(query || '').trim().slice(0, 60),
+    status: 'received',
+    reason: '',
+    place: null,
+    responseMs: null
+  };
+  state.commandLog.push(entry);
+  if (state.commandLog.length > 40) state.commandLog.splice(0, state.commandLog.length - 40);
+  return entry;
+};
+const commandFinish = (entry, status, reason = '', place = null) => {
+  entry.status = status;
+  entry.reason = reason;
+  if (place) entry.place = { name: place.name, state: place.state, lat: place.lat, lon: place.lon };
+  const then = Date.parse(entry.at || entry.receivedAt);
+  entry.responseMs = Number.isFinite(then) ? Math.max(0, Date.now() - then) : null;
+  entry.finishedAt = new Date().toISOString();
+  return entry;
+};
+
 // Returns true when the message was a ! command (handled or not).
 const handle = async (message) => {
   const text = String(message.snippet?.displayMessage || '').trim();
@@ -368,22 +398,47 @@ const handle = async (message) => {
   const m = text.match(/^!(forecast|fc|weather|wx|gas)\b\s*(.*)$/i);
   if (!m) return /^!/.test(text);
   const kind = /^gas$/i.test(m[1]) ? 'gas' : 'forecast';
+  const query = m[2] || '';
+  const entry = commandStart(message, kind, query);
   const author = message.authorDetails || {};
   const userKey = author.channelId || author.displayName;
   const now = Date.now();
   state.activeUntil = now + 5 * 60 * 1000;
-  if (!m[2]) return true;
+
+  if (!query) {
+    commandFinish(entry, 'rejected', 'Missing place');
+    return true;
+  }
+
   const { chat } = await loadBrain();
-  if (!(author.isChatOwner || author.isChatModerator) && now - (state.users.get(userKey) || 0) < chat.commandCooldownMinutes * 60 * 1000) return true;
+  if (!(author.isChatOwner || author.isChatModerator) && now - (state.users.get(userKey) || 0) < chat.commandCooldownMinutes * 60 * 1000) {
+    commandFinish(entry, 'rejected', 'Viewer cooldown');
+    return true;
+  }
+
   state.recent = state.recent.filter((t) => now - t < 20 * 60 * 1000);
-  if (state.recent.length >= chat.maxRequestsPer20Minutes) return true;
-  const place = findPlace(m[2]);
-  if (!place) return true;
+  if (state.recent.length >= chat.maxRequestsPer20Minutes) {
+    commandFinish(entry, 'rejected', '20-minute request limit');
+    return true;
+  }
+
+  const place = findPlace(query);
+  if (!place) {
+    commandFinish(entry, 'rejected', 'Place not found');
+    return true;
+  }
+
   state.users.set(userKey, now);
   state.recent.push(now);
   state.lastCommandAt = new Date().toISOString();
-  await applyLiveCommand({ action: 'chat-request', kind, place, user: safeName(author.displayName) });
-  console.log(`[chat] ${kind} request: ${place.name}, ${place.state}`);
+  try {
+    await applyLiveCommand({ action: 'chat-request', kind, place, user: safeName(author.displayName) });
+    commandFinish(entry, 'queued', 'Sent to the show', place);
+    console.log(`[chat] ${kind} request: ${place.name}, ${place.state}`);
+  } catch (error) {
+    commandFinish(entry, 'failed', error.message || 'Could not queue request', place);
+    throw error;
+  }
   return true;
 };
 
@@ -456,3 +511,24 @@ export const chatStatus = () => ({
   subscribers: Date.now() - state.subscribersAt < 30 * 60 * 1000 ? state.subscribers : null,
   lastCommandAt: state.lastCommandAt
 });
+
+export const chatCommandStatus = () => ({
+  enabled: state.enabled,
+  live: Boolean(state.chatId),
+  lastCommandAt: state.lastCommandAt,
+  commands: state.commandLog.slice(-30).reverse().map((entry) => ({
+    ...entry,
+    place: entry.place ? { ...entry.place } : null
+  }))
+});
+
+export const retryChatCommand = async (id) => {
+  const entry = state.commandLog.find((item) => item.id === String(id || ''));
+  if (!entry) throw Object.assign(new Error('That chat command is no longer in the monitor'), { status: 404 });
+  if (!['forecast', 'gas'].includes(entry.kind) || !entry.place) {
+    throw Object.assign(new Error('This command does not have a valid place to answer'), { status: 400 });
+  }
+  await applyLiveCommand({ action: 'chat-request', kind: entry.kind, place: entry.place, user: entry.user === 'Viewer' ? '' : entry.user });
+  commandFinish(entry, 'manual', 'Manually queued from Studio', entry.place);
+  return { ok: true, command: { ...entry, place: { ...entry.place } } };
+};
