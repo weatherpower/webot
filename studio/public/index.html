@@ -122,6 +122,19 @@
             <ul class="list warnings" id="o-warn" style="margin-top:10px"></ul>
           </div>
 
+          <div class="panel s5">
+            <h2>Level 2 radar <span class="r" id="o-l2-age"></span></h2>
+            <div class="row" style="gap:12px"><span class="dot" id="o-l2-dot"></span><span class="mid" id="o-l2-state">—</span></div>
+            <div class="row" style="margin-top:10px;gap:18px">
+              <div><span class="k">Sites</span><div class="big" id="o-l2-sites" style="font-size:26px">—</div></div>
+              <div><span class="k">Fresh (&lt;15 min)</span><div class="big ok" id="o-l2-fresh" style="font-size:26px">—</div></div>
+              <div><span class="k">Stale</span><div class="big" id="o-l2-stale" style="font-size:26px">—</div></div>
+            </div>
+            <div class="k" style="margin-top:10px">Worker on this PC</div>
+            <div class="row" style="margin-top:4px"><span id="o-l2-worker">—</span><button class="btn sm" id="o-l2-start">Start</button><button class="btn sm" id="o-l2-stop">Stop</button></div>
+            <pre class="mono dim" id="o-l2-log" style="margin:10px 0 0;font-size:11px;white-space:pre-wrap;max-height:110px;overflow:auto"></pre>
+          </div>
+
           <div class="panel s7">
             <h2>Snapshot <span class="r"><label class="toggle"><input type="checkbox" id="snap-auto">Every 30 s</label></span></h2>
             <div class="snap" id="snap">Press “Take snapshot” to see the stream right now.</div>
