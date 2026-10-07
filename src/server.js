@@ -85,6 +85,7 @@ app.use((req, res, next) => {
     || req.path.startsWith('/cards/')
     || req.path.startsWith('/api/warnings/rendered/')
     || req.path.startsWith('/api/v3/')
+    || req.path.startsWith('/radar-l2/')
   );
   // Live control is token-checked in its own handler, which refuses to run without a configured token.
   const isPublicShortRequest = req.method === 'POST' && (req.path === '/api/v3/short/request' || req.path === '/api/v3/live/control');
@@ -98,6 +99,8 @@ app.use((req, res, next) => {
 });
 app.use('/public', express.static(publicDir, { maxAge: '1h' }));
 app.use('/cards', express.static(cardsDir, { maxAge: '1h' }));
+// Level II radar images produced by radar-l2/radar_l2.py on the owner's PC and uploaded to data/radar-l2.
+app.use('/radar-l2', express.static(path.join(publicDir, '..', 'data', 'radar-l2'), { maxAge: '20s', index: false }));
 
 app.get('/', (req, res) => {
   if (config.publicWarningCenterOnly) {
@@ -631,6 +634,8 @@ const startServer = async () => {
     });
     pub.get('/warningcenter/public/assets/webot.png', (req, res) => res.sendFile(path.join(publicDir, 'assets', 'webot.png'), { maxAge: '1d' }));
     pub.use('/warningcenter/public/assets/fonts', express.static(path.join(publicDir, 'assets', 'fonts'), { maxAge: '7d', index: false }));
+    // Studio reads Level II freshness through the public status listener.
+    pub.use('/radar-l2', express.static(path.join(publicDir, '..', 'data', 'radar-l2'), { maxAge: '20s', index: false }));
     pub.get('/favicon.ico', (req, res) => res.type('image/png').sendFile(path.join(publicDir, 'assets', 'wp-logo.png')));
     pub.use((req, res) => res.status(404).type('text').send('Not found'));
     pub.listen(statusPort, config.host, () => console.log(`WeBot status page: http://${config.host}:${statusPort}/`));
