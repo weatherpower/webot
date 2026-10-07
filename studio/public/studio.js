@@ -211,8 +211,8 @@ const loadOverview = async () => {
     ]);
     renderOverview(overview);
     if (commands.error) {
-      $('chatmon-state').textContent = commands.error;
       renderChatCommands({ commands: [] });
+      $('chatmon-state').textContent = commands.error;
     } else renderChatCommands(commands);
   } catch (e) {
     $('s-onair-t').textContent = 'STUDIO ERROR';
