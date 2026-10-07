@@ -525,6 +525,9 @@ export const applyLiveCommand = async (body = {}) => {
     case 'gas-now':
       pushCommand({ type: 'segment', kind: 'gas' });
       break;
+    case 'emergency-now':
+      pushCommand({ type: 'segment', kind: 'emergency' });
+      break;
     case 'brb':
       // Be-right-back card over the stream (host switches, maintenance). WeBot and the show pause under it.
       current.brb = body.on ? { message: cleanText(body.message, 140), since: new Date().toISOString() } : null;
