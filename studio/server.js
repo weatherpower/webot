@@ -416,13 +416,34 @@ app.post('/api/studio/update', api(async () => {
 const deployPlan = async () => {
   const [{ deployed }, head, changed] = await Promise.all([health(), git(['rev-parse', 'HEAD']), changedFiles()]);
   let files = Object.keys(changed);
+  let baselineUnknown = false;
+
   if (deployed) {
-    const diff = await git(['diff', '--name-only', deployed]);
-    if (diff.code === 0) files = [...new Set([...files, ...diff.out.split('\n').filter(Boolean)])];
+    // Normally deploy only files changed since the server's recorded commit.
+    // If that commit came from an older/local history and no longer exists here,
+    // fall back to a full tracked deploy instead of incorrectly saying "nothing to deploy".
+    const known = await git(['cat-file', '-e', deployed + '^{commit}']);
+    if (known.code === 0) {
+      const diff = await git(['diff', '--name-only', deployed, 'HEAD']);
+      if (diff.code === 0) files = [...new Set([...files, ...diff.out.split('\n').filter(Boolean)])];
+    } else {
+      baselineUnknown = true;
+      const tracked = await git(['ls-files']);
+      if (tracked.code === 0) files = [...new Set([...files, ...tracked.out.split('\n').filter(Boolean)])];
+    }
   }
+
   files = files.filter((f) => DEPLOYABLE.test(f) && existsSync(path.join(projectRoot, f)));
   const hot = files.length > 0 && files.every((f) => /^public\//.test(f));
-  return { deployed, head: head.out.trim(), files, mode: hot ? 'hot' : 'rebuild', dirty: Object.keys(changed).length > 0, knownBaseline: Boolean(deployed) };
+  return {
+    deployed,
+    head: head.out.trim(),
+    files,
+    mode: hot ? 'hot' : 'rebuild',
+    dirty: Object.keys(changed).length > 0,
+    knownBaseline: Boolean(deployed) && !baselineUnknown,
+    baselineUnknown
+  };
 };
 app.get('/api/deploy/plan', api(deployPlan));
 app.post('/api/deploy', async (req, res) => {
