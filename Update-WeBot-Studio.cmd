@@ -52,14 +52,17 @@ function Log([string]$Text = '') {
     } catch {}
 }
 
-function RunGit([string[]]$Args) {
-    $output = & $gitExe @Args 2>&1
+function InvokeGit([string[]]$GitArgs) {
+    if (-not $GitArgs -or $GitArgs.Count -eq 0) {
+        throw 'Internal updater error: no Git command was provided.'
+    }
+    $output = & $gitExe @GitArgs 2>&1
     $code = $LASTEXITCODE
     foreach ($line in $output) {
         Log ([string]$line)
     }
     if ($code -ne 0) {
-        throw "git $($Args -join ' ') failed with exit code $code"
+        throw "git $($GitArgs -join ' ') failed with exit code $code"
     }
     return @($output)
 }
@@ -178,14 +181,14 @@ try {
         Log ''
         Log 'Local uncommitted changes found.'
         Log 'Saving them safely in Git stash before updating...'
-        RunGit @('stash','push','-u','-m',"WeBot Studio updater backup $stamp") | Out-Null
+        InvokeGit -GitArgs @('stash','push','-u','-m',"WeBot Studio updater backup $stamp") | Out-Null
         $stashMade = $true
         Log 'Local edits saved in Git stash.'
     }
 
     Log ''
     Log 'Fetching latest origin/master...'
-    RunGit @('fetch','origin','master','--prune') | Out-Null
+    InvokeGit -GitArgs @('fetch','origin','master','--prune') | Out-Null
 
     $headFull = (& $gitExe rev-parse HEAD 2>$null).Trim()
     $remoteFull = (& $gitExe rev-parse origin/master 2>$null).Trim()
@@ -193,7 +196,7 @@ try {
 
     if ($headFull -ne $remoteFull) {
         $backupBranch = "studio-local-backup-$stamp"
-        RunGit @('branch',$backupBranch,'HEAD') | Out-Null
+        InvokeGit -GitArgs @('branch',$backupBranch,'HEAD') | Out-Null
         Log "Committed local state preserved as branch: $backupBranch"
     }
 
@@ -205,13 +208,13 @@ try {
 
     if ($branch -ne 'master') {
         if ($masterExists) {
-            RunGit @('checkout','master') | Out-Null
+            InvokeGit -GitArgs @('checkout','master') | Out-Null
         } else {
-            RunGit @('checkout','-b','master','origin/master') | Out-Null
+            InvokeGit -GitArgs @('checkout','-b','master','origin/master') | Out-Null
         }
     }
 
-    RunGit @('reset','--hard','origin/master') | Out-Null
+    InvokeGit -GitArgs @('reset','--hard','origin/master') | Out-Null
 
     $after = (& $gitExe rev-parse --short HEAD 2>$null).Trim()
 
