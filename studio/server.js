@@ -421,7 +421,8 @@ const deployPlan = async () => {
   if (deployed) {
     // Normally deploy only files changed since the server's recorded commit.
     // If that commit came from an older/local history and no longer exists here,
-    // fall back to a full tracked deploy instead of incorrectly saying "nothing to deploy".
+    // prepare one archive of the current tracked stream code instead of SCPing hundreds
+    // of files one at a time (which looks like Studio is frozen).
     const known = await git(['cat-file', '-e', deployed + '^{commit}']);
     if (known.code === 0) {
       const diff = await git(['diff', '--name-only', deployed, 'HEAD']);
@@ -434,13 +435,14 @@ const deployPlan = async () => {
   }
 
   files = files.filter((f) => DEPLOYABLE.test(f) && existsSync(path.join(projectRoot, f)));
-  const hot = files.length > 0 && files.every((f) => /^public\//.test(f));
+  const dirty = Object.keys(changed).length > 0;
+  const hot = !baselineUnknown && files.length > 0 && files.every((f) => /^public\//.test(f));
   return {
     deployed,
     head: head.out.trim(),
     files,
-    mode: hot ? 'hot' : 'rebuild',
-    dirty: Object.keys(changed).length > 0,
+    mode: baselineUnknown && !dirty ? 'bundle' : hot ? 'hot' : 'rebuild',
+    dirty,
     knownBaseline: Boolean(deployed) && !baselineUnknown,
     baselineUnknown
   };
@@ -457,6 +459,50 @@ app.post('/api/deploy', async (req, res) => {
       const problem = await checkSyntax(f, path.join(projectRoot, f));
       if (problem) { say(`STOP: ${f} has a problem, nothing was deployed.\n${problem}`); return res.end(); }
     }
+    if (plan.mode === 'bundle') {
+      say('Older server baseline detected: packaging the current tracked stream code into one repair bundle…');
+      const roots = ['src', 'public', 'deploy', 'scripts', 'custom-products', 'Dockerfile', 'docker-compose.yml', 'package.json', 'package-lock.json', 'app.js']
+        .filter((p) => existsSync(path.join(projectRoot, p)));
+      const archive = path.join(here, '.backups', '_server-repair-' + Date.now() + '.tar');
+      await fs.mkdir(path.dirname(archive), { recursive: true });
+
+      const packed = await git(['archive', '--format=tar', '-o', archive, 'HEAD', '--', ...roots], { timeout: 180000 });
+      if (packed.code !== 0) {
+        say('Bundle build FAILED: ' + (packed.err.trim() || packed.out.trim()));
+        await fs.rm(archive, { force: true }).catch(() => {});
+        return res.end();
+      }
+
+      say('Uploading repair bundle to the stream server…');
+      const remoteArchive = R('.studio-repair.tar');
+      const sent = await scp(archive, remoteArchive);
+      await fs.rm(archive, { force: true }).catch(() => {});
+      if (sent.code !== 0) {
+        say('Bundle upload FAILED: ' + sent.err.trim());
+        return res.end();
+      }
+
+      say('Unpacking repair bundle…');
+      const unpacked = await ssh(`cd ${R()} && tar -xf .studio-repair.tar && rm -f .studio-repair.tar`, { timeout: 180000 });
+      if (unpacked.code !== 0) {
+        say('Bundle unpack FAILED: ' + (unpacked.err.trim() || unpacked.out.trim()));
+        return res.end();
+      }
+
+      say('Rebuilding and restarting the stream (about 1–2 minutes, the stream blips once)…');
+      const rebuilt = await ssh(`cd ${R()} && docker compose build -q 2>&1 | tail -3 && docker compose up -d 2>&1 | tail -2`, { timeout: 600000 });
+      say((rebuilt.out + rebuilt.err).trim() || 'done');
+      if (rebuilt.code !== 0) {
+        say('Deploy FAILED. The old version may still be running. Check Logs.');
+        return res.end();
+      }
+
+      await ssh(`echo ${q(plan.head)} > ${R('.deployed-commit')}`);
+      healthCache.at = 0;
+      say('DONE');
+      return res.end();
+    }
+
     const dirs = [...new Set(plan.files.map((f) => path.posix.dirname(f)).filter((d) => d !== '.'))];
     if (dirs.length) await ssh(`cd ${R()} && mkdir -p ${dirs.map(q).join(' ')}`);
     for (const f of plan.files) {
