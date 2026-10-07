@@ -1,7 +1,7 @@
 // Recent FEMA federal emergency declarations for the WeBot 24/7 stream.
 // OpenFEMA is the official nationwide source here. These are federal EM declarations,
 // not a claim that every governor-issued state emergency is represented.
-const FEMA_URL = 'https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries';
+const FEMA_URL = 'https://www.fema.gov/api/open/v1/DisasterDeclarationsSummaries';
 const FEMA_HEADERS = {
   Accept: 'application/json',
   'User-Agent': 'weatherpower.app WeatherPower Live contact@weatherpower.app'
@@ -24,7 +24,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
   }
 
   const params = new URLSearchParams({
-    '$filter': "declarationType eq 'EM'",
+    '$filter': "disasterType eq 'EM'",
     '$orderby': 'declarationDate desc',
     '$top': '1000'
   });
@@ -66,7 +66,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
         id: key,
         disasterNumber,
         state,
-        title: clean(row.declarationTitle || row.title || 'Emergency Declaration', 120),
+        title: clean(row.title || row.declarationTitle || 'Emergency Declaration', 120),
         incidentType: clean(row.incidentType || 'Emergency', 80),
         declarationDate,
         incidentBeginDate: iso(row.incidentBeginDate),
@@ -78,7 +78,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
       grouped.set(key, item);
     }
 
-    const area = clean(row.designatedArea, 100);
+    const area = clean(row.declaredCountyArea || row.designatedArea, 100);
     if (area && !item.designatedAreas.includes(area) && item.designatedAreas.length < 12) {
       item.designatedAreas.push(area);
     }
@@ -87,7 +87,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
 
   const body = {
     source: 'FEMA OpenFEMA',
-    sourceUrl: 'https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2',
+    sourceUrl: 'https://www.fema.gov/about/openfema/disaster-declarations-summaries',
     windowDays,
     fetchedAt: new Date().toISOString(),
     declarations: [...grouped.values()]
