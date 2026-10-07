@@ -111,6 +111,7 @@ export const readableChat = (raw, extraBlocked = []) => {
 /* ---------------- chat reader ---------------- */
 const state = {
   enabled: false, videoId: '', chatId: '', pageToken: '', primed: false, viewers: null, viewersAt: 0,
+  subscribers: null, subscribersAt: 0,
   lastFind: 0, activeUntil: 0, lastCommandAt: null, units: 0, unitsDay: '', timer: null, users: new Map(), recent: [],
   lastReadAt: 0, readUsers: new Map()
 };
@@ -130,6 +131,25 @@ const api = async (path, params, units) => {
   return body;
 };
 
+// Channel subscriber count for WeBot Studio. Keep this separate from live-video lookup so
+// a temporary channel-stat failure can never knock chat / !forecast offline.
+const refreshChannelStats = async (channel) => {
+  if (!/^UC[\w-]{22}$/.test(channel || '')) return;
+  if (Date.now() - state.subscribersAt < 10 * 60 * 1000) return;
+  try {
+    const body = await api('channels', { part: 'statistics', id: channel }, 1);
+    const stats = body.items?.[0]?.statistics;
+    state.subscribers = stats && !stats.hiddenSubscriberCount && stats.subscriberCount != null
+      ? Number(stats.subscriberCount)
+      : null;
+    state.subscribersAt = Date.now();
+  } catch (error) {
+    console.warn('[chat] subscriber count:', error.message);
+    // Retry sooner after a failure without affecting the rest of YouTube chat.
+    state.subscribersAt = Date.now() - 8 * 60 * 1000;
+  }
+};
+
 // The channel's live video: the one already found, the public /live page (no quota; YouTube sometimes
 // leaves the link out for servers), or the channel's uploads list (2 units). Each candidate
 // must be live and on this channel. Then its chat id and viewer count.
@@ -143,6 +163,7 @@ const liveVideo = async (videoId, channel) => {
 const findLive = async () => {
   state.lastFind = Date.now();
   const channel = process.env.YOUTUBE_CHANNEL_ID || '';
+  await refreshChannelStats(channel);
   let found = await liveVideo(process.env.YOUTUBE_VIDEO_ID || state.videoId, channel);
   if (!found && channel) {
     const html = await fetch(`https://www.youtube.com/channel/${encodeURIComponent(channel)}/live`, {
@@ -432,5 +453,6 @@ export const chatStatus = () => ({
   viewers: Date.now() - state.viewersAt < 10 * 60 * 1000 ? state.viewers : null,
   startedAt: state.startedAt || null,
   totalViews: state.totalViews ?? null,
+  subscribers: Date.now() - state.subscribersAt < 30 * 60 * 1000 ? state.subscribers : null,
   lastCommandAt: state.lastCommandAt
 });
