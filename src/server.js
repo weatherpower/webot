@@ -35,7 +35,7 @@ app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
-  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|wis|webot|favicon\.ico)\b/.test(req.url)) {
+  if (/^\/warningcenter\/(api|public|cards|controller|dashboard|warningdetail|weatherspace|live|wis|webot|studio|favicon\.ico)\b/.test(req.url)) {
     req.url = req.url.replace(/^\/warningcenter/, '');
   }
   if (/^\/dashboard\/(api|public|cards|controller|warningcenter|warningdetail|weatherspace)\b/.test(req.url)) {
@@ -69,6 +69,8 @@ app.use((req, res, next) => {
     '/live',
     '/wis',
     '/webot',
+    '/studio',
+    '/studio/installer',
     '/live/control',
     '/favicon.ico',
     '/api/health',
@@ -152,6 +154,16 @@ app.get('/wis', (req, res) => {
 app.get('/webot', (req, res) => {
   res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(publicDir, 'webot.html'));
+});
+
+app.get('/studio', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(publicDir, 'studio-install.html'));
+});
+
+app.get('/studio/installer', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.download(path.join(publicDir, 'downloads', 'Install-WeBot-Studio.cmd'), 'Install-WeBot-Studio.cmd');
 });
 
 app.get('/live', (req, res) => {
