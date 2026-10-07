@@ -444,6 +444,23 @@
       headlines: [], hlIndex: 0, lastRoundup: Date.now(), lastTip: Date.now(), subscribers: null
     };
 
+    const EMERGENCY_SEEN_KEY = 'wp-live-emergency-seen-v1';
+    const loadEmergencySeen = () => {
+      try {
+        const raw = JSON.parse(localStorage.getItem(EMERGENCY_SEEN_KEY) || '[]');
+        return new Set(Array.isArray(raw) ? raw.filter(Boolean).slice(-250) : []);
+      } catch { return new Set(); }
+    };
+    const saveEmergencySeen = (set) => {
+      try { localStorage.setItem(EMERGENCY_SEEN_KEY, JSON.stringify([...set].slice(-250))); } catch {}
+    };
+    const rememberEmergency = (id) => {
+      if (!id) return;
+      S.emergencySeen ||= loadEmergencySeen();
+      S.emergencySeen.add(id);
+      saveEmergencySeen(S.emergencySeen);
+    };
+
     /* ---------------- helpers ---------------- */
     const getJson = async (path) => {
       const response = await fetch(BASE + path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
@@ -2805,20 +2822,28 @@
       try {
         const body = await getJson('/api/v3/emergencies');
         const declarations = body.declarations || [];
-        const ids = new Set(declarations.map((d) => d.id).filter(Boolean));
         const st = focusState();
-        const recentState = declarations.find((d) =>
-          d.sourceType === 'state' &&
-          (!st || d.state === st) &&
-          Date.now() - Date.parse(d.declarationDate || 0) < 7 * 24 * 60 * 60 * 1000
-        );
-        const newState = S.emergencySeen
-          ? declarations.find((d) => d.sourceType === 'state' && !S.emergencySeen.has(d.id) && (!st || d.state === st))
-          : recentState;
-        S.emergencies = body;
-        S.emergencySeen = ids;
 
-        // Keep the declaration pending until it has actually made it on air.
+        // Persist declarations that have already aired so a page/server refresh does not announce
+        // the same State of Emergency all over again. On the very first run after this feature is
+        // installed, treat the declarations already on the feed as the baseline instead of "new".
+        if (!S.emergencySeen) {
+          S.emergencySeen = loadEmergencySeen();
+          if (!localStorage.getItem(EMERGENCY_SEEN_KEY)) {
+            declarations.forEach((d) => { if (d?.id) S.emergencySeen.add(d.id); });
+            saveEmergencySeen(S.emergencySeen);
+          }
+        }
+
+        const newState = declarations.find((d) =>
+          d.sourceType === 'state' &&
+          d.id &&
+          !S.emergencySeen.has(d.id) &&
+          (!st || d.state === st)
+        );
+        S.emergencies = body;
+
+        // Keep a genuinely new declaration pending until it has actually made it on air.
         if (newState) S.pendingEmergency = newState.id;
         const pending = S.pendingEmergency && declarations.find((d) => d.id === S.pendingEmergency && (!st || d.state === st));
         if (pending && S.control.mode === 'auto' && !S.control.pin) {
@@ -2859,7 +2884,10 @@
     const emergencyShot = async (shot) => {
       const list = emergencyList();
       if (!list.length) { nationalShot(); return; }
-      if (shot.emergencyId && S.pendingEmergency === shot.emergencyId) S.pendingEmergency = null;
+      if (shot.emergencyId) {
+        if (S.pendingEmergency === shot.emergencyId) S.pendingEmergency = null;
+        rememberEmergency(shot.emergencyId);
+      }
 
       await loadShapes();
       if (S.shot !== shot || shot.type !== 'emergency') return;
@@ -3831,8 +3859,11 @@
           const last = st.last;
           if (!last?.start || Date.now() - Date.parse(last.end || last.start) > 15 * 60 * 1000) return;
           S.kinds = [...(st.recent || []).slice(0, 5).reverse().map((h) => h.type)].filter(Boolean).slice(-6);
-          S.plan = (st.lastPlan || []).filter((k) => k !== 'pinned');
-          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'emergency', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
+          S.plan = (st.lastPlan || []).filter((k) => k !== 'pinned' && k !== 'emergency');
+          // Emergency declarations are event-style cut-ins, not a resumable segment. If the page/server
+          // refreshes after one airs, move on instead of replaying the same declaration again.
+          if (last.type === 'emergency') return;
+          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
           else if (last.type) S.plan.unshift(last.type);
         } catch {}
       };
