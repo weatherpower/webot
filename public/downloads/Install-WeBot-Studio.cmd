@@ -109,7 +109,7 @@ if (Test-Path (Join-Path $installDir '.git')) {
 
 Write-Host ""
 Write-Host "Installing WeBot Studio dependencies..." -ForegroundColor Cyan
-& npm --prefix "$installDir" install --omit=dev --no-audit --no-fund
+& npm --prefix "$studioDir" install --omit=dev --no-audit --no-fund
 if ($LASTEXITCODE -ne 0) { throw 'WeBot Studio server dependencies failed to install.' }
 
 $desktopDir = Join-Path $installDir 'desktop'
