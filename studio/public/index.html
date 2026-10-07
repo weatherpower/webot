@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="/studio.css?v=6">
+  <link rel="stylesheet" href="/studio.css?v=7">
 </head>
 <body>
   <!-- phones: top bar with the menu button (the rail slides out) -->
@@ -133,6 +133,23 @@
             <div class="k" style="margin-top:10px">Worker on this PC</div>
             <div class="row" style="margin-top:4px"><span id="o-l2-worker">—</span><button class="btn sm" id="o-l2-start">Start</button><button class="btn sm" id="o-l2-stop">Stop</button></div>
             <pre class="mono dim" id="o-l2-log" style="margin:10px 0 0;font-size:11px;white-space:pre-wrap;max-height:110px;overflow:auto"></pre>
+          </div>
+
+          <div class="panel s12 chat-monitor-panel">
+            <h2>Chat Command Monitor <span class="r" id="chatmon-state">waiting for chat</span></h2>
+            <div class="chatmon-summary">
+              <div><span class="k">Last 30</span><b id="chatmon-total">0</b></div>
+              <div><span class="k">Queued</span><b class="ok" id="chatmon-queued">0</b></div>
+              <div><span class="k">Rejected</span><b class="warn" id="chatmon-rejected">0</b></div>
+              <div><span class="k">Failed</span><b class="bad" id="chatmon-failed">0</b></div>
+              <div><span class="k">Avg response</span><b id="chatmon-response">—</b></div>
+            </div>
+            <div class="chatmon-wrap">
+              <table class="chatmon">
+                <thead><tr><th>Time</th><th>Viewer</th><th>Command</th><th>Place</th><th>Result</th><th>Response</th><th></th></tr></thead>
+                <tbody id="chatmon-body"><tr><td colspan="7" class="empty">No viewer commands yet.</td></tr></tbody>
+              </table>
+            </div>
           </div>
 
           <div class="panel s7 snapshot-panel">

@@ -19,7 +19,7 @@ import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
 import { surfaceAnalysis } from './surface.js';
 import { cityForecast, randomCityForecast } from './cityForecast.js';
-import { chatStatus } from './youtubeChat.js';
+import { chatCommandStatus, chatStatus, retryChatCommand } from './youtubeChat.js';
 import { loadBrain } from './brain.js';
 import { getHeadlines } from './headlines.js';
 import { gasSegment } from './gasPrices.js';
@@ -347,6 +347,21 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=3');
       res.json(await webotStatus());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Private operations feed for WeBot Studio. Viewer command history is intentionally not exposed
+  // through the public /webot/status endpoint.
+  router.get('/live/chat-commands', requireLiveToken, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(chatCommandStatus());
+  });
+  router.post('/live/chat-commands/retry', requireLiveToken, async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json(await retryChatCommand(req.body?.id));
     } catch (error) {
       next(error);
     }
