@@ -431,7 +431,7 @@
     ];
 
     const S = {
-      alerts: [], live: null, radar: null, sites: [], emergencies: null, emergencySeen: null, spokenEmergency: new Set(), seen: null, spoken: new Set(), recent: [],
+      alerts: [], live: null, radar: null, sites: [], emergencies: null, emergencySeen: null, pendingEmergency: null, spokenEmergency: new Set(), seen: null, spoken: new Set(), recent: [],
       cycle: 0, shot: null, shotTimer: null, shotStart: 0, shotDur: 1, breaking: [], fresh: [], inBreaking: false,
       lastCmd: null, control: { rev: -1, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null },
       map: null, styleReady: false, step: 0, local: null, localKey: '', velOn: false, siteMarker: null, sel: null,
@@ -488,6 +488,7 @@
     // Viewer forecast/gas requests are more important than the ordinary calm-day rotation.
     // They may run during busy weather, but never while a breaking cut-in is active or a tornado warning is out.
     const chatRequestSafe = () => !S.inBreaking && !(S.live?.tallies?.tor);
+    const chatReplySafe = () => !S.control.brb && !S.inBreaking && !(S.live?.tallies?.tor);
     // Weather quiet enough for daily forecasts (in the focused state when there is one).
     const forecastWeather = () => {
       const st = focusState();
@@ -2759,10 +2760,11 @@
         S.emergencies = body;
         S.emergencySeen = ids;
 
-        // A governor-issued state of emergency should not wait for the random rotation.
-        // It cuts to this segment once when first seen (breaking weather still has priority).
-        if (newState && S.control.mode === 'auto' && !S.control.pin) {
-          S.forceShot = { type: 'emergency', emergencyId: newState.id };
+        // Keep the declaration pending until it has actually made it on air.
+        if (newState) S.pendingEmergency = newState.id;
+        const pending = S.pendingEmergency && declarations.find((d) => d.id === S.pendingEmergency && (!st || d.state === st));
+        if (pending && S.control.mode === 'auto' && !S.control.pin) {
+          S.forceShot = { type: 'emergency', emergencyId: pending.id };
           if (S.styleReady && S.shot && !S.inBreaking) setTimeout(() => nextShot(true), 350);
         }
       } catch (error) {
@@ -2799,6 +2801,7 @@
     const emergencyShot = async (shot) => {
       const list = emergencyList();
       if (!list.length) { nationalShot(); return; }
+      if (shot.emergencyId && S.pendingEmergency === shot.emergencyId) S.pendingEmergency = null;
 
       await loadShapes();
       if (S.shot !== shot || shot.type !== 'emergency') return;
@@ -3531,6 +3534,9 @@
           else if (cmd.type === 'reload') location.reload();
           else if (cmd.type === 'music-next') musicNext();
           else if (cmd.type === 'segment' && cmd.kind === 'gas') { S.forceShot = { type: 'gas' }; nextShot(true); }
+          else if (cmd.type === 'segment' && cmd.kind === 'emergency') {
+            loadEmergencies().finally(() => { S.forceShot = { type: 'emergency' }; nextShot(true); });
+          }
           else if (cmd.type === 'chat-request' && cmd.place) queueChatRequest(cmd);
           else if (cmd.type === 'chat-say' && cmd.text) readChatMessage(cmd);
           else if (cmd.type === 'chat-show') showChats(cmd.messages);
@@ -3620,11 +3626,13 @@
     const readChatMessage = (cmd) => { chatSayQ.push({ ...cmd, got: Date.now() }); };
     setInterval(() => {
       if (!chatSayQ.length || speech.busy || speech.queue.length) return;
+      // Hold the message instead of losing it while tornado/breaking coverage is active.
+      if (!chatReplySafe()) return;
       const cmd = chatSayQ.shift();
       if (Date.now() - cmd.got < 4 * 60 * 1000) answerChat(cmd);
     }, 1000);
     const answerChat = (cmd) => {
-      if (S.control.brb || S.inBreaking || !isCalm()) return;
+      if (!chatReplySafe()) return;
       const reply = cmd.reply != null ? cmd.reply : chatReply(cmd.text);
       chatAnswer(cmd.user, cmd.text, reply);
       // Spoken with chat shorthand spelled out ("ngl" → "not gonna lie"); the chat box shows what they typed.
@@ -3635,7 +3643,7 @@
     const CH = { queue: [], rows: [], seen: new Map(), id: 0, shown: '' };
     const chatColor = (name) => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) % 360; return 'hsl(' + h + ' 85% 70%)'; };
     const chatKey = (user, text) => (user || '') + '|' + text;
-    const chatOn = () => !S.control.brb && !S.inBreaking && isCalm() && S.control.chatRead !== false && !document.body.classList.contains('brb-on');
+    const chatOn = () => chatReplySafe() && S.control.chatRead !== false && !document.body.classList.contains('brb-on');
     const renderChat = (force) => {
       const now = Date.now();
       CH.rows = CH.rows.filter((r) => r.until > now).slice(-4);
@@ -3774,7 +3782,12 @@
         installLayers();
         showHeadline();
         $('boot').classList.add('done');
-        resumeShow().finally(() => nextShot());
+        resumeShow().finally(() => {
+          if (S.pendingEmergency && S.control.mode === 'auto' && !S.control.pin) {
+            S.forceShot = { type: 'emergency', emergencyId: S.pendingEmergency };
+          }
+          nextShot();
+        });
       });
       loadBrainCfg();
       poll(loadBrainCfg, 60000);
