@@ -7,3 +7,4 @@ studio/.backups/
 studio/studio.config.json
 house/house.state.json
 house/house.config.json
+radar-l2/out/
