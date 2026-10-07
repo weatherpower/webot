@@ -371,15 +371,27 @@ const readChat = async () => {
   if (state.pageToken) params.pageToken = state.pageToken;
   const body = await api('liveChat/messages', params, 5);
   state.pageToken = body.nextPageToken || state.pageToken;
-  // The first read returns recent history: skip it so old commands don't replay after a restart.
-  if (state.primed) {
+  const items = body.items || [];
+  // The first read after a restart contains recent history. Do not replay normal chat, but DO rescue
+  // fresh commands posted while the service was restarting/deploying. Otherwise viewers can type
+  // !forecast right after a refresh and WeBot silently drops it.
+  if (!state.primed) {
+    const cutoff = Date.now() - 2 * 60 * 1000;
+    for (const message of items) {
+      const published = Date.parse(message.snippet?.publishedAt || '');
+      if (!Number.isFinite(published) || published < cutoff) continue;
+      const text = String(message.snippet?.displayMessage || '').trim();
+      if (!/^!(forecast|fc|weather|wx|gas|roast)\b/i.test(text)) continue;
+      await handle(message).catch((e) => console.warn('[chat]', e.message));
+    }
+  } else {
     const regular = [];
-    for (const message of body.items || []) {
+    for (const message of items) {
       const command = await handle(message).catch((e) => { console.warn('[chat]', e.message); return true; });
       if (!command) regular.push(message);
     }
-    await showChats(body.items || []).catch((e) => console.warn('[chat]', e.message));
-    await welcomeRegulars(body.items || []).catch((e) => console.warn('[chat]', e.message));
+    await showChats(items).catch((e) => console.warn('[chat]', e.message));
+    await welcomeRegulars(items).catch((e) => console.warn('[chat]', e.message));
     await readOne(regular).catch((e) => console.warn('[chat]', e.message));
   }
   state.primed = true;
