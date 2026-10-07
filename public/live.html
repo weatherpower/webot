@@ -431,7 +431,7 @@
     ];
 
     const S = {
-      alerts: [], live: null, radar: null, sites: [], seen: null, spoken: new Set(), recent: [],
+      alerts: [], live: null, radar: null, sites: [], emergencies: null, seen: null, spoken: new Set(), recent: [],
       cycle: 0, shot: null, shotTimer: null, shotStart: 0, shotDur: 1, breaking: [], fresh: [], inBreaking: false,
       lastCmd: null, control: { rev: -1, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null },
       map: null, styleReady: false, step: 0, local: null, localKey: '', velOn: false, siteMarker: null, sel: null,
@@ -2143,7 +2143,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, rain: 70, reports: 70, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, rain: 70, reports: 70, emergency: 75, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -2158,6 +2158,7 @@
       else if (shot.type === 'forecast') s = 22;
       else if (shot.type === 'gas') s = 22;
       else if (shot.type === 'rain') s = 20;
+      else if (shot.type === 'emergency') s = 26;
       else s = 14;
       return s * OPT.speed * 1000;
     };
@@ -2368,6 +2369,7 @@
       if (shot.type === 'reports' && !enoughReports()) shot = { type: 'national' };
       if (shot.type === 'tropics' && !(tropicsActive() && tropicsHere())) shot = { type: 'national' };
       if (shot.type === 'surface' && !S.surface) shot = { type: 'national' };
+      if (shot.type === 'emergency' && !emergencyList().length) shot = { type: 'national' };
       runShot(shot);
     };
 
@@ -2383,6 +2385,8 @@
         national: 1.2,
         outlook: outlooks().length ? 1 : 0,
         reports: enoughReports() ? 1.2 : 0,
+        // Recent FEMA federal emergency declarations. Fresh declarations get extra airtime.
+        emergency: emergencyList().length ? (emergencyList().some((d) => d.fresh) ? 2.4 : 1.1) : 0,
         // Focused on a state: the tropics only come up if that state has tropical alerts.
         tropics: tropicsActive() && tropicsHere() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
         // The national radar + surface map is the quiet-day staple (like Ryan's).
@@ -2399,7 +2403,7 @@
       const bw = B.brain?.calmWeights || {};
       const num = (v, d) => (Number.isFinite(v) ? v : d);
       if (calm) Object.assign(w, { surface: S.surface ? num(bw.surface, 5) : 0, alert: list.length ? num(bw.alert, 1.5) : 0, think: num(bw.think, 1), national: num(bw.national, 1),
-        outlook: w.outlook * num(bw.outlook, 0.5), reports: w.reports * num(bw.reports, 0.5), forecast: forecastWeather() ? num(bw.forecast, 2.5) : 0,
+        outlook: w.outlook * num(bw.outlook, 0.5), reports: w.reports * num(bw.reports, 0.5), emergency: emergencyList().length ? num(bw.emergency, 1.2) * (emergencyList().some((d) => d.fresh) ? 1.8 : 1) : 0, forecast: forecastWeather() ? num(bw.forecast, 2.5) : 0,
         gas: forecastWeather() && S.control.gas !== false && Date.now() - (S.gasAt || 0) > num(B.brain?.gasEveryMinutes, 40) * 60 * 1000 ? num(bw.gas, 0.9) : 0,
         // Train Cam (SouthWest RailCams) only on calm days, when some cams are live.
         train: S.trainCams?.length && S.control.train !== false ? num(bw.train, 0) : 0,
@@ -2479,10 +2483,20 @@
       if (shot.type !== 'gas') hideGas();
       if (shot.type !== 'train') hideTrain();
       if (shot.type !== 'rain') hideWpc();
+      if (shot.type !== 'emergency') hideEmergency();
       hideCam();
       // A pinned camera gets a mention every few segments, after WeBot's line for the segment.
       if (S.camPinnedId && S.camPinned && shot.type !== 'think' && !shot.breaking && ++S.pinTalk % 4 === 0) {
         setTimeout(() => { if (S.shot === shot && S.camPinned) sayNext(camTalk(S.camPinned, 'still')); }, 7000);
+      }
+      if (shot.type === 'emergency') {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(false);
+        renderRadarPanel();
+        $('rp').classList.add('show');
+        emergencyShot(shot);
+        return;
       }
       if (shot.type === 'surface') {
         setSelected('');
@@ -2724,6 +2738,99 @@
       S.map.addSource('gas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       S.map.addLayer({ id: 'gas', type: 'circle', source: 'gas', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 9, 5.5], 'circle-color': '#ffb020', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#10131a' } }, 'a-case');
     };
+    /* ---------------- recent FEMA federal emergency declarations ---------------- */
+    const loadEmergencies = async () => {
+      try { S.emergencies = await getJson('/api/v3/emergencies'); }
+      catch (error) { console.warn('FEMA emergency declarations:', error.message); }
+    };
+    const emergencyList = () => {
+      const all = S.emergencies?.declarations || [];
+      const st = focusState();
+      return st ? all.filter((d) => d.state === st) : all;
+    };
+    const ensureEmergencyLayers = () => {
+      if (!S.styleReady || S.map.getSource('fema-emergency')) return;
+      const empty = { type: 'FeatureCollection', features: [] };
+      S.map.addSource('fema-emergency', { type: 'geojson', data: empty });
+      const color = ['case', ['==', ['get', 'fresh'], 1], '#ff3b3b', '#ff9f2a'];
+      S.map.addLayer({
+        id: 'fema-emergency-fill', type: 'fill', source: 'fema-emergency',
+        paint: { 'fill-color': color, 'fill-opacity': 0.24 }
+      }, 'a-fill');
+      S.map.addLayer({
+        id: 'fema-emergency-line', type: 'line', source: 'fema-emergency',
+        paint: { 'line-color': color, 'line-width': 3.5, 'line-opacity': 0.96 }
+      }, 'a-case');
+    };
+    const hideEmergency = () => {
+      if (!S.styleReady || !S.map.getLayer('fema-emergency-fill')) return;
+      ['fema-emergency-fill', 'fema-emergency-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+    };
+    const emergencyDate = (value) => {
+      try { return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: OPT.tz }).format(new Date(value)); }
+      catch { return ''; }
+    };
+    const emergencyShot = async (shot) => {
+      const list = emergencyList();
+      if (!list.length) { nationalShot(); return; }
+
+      await loadShapes();
+      if (S.shot !== shot || shot.type !== 'emergency') return;
+      ensureEmergencyLayers();
+
+      const seen = new Set();
+      const features = [];
+      for (const d of list) {
+        if (seen.has(d.state)) continue;
+        seen.add(d.state);
+        const geometry = SHAPES.byName.get(STATE_NAMES[d.state]);
+        if (!geometry) continue;
+        features.push({
+          type: 'Feature',
+          properties: { state: d.state, fresh: d.fresh ? 1 : 0, title: d.title || '', incidentType: d.incidentType || '' },
+          geometry
+        });
+      }
+
+      const source = S.map.getSource('fema-emergency');
+      if (source) source.setData({ type: 'FeatureCollection', features });
+      ['fema-emergency-fill', 'fema-emergency-line'].forEach((id) => {
+        if (S.map.getLayer(id)) S.map.setLayoutProperty(id, 'visibility', 'visible');
+      });
+
+      const top = list.slice(0, 5);
+      const rows = top.map((d) => '<div class="rowi" style="--rc:' + (d.fresh ? '#ff3b3b' : '#ff9f2a') + '"><i></i><b>' +
+        esc((STATE_NAMES[d.state] || d.state).toUpperCase()) + '</b><span>' +
+        esc((d.incidentType || 'Emergency') + ' · ' + emergencyDate(d.declarationDate)) + '</span></div>').join('');
+      const scope = focusState() ? esc(focusName().toUpperCase()) : top.length + ' RECENT DECLARATION' + (top.length === 1 ? '' : 'S');
+      setCard('<div class="head"><div class="ico">' + icon('alert', 30) + '</div><div><h2>FEDERAL EMERGENCY DECLARATIONS</h2><div class="sub">FEMA · ' +
+        scope + ' · LAST ' + esc(S.emergencies?.windowDays || 45) + ' DAYS</div></div><span class="status">EM</span></div><div class="rows">' + rows + '</div>', '#ff7a2a');
+
+      const geos = features.map((f) => f.geometry);
+      fly(geos.length ? bboxOf({ type: 'GeometryCollection', geometries: geos }) : viewBounds(), {
+        padding: { top: 120, bottom: 110, left: 600, right: 140 },
+        maxZoom: focusState() ? 7 : 5.5
+      });
+
+      const fresh = top.some((d) => d.fresh);
+      setMood(fresh ? 'danger' : 'alert');
+      setNow({
+        k: fresh ? 'NEW EMERGENCY DECLARATION' : 'EMERGENCY DECLARATIONS',
+        title: focusState() ? 'FEMA emergency declaration update for ' + focusName() : 'Recent FEMA federal emergency declarations',
+        color: '#ff7a2a',
+        crawl: top.map((d) => (STATE_NAMES[d.state] || d.state) + ': ' + (d.incidentType || 'Emergency') + ' · signed ' + emergencyDate(d.declarationDate)).join('   ◆   ')
+      });
+
+      const names = top.slice(0, 3).map((d) => STATE_NAMES[d.state] || d.state);
+      let detail;
+      if (top.length === 1) {
+        detail = 'FEMA lists a recent federal emergency declaration for ' + names[0] + ' following ' + String(top[0].incidentType || 'an emergency').toLowerCase() + '.';
+      } else {
+        detail = 'FEMA lists recent federal emergency declarations affecting ' + listWords(names) + (top.length > 3 ? ' and other states' : '') + '.';
+      }
+      chatter(pick(brainLines('emergency', ['Here’s a federal emergency declaration update from FEMA.'])) + ' ' + detail);
+    };
+
     /* ---------------- WPC flash flood (Excessive Rainfall) outlook ---------------- */
     const RAIN_RISK = { 1: ['MARGINAL', '#3fd16b'], 2: ['SLIGHT', '#ffd23f'], 3: ['MODERATE', '#ff3b3b'], 4: ['HIGH', '#ff3bf5'] };
     const loadWpc = async () => { try { S.wpc = await getJson('/api/v3/wpc'); } catch {} };
@@ -3610,7 +3717,7 @@
           if (!last?.start || Date.now() - Date.parse(last.end || last.start) > 15 * 60 * 1000) return;
           S.kinds = [...(st.recent || []).slice(0, 5).reverse().map((h) => h.type)].filter(Boolean).slice(-6);
           S.plan = (st.lastPlan || []).filter((k) => k !== 'pinned');
-          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
+          if (['surface', 'national', 'outlook', 'reports', 'tropics', 'emergency', 'gas', 'rain', 'think'].includes(last.type)) S.forceShot = { type: last.type };
           else if (last.type) S.plan.unshift(last.type);
         } catch {}
       };
@@ -3627,7 +3734,9 @@
       poll(loadRadar, 120000);
       loadTropics().catch(() => {});
       loadSurface().catch(() => {});
+      loadEmergencies().catch(() => {});
       poll(loadSurface, 15 * 60 * 1000);
+      poll(loadEmergencies, 10 * 60 * 1000);
       loadNewsHeadlines();
       poll(loadNewsHeadlines, 10 * 60 * 1000);
       poll(loadTropics, 5 * 60 * 1000);
