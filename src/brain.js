@@ -96,6 +96,7 @@ const OLD_DEFAULTS = {
   'lines.gas': ['Let’s check gas prices.', 'Time for a gas price check.', 'Let’s see what it costs to fill up this week.', 'Here’s your weekly gas price update.'],
   'lines.gasRequest': '{name} asked about gas prices around {city}.',
   'lines.surface': ['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.'],
+  'lines.emergency': ['Here’s a federal emergency declaration update from FEMA.', 'Let’s check the latest FEMA emergency declarations.', 'Emergency declaration update, y’all. Here’s what FEMA has listed recently.'],
   'chat.hint': 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP IN CHAT · WEBOT WILL CHECK IT ON THE STREAM',
   'chat.readEverySeconds': [75, 45],
   'chat.sameViewerMinutes': [5, 3]
