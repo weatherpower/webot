@@ -96,6 +96,13 @@ const renderOverview = (o) => {
   }
   $('f-ssh').innerHTML = `<span class="dot ${srv.error ? 'bad' : 'ok'}"></span> ${srv.error ? 'down' : 'ok'}`;
   $('f-deployed').textContent = srv.deployed ? srv.deployed.slice(0, 7) : 'unknown';
+  $('o-deploy').textContent = srv.error
+    ? '—'
+    : srv.deployedAt
+      ? `Deployed ${ago(srv.deployedAt)} · ${srv.deployedDirty ? 'uncommitted changes' : (srv.deployed ? srv.deployed.slice(0, 7) : 'unknown commit')}`
+      : srv.deployed
+        ? `On server · ${srv.deployed.slice(0, 7)}`
+        : 'No deploy recorded';
 
   // on air
   $('o-updated').textContent = 'updated ' + clock(new Date().toISOString());
@@ -150,6 +157,7 @@ const renderOverview = (o) => {
     pressed('c-voice', ctl.voice === false ? 'off' : 'on');
     pressed('c-genre', ctl.music?.genre || 'mix');
     pressed('c-chat', ctl.chatRead === false ? 'off' : 'on');
+    pressed('c-subcount', ctl.subCount === false ? 'off' : 'on');
     if (document.activeElement !== $('c-mode')) $('c-mode').value = ctl.mode || 'auto';
     $('c-brb').textContent = ctl.brb ? 'End BRB' : 'Start BRB';
     $('c-brb').classList.toggle('danger', Boolean(ctl.brb));
@@ -233,6 +241,7 @@ $('c-costume').addEventListener('change', () => act({ action: 'costume', costume
 segClick('c-voice', (v) => act({ action: 'voice', on: v === 'on' }, 'Voice ' + v));
 segClick('c-genre', (v) => act({ action: 'music', genre: v }, 'Radio style: ' + v));
 segClick('c-chat', (v) => act({ action: 'chat-read', on: v === 'on' }, v === 'on' ? 'WeBot reads chat' : 'Chat: commands only'));
+segClick('c-subcount', (v) => act({ action: 'sub-count', on: v === 'on' }, v === 'on' ? 'Subscriber count shown on stream' : 'Subscriber count hidden from stream'));
 $('c-mode').addEventListener('change', () => act({ action: 'mode', mode: $('c-mode').value }, 'Show: ' + $('c-mode').selectedOptions[0].textContent));
 $('c-brb').addEventListener('click', async () => {
   if (S.brb) return act({ action: 'brb', on: false }, 'BRB ended');
