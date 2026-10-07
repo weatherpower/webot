@@ -266,6 +266,7 @@
     .brandbox .bi { min-width: 0; }
     .brandbox b { display: block; font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .14em; white-space: nowrap; }
     .brandbox .subs { display: flex; align-items: baseline; gap: 7px; margin-top: 5px; color: #d9d4f4; white-space: nowrap; }
+    .brandbox.subs-off .subs { display: none; }
     .brandbox .subs strong { font-family: "WP Display"; font-size: 19px; line-height: 1; color: #fff; letter-spacing: .02em; }
     .brandbox .subs span { font-family: "WP Mono"; font-size: 9px; font-weight: 700; letter-spacing: .15em; color: #bcb3e5; }
     .brandbox.bump .subs strong { animation: subpop .7s ease-out; }
@@ -3599,6 +3600,7 @@
       const prevCtl = S.control;
       S.live = body;
       S.control = body.control || S.control;
+      $('subbox').classList.toggle('subs-off', S.control.subCount === false);
       // A new costume from WeBot Studio: redraw WeBot with it.
       if ((S.control.costume || 'auto') !== S.costumeShown) { S.costumeShown = S.control.costume || 'auto'; drawBot(); if (typeof applyBrain === 'function' && B.brain) applyBrain(); }
       if (S.fitKey !== fitKeyNow()) fit();
