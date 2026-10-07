@@ -27,6 +27,7 @@ import { trainCams } from './trainCams.js';
 import { wpcOutlook } from './wpcOutlook.js';
 import { cameraStream, camerasNear, getCamera, searchCameras } from './cameras.js';
 import { modelCatalog, modelFrame, modelSegment, soundingAvailable, soundingPng } from './models.js';
+import { emergencyDeclarations } from './emergencyDeclarations.js';
 
 const IEM_TILES = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0';
 const GROUP_ORDER = ['warnings', 'watches', 'statements', 'discussions', 'outlooks', 'forecasts'];
@@ -375,6 +376,16 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=300');
       res.json(await surfaceAnalysis());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Recent FEMA federal emergency declarations for WeBot's emergency-declaration segment.
+  router.get('/emergencies', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json(await emergencyDeclarations({ days: req.query.days }));
     } catch (error) {
       next(error);
     }
