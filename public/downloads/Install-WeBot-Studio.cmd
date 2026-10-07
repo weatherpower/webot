@@ -6,7 +6,7 @@ echo.
 echo  WeatherPower - WeBot Studio Installer
 echo  -----------------------------------
 echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$m='::POWERSHELL';$t=[IO.File]::ReadAllText($env:WBSTUDIO_INSTALLER);$i=$t.IndexOf($m);if($i -lt 0){throw 'Installer payload missing'};Invoke-Expression $t.Substring($i+$m.Length)"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$lines=Get-Content -LiteralPath $env:WBSTUDIO_INSTALLER;$i=[Array]::IndexOf([string[]]$lines,'::POWERSHELL');if($i -lt 0){throw 'Installer payload missing'};$payload=($lines[($i+1)..($lines.Length-1)] -join [Environment]::NewLine);& ([ScriptBlock]::Create($payload))"
 set "EC=%ERRORLEVEL%"
 echo.
 if not "%EC%"=="0" (
