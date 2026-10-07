@@ -410,21 +410,22 @@ const handle = async (message) => {
     return true;
   }
 
+  const place = findPlace(query);
+  if (!place) {
+    commandFinish(entry, 'rejected', 'Place not found');
+    return true;
+  }
+  entry.place = { name: place.name, state: place.state, lat: place.lat, lon: place.lon };
+
   const { chat } = await loadBrain();
   if (!(author.isChatOwner || author.isChatModerator) && now - (state.users.get(userKey) || 0) < chat.commandCooldownMinutes * 60 * 1000) {
-    commandFinish(entry, 'rejected', 'Viewer cooldown');
+    commandFinish(entry, 'rejected', 'Viewer cooldown', place);
     return true;
   }
 
   state.recent = state.recent.filter((t) => now - t < 20 * 60 * 1000);
   if (state.recent.length >= chat.maxRequestsPer20Minutes) {
-    commandFinish(entry, 'rejected', '20-minute request limit');
-    return true;
-  }
-
-  const place = findPlace(query);
-  if (!place) {
-    commandFinish(entry, 'rejected', 'Place not found');
+    commandFinish(entry, 'rejected', '20-minute request limit', place);
     return true;
   }
 
