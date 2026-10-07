@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="/studio.css?v=5">
+  <link rel="stylesheet" href="/studio.css?v=6">
 </head>
 <body>
   <!-- phones: top bar with the menu button (the rail slides out) -->
@@ -54,7 +54,7 @@
       <!-- ================= OVERVIEW ================= -->
       <section class="page on" id="page-overview">
         <div class="grid">
-          <div class="panel s7">
+          <div class="panel s7 air-panel">
             <h2>On air <span class="r" id="o-updated"></span></h2>
             <div class="k" id="o-kind">—</div>
             <div class="big" id="o-label" style="margin-top:6px">—</div>
@@ -70,7 +70,7 @@
             <div id="o-said" class="quote empty">Nothing yet.</div>
           </div>
 
-          <div class="panel s5">
+          <div class="panel s5 server-panel">
             <h2>Stream server <span class="r" id="o-srv-at"></span></h2>
             <div class="meter"><span class="k">CPU (container)</span><b id="o-cpu">—</b><div class="bar"><i id="o-cpu-bar"></i></div></div>
             <div class="meter" style="margin-top:10px"><span class="k">Memory (server)</span><b id="o-mem">—</b><div class="bar"><i id="o-mem-bar"></i></div></div>
@@ -89,7 +89,7 @@
             <div id="o-log" class="mono faint" style="font-size:11.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere"></div>
           </div>
 
-          <div class="panel s7">
+          <div class="panel s7 control-panel">
             <h2>Show control</h2>
             <div class="stack">
               <div class="row">
@@ -110,7 +110,7 @@
             </div>
           </div>
 
-          <div class="panel s5">
+          <div class="panel s5 weather-panel">
             <h2>Weather</h2>
             <div class="row" style="align-items:baseline;gap:12px"><span class="big ok" id="o-wis">—</span><span class="mid" id="o-wis-l"></span></div>
             <div class="tallies" style="margin-top:12px">
@@ -122,7 +122,7 @@
             <ul class="list warnings" id="o-warn" style="margin-top:10px"></ul>
           </div>
 
-          <div class="panel s5">
+          <div class="panel s5 l2-panel">
             <h2>Level 2 radar <span class="r" id="o-l2-age"></span></h2>
             <div class="row" style="gap:12px"><span class="dot" id="o-l2-dot"></span><span class="mid" id="o-l2-state">—</span></div>
             <div class="row" style="margin-top:10px;gap:18px">
@@ -135,13 +135,13 @@
             <pre class="mono dim" id="o-l2-log" style="margin:10px 0 0;font-size:11px;white-space:pre-wrap;max-height:110px;overflow:auto"></pre>
           </div>
 
-          <div class="panel s7">
+          <div class="panel s7 snapshot-panel">
             <h2>Snapshot <span class="r"><label class="toggle"><input type="checkbox" id="snap-auto">Every 30 s</label></span></h2>
             <div class="snap" id="snap">Press “Take snapshot” to see the stream right now.</div>
             <div class="row" style="margin-top:10px"><button class="btn" id="snap-btn">Take snapshot</button><span class="k" id="snap-at"></span></div>
           </div>
 
-          <div class="panel s5">
+          <div class="panel s5 history-panel">
             <h2>Earlier on the stream</h2>
             <ul class="list" id="o-recent"></ul>
           </div>
