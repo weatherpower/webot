@@ -63,6 +63,17 @@ const control = async (body) => {
   if (!r.ok) throw Object.assign(new Error(json.error || 'Live Control said ' + r.status), { status: r.status });
   return json.control || json;
 };
+const livePrivate = async (pathName, { method = 'GET', body } = {}) => {
+  const r = await fetch(`${CONTROL_BASE}/warningcenter/api/v3${pathName}`, {
+    method,
+    headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), 'X-Controller-Token': await getToken(), 'Cache-Control': 'no-cache' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(15000)
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(json.error || 'Live API said ' + r.status), { status: r.status });
+  return json;
+};
 const getJson = async (url, ms = 10000) => {
   const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { 'Cache-Control': 'no-cache' } });
   if (!r.ok) throw new Error(url + ' → ' + r.status);
@@ -254,6 +265,8 @@ app.get('/api/overview', api(async () => {
 }));
 
 app.post('/api/control', api(async (req) => control(req.body || {})));
+app.get('/api/chat-commands', api(async () => livePrivate('/live/chat-commands')));
+app.post('/api/chat-commands/retry', api(async (req) => livePrivate('/live/chat-commands/retry', { method: 'POST', body: { id: req.body?.id } })));
 // Start / stop the Level 2 radar worker on this PC (desktop Studio only).
 app.post('/api/radar/start', api(async () => {
   if (WEB) throw Object.assign(new Error('The radar worker runs on the owner\'s PC: start it from the desktop Studio.'), { status: 400 });
