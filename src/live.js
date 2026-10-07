@@ -282,7 +282,7 @@ export const noteStreamBeat = (query = {}) => {
 };
 
 // WeBot status (public page): the segment on now, the planned next few, recent segments and lines he said.
-const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'forecast', 'gas', 'rain', 'train']);
+const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'emergency', 'forecast', 'gas', 'rain', 'train']);
 const webot = { seg: null, plan: [], requests: [], history: [], said: [], saidKeys: new Set() };
 // Where the show was (segment, plan, recent segments, lines said) survives restarts: saved to
 // data/webot-activity.json at most every 15 s, loaded at startup. The stream page picks up from it.
@@ -468,7 +468,7 @@ export const applyLiveCommand = async (body = {}) => {
       current.state = /^[A-Z]{2}$/.test(String(body.state || '').toUpperCase()) ? String(body.state).toUpperCase() : '';
       break;
     case 'mode':
-      current.mode = ['auto', 'national', 'outlook', 'reports', 'models', 'tropics', 'surface', 'forecast', 'gas'].includes(body.mode) ? body.mode : 'auto';
+      current.mode = ['auto', 'national', 'outlook', 'reports', 'models', 'tropics', 'surface', 'emergency', 'forecast', 'gas'].includes(body.mode) ? body.mode : 'auto';
       break;
     case 'voice':
       current.voice = Boolean(body.on);
