@@ -88,7 +88,9 @@ echo "@@host"; cat /proc/loadavg; nproc; free -m | awk '/Mem:/ {print $2" "$3}';
 echo "@@procs"; pgrep -c ffmpeg; pgrep -fc 'chrome --kiosk'
 echo "@@env"; grep -E '^(STREAM_WIDTH|STREAM_HEIGHT|STREAM_FPS|STREAM_BITRATE|STREAM_PRESET|STREAM_CPUS)=' .env
 echo "@@log"; docker compose logs --no-color --since 30m 2>&1 | grep -E 'streaming [0-9]+x|stopped|restarting|\\[chat\\]|Error|error' | tail -8
-echo "@@deployed"; cat .deployed-commit 2>/dev/null`;
+echo "@@deployed"; cat .deployed-commit 2>/dev/null
+echo "@@deployed_at"; cat .deployed-at 2>/dev/null
+echo "@@deployed_dirty"; test -f .deployed-dirty && echo 1 || echo 0`;
 let healthCache = { at: 0, body: null };
 const health = async () => {
   if (healthCache.body && Date.now() - healthCache.at < 8000) return healthCache.body;
@@ -112,7 +114,9 @@ const health = async () => {
     procs: { ffmpeg: Number(part.procs?.[0]) || 0, chrome: Number(part.procs?.[1]) || 0 },
     stream: { width: Number(env.STREAM_WIDTH) || 1920, height: Number(env.STREAM_HEIGHT) || 1080, fps: Number(env.STREAM_FPS) || 30, bitrate: env.STREAM_BITRATE || '6000k', preset: env.STREAM_PRESET || 'veryfast' },
     log: part.log || [],
-    deployed: (part.deployed?.[0] || '').trim()
+    deployed: (part.deployed?.[0] || '').trim(),
+    deployedAt: (part.deployed_at?.[0] || '').trim() || null,
+    deployedDirty: (part.deployed_dirty?.[0] || '').trim() === '1'
   };
   healthCache = { at: Date.now(), body };
   return body;
@@ -545,7 +549,7 @@ app.post('/api/deploy', async (req, res) => {
         return res.end();
       }
 
-      await ssh(`echo ${q(plan.head)} > ${R('.deployed-commit')}`);
+      await ssh(`echo ${q(plan.head)} > ${R('.deployed-commit')} && rm -f ${R('.deployed-dirty')} && date -u +%Y-%m-%dT%H:%M:%SZ > ${R('.deployed-at')}`);
       healthCache.at = 0;
       say('DONE');
       return res.end();
@@ -573,8 +577,12 @@ app.post('/api/deploy', async (req, res) => {
       if (r.code !== 0) { say('Deploy FAILED. The old version may still be running. Check Logs.'); return res.end(); }
     }
     const marker = plan.dirty ? '' : plan.head;
-    if (marker) await ssh(`echo ${q(marker)} > ${R('.deployed-commit')}`);
-    else say('Note: you have unsaved-to-git changes. Commit them so the next deploy knows what is already on the server.');
+    if (marker) {
+      await ssh(`echo ${q(marker)} > ${R('.deployed-commit')} && rm -f ${R('.deployed-dirty')} && date -u +%Y-%m-%dT%H:%M:%SZ > ${R('.deployed-at')}`);
+    } else {
+      await ssh(`touch ${R('.deployed-dirty')} && date -u +%Y-%m-%dT%H:%M:%SZ > ${R('.deployed-at')}`);
+      say('Note: this deploy included unsaved-to-git changes, so Studio will label the live version as uncommitted.');
+    }
     healthCache.at = 0;
     say('DONE');
   } catch (e) {
@@ -584,9 +592,9 @@ app.post('/api/deploy', async (req, res) => {
 });
 app.post('/api/deploy/mark', api(async () => {
   const head = (await git(['rev-parse', 'HEAD'])).out.trim();
-  await ssh(`echo ${q(head)} > ${R('.deployed-commit')}`);
+  await ssh(`echo ${q(head)} > ${R('.deployed-commit')} && rm -f ${R('.deployed-dirty')} && date -u +%Y-%m-%dT%H:%M:%SZ > ${R('.deployed-at')}`);
   healthCache.at = 0;
-  return { ok: true, deployed: head };
+  return { ok: true, deployed: head, deployedAt: new Date().toISOString() };
 }));
 
 app.listen(config.port, '127.0.0.1', () => {
