@@ -581,6 +581,33 @@ $('ed-revert').addEventListener('click', async () => {
     await call('POST', '/api/file/revert', { path: ED.path }); ED.dirty = false; const p = ED.path; ED.path = ''; await loadFiles(); openFile(p); toast('Changes undone');
   } catch (e) { toast(e.message, 'bad'); }
 });
+$('studio-update').addEventListener('click', async () => {
+  if (ED.dirty) return toast('Save or discard the file you are editing before updating Studio.', 'warn');
+  try {
+    const check = await call('GET', '/api/studio/update/check');
+    if (check.dirty) return modal('Studio has local changes', '<p class="dim">Save a version or undo your local code changes before updating Studio. The updater will not overwrite them.</p>');
+    if (check.branch !== 'master') return modal('Studio update paused', '<p class="dim">' + esc(check.reason || 'Switch to the master branch before updating Studio.') + '</p>');
+    if (!check.available) return toast('WeBot Studio is already up to date');
+
+    const go = await confirmBox(
+      'Update WeBot Studio?',
+      'There ' + (check.available === 1 ? 'is 1 update' : 'are ' + check.available + ' updates') + ' on GitHub. This fast-forwards your local Studio files and will not overwrite local edits. After it finishes, close and reopen Studio.',
+      'Update Studio',
+      'primary'
+    );
+    if (!go) return;
+
+    const r = await call('POST', '/api/studio/update');
+    await modal(
+      r.updated ? 'Studio updated' : 'Studio is current',
+      '<p class="dim">' + esc(r.message || '') + '</p>' +
+      (r.updated ? '<p><b>' + esc(r.before) + '</b> → <b>' + esc(r.after) + '</b></p><p class="warn" style="margin-top:10px">Close and reopen WeBot Studio now so the updated server code loads.</p>' : '')
+    );
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+});
+
 $('git-commit').addEventListener('click', async () => {
   const changed = ED.files.filter((x) => x.status);
   if (!changed.length) return toast('Nothing new to save as a version');
