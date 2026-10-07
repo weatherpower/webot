@@ -281,24 +281,24 @@ API: `GET /api/v3/live` (tallies, index + history, control state, storm reports)
 "mode" | "voice" | "sound" | "banner" | "say" | "next" | "test-breaking" | "reload" | "ping" }`.
 Stream state is stored in `data/live-control.json` and `data/live-index.json`.
 
-### FEMA emergency declaration segment
+### State of emergency + FEMA declaration segment
 
-The 24/7 show now includes a **Federal Emergency Declarations** segment backed by the official
-FEMA OpenFEMA `DisasterDeclarationsSummaries` feed. It looks at recent `EM` declarations,
-groups FEMA's per-area rows into one declaration per state/disaster, and:
+The 24/7 show now has an **Emergency Declarations** segment with two kinds of official sources:
 
-- shades affected states directly on the live MapLibre map;
-- shows the declaration state, incident type and signed date;
-- gives declarations signed in the last 24 hours extra rotation weight;
-- has WeBot announce the update using FEMA-specific wording;
-- respects **State focus**, so a focused stream only shows declarations for that state;
-- can be forced from Live Control / WeBot Studio with the **Emergencies** show mode.
+- **Governor/state declarations** from state emergency-management or governor sources. Florida is
+  wired first using the Florida Division of Emergency Management / Governor sources, including the
+  current Executive Order 26-202 for Tropical Depression Nine.
+- **Federal EM declarations** from FEMA OpenFEMA for nationwide federal coverage.
 
-This is deliberately labeled **FEMA / federal emergency declaration** on air. It does not claim to
-be a complete nationwide feed of every governor-issued state emergency, because there is no single
-authoritative national governor-declaration API.
+The stream highlights affected states on the MapLibre map, shows the incident, signed date and
+covered-area count, respects **State focus**, and lets Live Control / WeBot Studio force the
+**Emergencies** mode. A newly discovered governor-issued state of emergency jumps into the show
+instead of waiting for the random rotation, and WeBot announces it even on a calm-weather day
+(while still respecting BRB and breaking-weather priority).
 
-API: `GET /api/v3/emergencies[?days=45]`. The default window is 45 days, cached for 10 minutes.
+API: `GET /api/v3/emergencies[?days=45]`. The default window is 45 days; results are cached for
+5 minutes.
+
 
 ### WeBot thinks and checks the models
 
