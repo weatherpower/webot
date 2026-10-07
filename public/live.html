@@ -1643,9 +1643,42 @@
 
     /* ---------------- map ---------------- */
     const firstSymbolId = () => (S.map.getStyle().layers || []).find((l) => l.type === 'symbol')?.id;
+    // The upstream alert feed occasionally carries a broad bounding rectangle in place of an
+    // actual warning/watch polygon. Never paint that box across the whole national radar.
+    // Genuine smaller warning/watch polygons (and SPC outlook areas) are left untouched.
+    const bogusNationwideBox = (geometry) => {
+      if (!geometry || !['Polygon', 'MultiPolygon'].includes(geometry.type)) return false;
+      const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+      if (!Array.isArray(polygons) || polygons.length !== 1 || !Array.isArray(polygons[0]) || polygons[0].length !== 1) return false;
+      const ring = polygons[0][0];
+      if (!Array.isArray(ring)) return false;
+      const closed = ring.length > 1 && ring[0]?.[0] === ring[ring.length - 1]?.[0] && ring[0]?.[1] === ring[ring.length - 1]?.[1];
+      const points = closed ? ring.slice(0, -1) : ring;
+      if (points.length < 4 || points.length > 24 || !points.every((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))) return false;
+      const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+      const west = Math.min(...xs), east = Math.max(...xs), south = Math.min(...ys), north = Math.max(...ys);
+      if (east - west < 20 || north - south < 10) return false;
+      const near = (a, b) => Math.abs(a - b) < 0.02;
+      const corners = [[west, south], [west, north], [east, south], [east, north]];
+      return corners.every(([x, y]) => points.some((p) => near(p[0], x) && near(p[1], y))) &&
+        points.every((p, i) => {
+          const next = points[(i + 1) % points.length];
+          return near(p[0], next[0]) || near(p[1], next[1]);
+        }) &&
+        points.every(([x, y]) => near(x, west) || near(x, east) || near(y, south) || near(y, north));
+    };
+    const suppressedMapBoxes = new Set();
     const alertFC = () => ({
       type: 'FeatureCollection',
-      features: S.alerts.filter((a) => a.geometry && a.group !== 'forecasts').map((a) => ({
+      features: S.alerts.filter((a) => {
+        if (!a.geometry || a.group === 'forecasts') return false;
+        if (a.group !== 'outlooks' && bogusNationwideBox(a.geometry)) {
+          if (!suppressedMapBoxes.has(a.key)) console.warn('[WeBot map] Ignoring oversized rectangular alert geometry', a.key, a.event);
+          suppressedMapBoxes.add(a.key);
+          return false;
+        }
+        return true;
+      }).map((a) => ({
         type: 'Feature', geometry: a.geometry,
         properties: { key: a.key, color: a.accent || a.color || '#888', rank: a.rank, group: a.group }
       })).sort((x, y) => y.properties.rank - x.properties.rank)
@@ -1684,6 +1717,11 @@
     setInterval(() => {
       if (S.styleReady && S.sel) S.map.setPaintProperty('sel-line', 'line-opacity', 0.55 + 0.45 * Math.abs(Math.sin(Date.now() / 420)));
     }, 90);
+    const alertMapLayers = ['a-fill', 'a-case', 'a-line', 'w-line', 'sel-case', 'sel-line'];
+    const setAlertMapVisible = (visible) => {
+      if (!S.styleReady) return;
+      alertMapLayers.forEach((id) => S.map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'));
+    };
     const setOutlookVisible = (on) => {
       if (!S.styleReady) return;
       ['o-fill', 'o-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
@@ -2322,7 +2360,7 @@
       S.modelValid = null;
       clearInterval(S.modelTimer);
       if (S.styleReady && S.map.getLayer('model')) S.map.setLayoutProperty('model', 'visibility', 'none');
-      if (S.styleReady) S.map.setLayoutProperty('a-fill', 'visibility', 'visible');
+      setAlertMapVisible(true);
     };
     const showModelFrame = (seg, i) => {
       const frame = seg.frames[i];
@@ -2346,7 +2384,8 @@
       setMood('calm');
       S.modelSeg = seg;
       S.modelOn = true;
-      if (S.styleReady) S.map.setLayoutProperty('a-fill', 'visibility', 'none');
+      // Model Studio owns this shot: hide every warning/watch outline, not just the fill.
+      setAlertMapVisible(false);
       const f = seg.field;
       $('rp-title').textContent = seg.modelName.replace(' 3km', '') + ' · ' + (SHORT_FIELD[f.key] || f.name.toUpperCase());
       $('rp-bar').style.background = legendCss(f.legend || []);
