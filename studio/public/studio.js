@@ -36,7 +36,7 @@ const getPath = (obj, p) => p.split('.').reduce((o, k) => (o == null ? o : o[k])
 const setPath = (obj, p, v) => { const ks = p.split('.'); let o = obj; ks.slice(0, -1).forEach((k) => { o = o[k] = o[k] || {}; }); o[ks[ks.length - 1]] = v; };
 const KINDS = {
   alert: 'Top alert', pinned: 'Pinned alert', think: 'Model check', models: 'Weather models', national: 'National overview',
-  outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', forecast: 'Daily forecast', gas: 'Gas prices'
+  outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', emergency: 'Emergency declarations', forecast: 'Daily forecast', gas: 'Gas prices'
 };
 
 /* ---------------- navigation ---------------- */
@@ -226,6 +226,7 @@ const SEGMENTS = [
   ['national', 'National overview', 'Every active warning', true, true],
   ['outlook', 'Severe outlook', 'Today’s SPC outlook (when there is one)', true, true],
   ['reports', 'Storm reports', 'Recent tornado, hail and wind reports', true, true],
+  ['emergency', 'Emergency declarations', 'Recent FEMA federal emergency declarations on the map', true, true],
   ['models', 'Weather models (after a check)', 'How long the model loop stays up', false, true],
   ['tropics', 'Tropics', 'Hurricanes and areas to watch', false, true]
 ];
@@ -242,7 +243,8 @@ const BRAIN = [
     { path: 'lines.gasRequest', label: 'When a viewer asks about gas', type: 'text' },
     { path: 'lines.surface', label: 'National radar openers', type: 'lines' },
     { path: 'lines.train', label: 'Train Cam openers ({city} = the cam’s town)', type: 'lines' },
-    { path: 'lines.rain', label: 'Rain (WPC) outlook openers', type: 'lines' }
+    { path: 'lines.rain', label: 'Rain (WPC) outlook openers', type: 'lines' },
+    { path: 'lines.emergency', label: 'FEMA emergency declaration openers', type: 'lines' }
   ] },
   { id: 'chat', title: 'Chat', fields: [
     { path: 'chat.readAloud', label: 'Read regular chat messages out loud', type: 'bool' },
