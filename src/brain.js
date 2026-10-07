@@ -14,9 +14,9 @@ export const DEFAULT_BRAIN = {
     tagline: 'AI weather bot'
   },
   // How often each segment comes up on calm days (bigger = more often; 0 = never).
-  calmWeights: { surface: 5, alert: 1.5, think: 1, national: 1, outlook: 0.5, reports: 0.5, forecast: 2.5, gas: 0.9, train: 0, rain: 0.8 },
+  calmWeights: { surface: 5, alert: 1.5, think: 1, national: 1, outlook: 0.5, reports: 0.5, emergency: 1.2, forecast: 2.5, gas: 0.9, train: 0, rain: 0.8 },
   // How long each segment stays up on calm days, in seconds.
-  calmSeconds: { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, forecast: 75, gas: 70, train: 90, rain: 70, think: 13 },
+  calmSeconds: { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, reports: 70, emergency: 75, forecast: 75, gas: 70, train: 90, rain: 70, think: 13 },
   gasEveryMinutes: 40,
   lines: {
     // {city} becomes the city and state, {name} the viewer's name.
@@ -25,6 +25,7 @@ export const DEFAULT_BRAIN = {
     gas: ['Let’s see how bad the gas pump is gonna hurt this week.', 'Gas price check, y’all. Hold onto your wallets.', 'Let’s see what it costs to fill up the truck this week.', 'Here’s your weekly gas prices. Don’t cry, it’s just money.'],
     gasRequest: '{name} asked about gas around {city}. Let’s see how bad it is, sugar.',
     rain: ['Let’s check the flash flood outlook from the Weather Prediction Center.', 'Time for the rain outlook, y’all.', 'Let’s see who’s gettin soaked. Here’s the flash flood outlook.'],
+    emergency: ['Here’s a federal emergency declaration update from FEMA.', 'Let’s check the latest FEMA emergency declarations.', 'Emergency declaration update, y’all. Here’s what FEMA has listed recently.'],
     // {city} becomes the train cam's town.
     train: ['Let’s check on the trains, y’all. This is {city}, live from SouthWest RailCams.', 'Train time! Here’s {city}, courtesy of SouthWest RailCams.', 'Let’s see if anything’s rollin through {city}. Live from SouthWest RailCams.'],
     surface: ['Here’s the national radar and the surface map, y’all.', 'Let’s check the big picture on radar.', 'Time to see what the whole country has got goin on.']
