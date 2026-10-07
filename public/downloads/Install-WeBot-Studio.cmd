@@ -108,36 +108,39 @@ if (Test-Path (Join-Path $installDir '.git')) {
 }
 
 Write-Host ""
-Write-Host "Installing the lightweight Studio runtime..." -ForegroundColor Cyan
+Write-Host "Installing WeBot Studio dependencies..." -ForegroundColor Cyan
 & npm --prefix "$studioDir" install --omit=dev --no-audit --no-fund
-if ($LASTEXITCODE -ne 0) { throw 'Studio runtime installation failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'WeBot Studio server dependencies failed to install.' }
 
-$launcher = Join-Path $studioDir 'WeBot Studio.cmd'
-if (-not (Test-Path $launcher)) { throw 'The WeBot Studio launcher is missing from the downloaded build.' }
-
-Write-Host ""
-Write-Host "Creating shortcuts..." -ForegroundColor Cyan
-$shell = New-Object -ComObject WScript.Shell
-$desktop = [Environment]::GetFolderPath('Desktop')
-$desktopLink = Join-Path $desktop 'WeBot Studio.lnk'
-$shortcut = $shell.CreateShortcut($desktopLink)
-$shortcut.TargetPath = $launcher
-$shortcut.WorkingDirectory = $studioDir
-$shortcut.Description = 'WeatherPower WeBot Studio'
-$shortcut.Save()
-
-$startDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\WeatherPower'
-New-Item -ItemType Directory -Force -Path $startDir | Out-Null
-$startLink = Join-Path $startDir 'WeBot Studio.lnk'
-$shortcut2 = $shell.CreateShortcut($startLink)
-$shortcut2.TargetPath = $launcher
-$shortcut2.WorkingDirectory = $studioDir
-$shortcut2.Description = 'WeatherPower WeBot Studio'
-$shortcut2.Save()
+$desktopDir = Join-Path $installDir 'desktop'
+if (-not (Test-Path (Join-Path $desktopDir 'package.json'))) {
+  throw 'The real desktop app folder is missing from the downloaded build.'
+}
+& npm --prefix "$desktopDir" install --no-audit --no-fund
+if ($LASTEXITCODE -ne 0) { throw 'WeBot Studio desktop dependencies failed to install.' }
 
 Write-Host ""
-Write-Host "Installed to:" -ForegroundColor Green
+Write-Host "Building the real Windows WeBot Studio app..." -ForegroundColor Cyan
+$oldBuildApp = $env:WP_BUILD_APP
+$env:WP_BUILD_APP = 'studio'
+try {
+  & npm --prefix "$desktopDir" run build
+  if ($LASTEXITCODE -ne 0) { throw 'WeBot Studio desktop build failed.' }
+} finally {
+  $env:WP_BUILD_APP = $oldBuildApp
+}
+
+$exe = Join-Path $env:LOCALAPPDATA 'Programs\WeatherPower\WeBot Studio.exe'
+if (-not (Test-Path $exe)) {
+  throw 'The WeBot Studio.exe build finished but the installed app was not found.'
+}
+
+Write-Host ""
+Write-Host "Installed app:" -ForegroundColor Green
+Write-Host "  $exe"
+Write-Host "Project files:" -ForegroundColor Green
 Write-Host "  $installDir"
 Write-Host ""
-Write-Host "Launching WeBot Studio..." -ForegroundColor Green
-Start-Process -FilePath $launcher -WorkingDirectory $studioDir
+Write-Host "Launching the WeBot Studio desktop app..." -ForegroundColor Green
+Start-Process -FilePath $exe
+

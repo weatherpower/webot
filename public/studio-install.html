@@ -68,12 +68,12 @@
       <div>
         <div class="eyebrow">Install on your main PC</div>
         <h1>Your WeatherPower control room, on this computer.</h1>
-        <p class="lead">Install the full desktop WeBot Studio checkout with one Windows installer. It sets up the tools Studio needs, signs into the private WeatherPower GitHub repository, creates shortcuts, and launches Studio at <strong>localhost:7777</strong>.</p>
+        <p class="lead">Install the actual <strong>WeBot Studio Windows app</strong> with one installer. It sets up the tools Studio needs, signs into the private WeatherPower GitHub repository, builds the Electron desktop program, creates shortcuts, and launches <strong>WeBot Studio.exe</strong>.</p>
         <div class="actions">
           <a class="btn primary" id="download" href="/warningcenter/studio/installer">Download Windows installer</a>
           <a class="btn" href="/warningcenter/webot">View WeBot status</a>
         </div>
-        <div class="note">Install location: %LOCALAPPDATA%\WeatherPower\WeBot Studio</div>
+        <div class="note">App: %LOCALAPPDATA%\Programs\WeatherPower\WeBot Studio.exe · Project: %LOCALAPPDATA%\WeatherPower\WeBot Studio</div>
         <div class="warn">This is an owner-only installer. Because the WeBot repository is private, GitHub will ask you to sign in with an account that has access to <strong>weatherpower/webot</strong>. The installer does not contain a GitHub token or controller token.</div>
       </div>
 
@@ -84,9 +84,9 @@
           <div><span class="cyan">02</span> Install anything missing with winget</div>
           <div><span class="cyan">03</span> <span class="white">Sign in to GitHub</span> in your browser</div>
           <div><span class="cyan">04</span> Clone the private WeBot master branch</div>
-          <div><span class="cyan">05</span> Install the lightweight Studio runtime</div>
-          <div><span class="cyan">06</span> Create Desktop + Start Menu shortcuts</div>
-          <div><span class="cyan">07</span> Launch WeBot Studio</div>
+          <div><span class="cyan">05</span> Install Studio + Electron dependencies</div>
+          <div><span class="cyan">06</span> Build the real WeBot Studio.exe desktop app</div>
+          <div><span class="cyan">07</span> Create shortcuts + launch the app</div>
           <div style="margin-top:20px"><span class="ok">READY</span> · future Studio updates still use the real Git checkout</div>
         </div>
       </div>
@@ -98,7 +98,7 @@
       <div class="grid">
         <div class="step"><div class="n">1</div><b>Download</b><p>Grab <strong>Install-WeBot-Studio.cmd</strong> from the button above and open it.</p></div>
         <div class="step"><div class="n">2</div><b>Sign into GitHub</b><p>If needed, the installer opens GitHub's browser sign-in. Use the WeatherPower account that can access the private repo.</p></div>
-        <div class="step"><div class="n">3</div><b>Launch Studio</b><p>A WeBot Studio shortcut is added to your Desktop and Start Menu, and the installer opens it when setup finishes.</p></div>
+        <div class="step"><div class="n">3</div><b>Launch Studio</b><p>The installer builds <strong>WeBot Studio.exe</strong>, adds Desktop and Start Menu shortcuts, and opens the desktop app when setup finishes.</p></div>
       </div>
       <div class="info">
         <div><b>Safe existing-install behavior</b><span>If a real WeBot Git checkout already exists, the installer only attempts a fast-forward update. It will not hard-reset or delete local changes.</span></div>
