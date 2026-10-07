@@ -368,6 +368,50 @@ app.get('/api/git/log', api(async () => {
   return r.out.split('\n').filter(Boolean).map((l) => { const [hash, date, ...msg] = l.split('|'); return { hash, date, message: msg.join('|') }; });
 }));
 
+const studioUpdateState = async () => {
+  if (WEB) throw Object.assign(new Error('Update Studio from the desktop app, not web mode.'), { status: 400 });
+  const branch = (await git(['branch', '--show-current'])).out.trim();
+  const head = (await git(['rev-parse', '--short', 'HEAD'])).out.trim();
+  const tracked = (await git(['status', '--porcelain', '--untracked-files=no'])).out.trim();
+  return { branch, head, dirty: Boolean(tracked) };
+};
+
+app.get('/api/studio/update/check', api(async () => {
+  const state = await studioUpdateState();
+  if (state.branch !== 'master') return { ...state, available: null, reason: 'Switch to the master branch before updating Studio.' };
+  const fetch = await git(['fetch', 'origin', 'master', '--quiet'], { timeout: 120000 });
+  if (fetch.code !== 0) throw new Error(fetch.err.trim() || 'Could not check GitHub for Studio updates');
+  const remote = (await git(['rev-parse', '--short', 'origin/master'])).out.trim();
+  const counts = (await git(['rev-list', '--left-right', '--count', 'HEAD...origin/master'])).out.trim().split(/\s+/).map(Number);
+  return { ...state, remote, ahead: counts[0] || 0, available: counts[1] || 0 };
+}));
+
+app.post('/api/studio/update', api(async () => {
+  const state = await studioUpdateState();
+  if (state.branch !== 'master') throw Object.assign(new Error('Studio updater only runs from the master branch.'), { status: 400 });
+  if (state.dirty) throw Object.assign(new Error('You have local code changes. Save a version or undo them before updating Studio.'), { status: 409 });
+
+  const fetch = await git(['fetch', 'origin', 'master', '--quiet'], { timeout: 120000 });
+  if (fetch.code !== 0) throw new Error(fetch.err.trim() || 'Could not download the latest Studio files');
+
+  const ancestor = await git(['merge-base', '--is-ancestor', 'HEAD', 'origin/master']);
+  if (ancestor.code !== 0) throw Object.assign(new Error('Your local master has commits that do not fast-forward to origin/master. Save/back up your work before updating.'), { status: 409 });
+
+  const before = (await git(['rev-parse', '--short', 'HEAD'])).out.trim();
+  const merge = await git(['merge', '--ff-only', 'origin/master'], { timeout: 120000 });
+  if (merge.code !== 0) throw new Error(merge.err.trim() || merge.out.trim() || 'Studio update failed');
+  const after = (await git(['rev-parse', '--short', 'HEAD'])).out.trim();
+
+  return {
+    ok: true,
+    updated: before !== after,
+    before,
+    after,
+    restartRequired: before !== after,
+    message: before === after ? 'Studio is already up to date.' : 'Studio files updated. Close and reopen WeBot Studio to load the new server code.'
+  };
+}));
+
 /* ---------- deploy ---------- */
 const deployPlan = async () => {
   const [{ deployed }, head, changed] = await Promise.all([health(), git(['rev-parse', 'HEAD']), changedFiles()]);
