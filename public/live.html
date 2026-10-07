@@ -485,6 +485,9 @@
     const talkAllowed = () => talkMode() === 'on' || (talkMode() === 'auto' && wisScore() >= 100);
     // Calm day: below WIS 100 and no tornado warnings. The show slows down and stays mellow.
     const isCalm = () => wisScore() < 100 && !(S.live?.tallies?.tor);
+    // Viewer forecast/gas requests are more important than the ordinary calm-day rotation.
+    // They may run during busy weather, but never while a breaking cut-in is active or a tornado warning is out.
+    const chatRequestSafe = () => !S.inBreaking && !(S.live?.tallies?.tor);
     // Weather quiet enough for daily forecasts (in the focused state when there is one).
     const forecastWeather = () => {
       const st = focusState();
@@ -2340,7 +2343,7 @@
       if (!shot && S.forceShot) { shot = S.forceShot; S.forceShot = null; }
       // Viewer requests from YouTube chat: next in line when it's calm (they wait out severe weather, up to 30 min).
       S.chatQueue = (S.chatQueue || []).filter((r) => Date.now() - r.at < 30 * 60 * 1000);
-      if (!shot && S.chatQueue.length && isCalm() && !S.control.pin && Date.now() - (S.chatAt || 0) > chatGapMs()) {
+      if (!shot && S.chatQueue.length && chatRequestSafe() && !S.control.pin && Date.now() - (S.chatAt || 0) > chatGapMs()) {
         const req = S.chatQueue.shift();
         S.chatAt = Date.now();
         shot = { type: req.kind, request: req };
@@ -3590,7 +3593,8 @@
     // Read-only voice check for troubleshooting (deploy/cloud-stream scripts, WeBot Studio).
     window.WPVoice = () => ({ voiceOn: voiceOn(), engine: ttsCfg().engine, puter: pt.state, canNeural: canNeural(), speechWorks: Boolean(speechWorks()), actx: actx ? actx.state : 'none', queue: speech.queue.length, busy: speech.busy, played: speech.played || 0, log: speech.log || [], lastError: pt.lastError || '' });
     // Viewer requests from YouTube chat: say "got it" in the top bar, then cut over to it soon (15 s into the
-    // current segment, at most one request every 2 minutes, only on calm weather).
+    // current segment, at most one request every 2 minutes). Busy weather no longer blocks requests;
+    // an active tornado warning or breaking cut-in still does.
     const queueChatRequest = (cmd, ack = true) => {
       S.chatQueue = (S.chatQueue || []).filter((r) => !(r.kind === cmd.kind && r.place.name === cmd.place.name && r.place.state === cmd.place.state));
       if (S.chatQueue.length >= 5) return;
@@ -3675,7 +3679,7 @@
     };
     const scheduleChatJump = () => {
       clearTimeout(S.chatJump);
-      if (!S.chatQueue?.length || !isCalm() || S.control.pin || S.control.brb) return;
+      if (!S.chatQueue?.length || !chatRequestSafe() || S.control.pin || S.control.brb) return;
       const wait = Math.max(0, 15000 - (Date.now() - (S.shotStart || 0)), chatGapMs() - (Date.now() - (S.chatAt || 0)));
       S.chatJump = setTimeout(() => {
         if (!S.chatQueue?.length || S.inBreaking || S.shot?.request) return scheduleChatJump();
