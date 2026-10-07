@@ -11,10 +11,13 @@ const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(__dirname, 'node_modules', 'electron', 'dist');
 const OUT = process.env.WP_INSTALL_DIR || path.join(process.env.LOCALAPPDATA, 'Programs', 'WeatherPower');
 const VERSION = require('./package.json').version;
-const PROGRAMS = [
-  { exe: 'WeBot Studio.exe', icon: path.join(ROOT, 'studio', 'webot-studio.ico'), desc: 'WeBot Studio' },
-  { exe: 'WeatherPower Stream House.exe', icon: path.join(ROOT, 'house', 'stream-house.ico'), desc: 'WeatherPower Stream House' }
+const ALL_PROGRAMS = [
+  { key: 'studio', exe: 'WeBot Studio.exe', icon: path.join(ROOT, 'studio', 'webot-studio.ico'), desc: 'WeBot Studio' },
+  { key: 'house', exe: 'WeatherPower Stream House.exe', icon: path.join(ROOT, 'house', 'stream-house.ico'), desc: 'WeatherPower Stream House' }
 ];
+const wanted = String(process.env.WP_BUILD_APP || 'all').toLowerCase();
+const PROGRAMS = wanted === 'all' ? ALL_PROGRAMS : ALL_PROGRAMS.filter((p) => p.key === wanted);
+if (!PROGRAMS.length) throw new Error('Unknown WP_BUILD_APP "' + wanted + '"');
 
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'electron.exe'))) throw new Error('Electron is missing: run "npm install" in ' + __dirname);
