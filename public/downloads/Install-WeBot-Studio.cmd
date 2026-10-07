@@ -116,8 +116,28 @@ $desktopDir = Join-Path $installDir 'desktop'
 if (-not (Test-Path (Join-Path $desktopDir 'package.json'))) {
   throw 'The real desktop app folder is missing from the downloaded build.'
 }
-& npm --prefix "$desktopDir" install --no-audit --no-fund
-if ($LASTEXITCODE -ne 0) { throw 'WeBot Studio desktop dependencies failed to install.' }
+
+Write-Host "Installing Electron desktop dependencies..." -ForegroundColor Cyan
+$oldNodeEnv = $env:NODE_ENV
+$oldOmit = $env:NPM_CONFIG_OMIT
+$env:NODE_ENV = 'development'
+$env:NPM_CONFIG_OMIT = ''
+try {
+  if (Test-Path (Join-Path $desktopDir 'package-lock.json')) {
+    & npm --prefix "$desktopDir" ci --include=dev --no-audit --no-fund
+  } else {
+    & npm --prefix "$desktopDir" install --include=dev --no-audit --no-fund
+  }
+  if ($LASTEXITCODE -ne 0) { throw 'WeBot Studio desktop dependencies failed to install.' }
+} finally {
+  $env:NODE_ENV = $oldNodeEnv
+  $env:NPM_CONFIG_OMIT = $oldOmit
+}
+
+$electronExe = Join-Path $desktopDir 'node_modules\electron\dist\electron.exe'
+if (-not (Test-Path $electronExe)) {
+  throw 'Electron still was not installed in desktop\node_modules. The installer stopped before changing the desktop app.'
+}
 
 Write-Host ""
 Write-Host "Building the real Windows WeBot Studio app..." -ForegroundColor Cyan
