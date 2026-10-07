@@ -15,6 +15,18 @@ const FLORIDA_INDEX_URLS = [
 const FLORIDA_BOOTSTRAP_URLS = [
   'https://www.floridadisaster.org/news-media/news/icymi-governor-ron-desantis-issues-executive-order-in-preparation-for-tropical-depression-nine/'
 ];
+
+// Time-limited source-backed bootstrap for Alabama's October 7, 2026
+// emergency proclamation ahead of Isaias. Expire after October 14 CDT.
+const ALABAMA_ISAIAS_SOURCE = 'https://alabamareflector.com/2026/10/07/gov-kay-ivey-declares-state-of-emergency-as-isaias-approaches-gulf-coast/';
+const ALABAMA_ISAIAS_COUNTIES = ["Autauga","Baldwin","Barbour","Bibb","Bullock","Butler","Chambers","Chilton","Clarke","Choctaw","Coffee","Conecuh","Coosa","Covington","Crenshaw","Dale","Dallas","Elmore","Escambia","Geneva","Greene","Hale","Henry","Houston","Lee","Lowndes","Macon","Marengo","Mobile","Monroe","Montgomery","Perry","Pickens","Pike","Russell","Sumter","Tallapoosa","Tuscaloosa","Washington","Wilcox"];
+const ALABAMA_ISAIAS_DATE = '2026-10-07T12:00:00.000Z'; // Calendar date only, NOT an exact signature time.
+const ALABAMA_ISAIAS_END = '2026-10-15T04:59:59.000Z'; // October 14, 11:59pm CDT.
+const ALABAMA_OFFICIAL_INDEXES = [
+  'https://governor.alabama.gov/newsroom/category/state-of-emergency/',
+  'https://governor.alabama.gov/newsroom/category/press-releases/'
+];
+
 const HEADERS = {
   Accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
   'User-Agent': 'weatherpower.app WeatherPower Live contact@weatherpower.app'
@@ -209,6 +221,63 @@ const floridaStateEmergency = async (windowDays) => {
   return [];
 };
 
+
+const alabamaStateEmergency = async (windowDays) => {
+  const declarationTime = Date.parse(ALABAMA_ISAIAS_DATE);
+  const now = Date.now();
+  // Historic declarations must not be presented as active state emergencies.
+  if (now < declarationTime || now > Date.parse(ALABAMA_ISAIAS_END) ||
+      declarationTime < now - windowDays * 24 * 60 * 60 * 1000) return [];
+
+  let sourceUrl = ALABAMA_ISAIAS_SOURCE;
+  let source = 'Alabama Reflector (verified reporting)';
+  // Prefer the Governor's official posting when one becomes available.
+  // An EMA storm forecast or NWS watch does NOT count as a proclamation.
+  const indexes = await Promise.allSettled(ALABAMA_OFFICIAL_INDEXES.map(fetchTimed));
+  const officialLinks = [];
+  for (let i = 0; i < indexes.length; i++) {
+    const result = indexes[i];
+    if (result.status !== 'fulfilled') continue;
+    for (const match of String(result.value).matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+      const label = htmlText(match[2]);
+      if (!/isaias|state of emergency/i.test(label)) continue;
+      try {
+        const url = new URL(decodeHtml(match[1]), ALABAMA_OFFICIAL_INDEXES[i]);
+        if (url.hostname === 'governor.alabama.gov' &&
+            /^\/newsroom\/2026\/10\//.test(url.pathname) &&
+            !officialLinks.includes(url.href)) officialLinks.push(url.href);
+      } catch { /* Ignore malformed index links. */ }
+    }
+  }
+  for (const url of officialLinks.slice(0, 6)) {
+    try {
+      const text = htmlText(await fetchTimed(url));
+      if (/\bIsaias\b/i.test(text) && /\bstate of emergency\b/i.test(text) &&
+          /\bGovernor (?:Kay )?Ivey\b|\bKay Ivey\b/i.test(text) &&
+          /\b40\b/.test(text) && !/termination of (?:the )?state of emergency/i.test(text)) {
+        sourceUrl = url;
+        source = 'Office of the Governor of Alabama';
+        break;
+      }
+    } catch { /* Keep the independently reported declaration until official posting. */ }
+  }
+  return [{
+    id: 'AL-SOE-ISAIAS-2026-10-07',
+    sourceType: 'state',
+    source,
+    sourceUrl,
+    state: 'AL',
+    title: 'State of Emergency — Tropical Storm Isaias',
+    incidentType: 'Tropical Storm Isaias',
+    declarationDate: ALABAMA_ISAIAS_DATE,
+    incidentBeginDate: ALABAMA_ISAIAS_DATE,
+    incidentEndDate: ALABAMA_ISAIAS_END,
+    designatedAreas: ALABAMA_ISAIAS_COUNTIES,
+    areaCount: ALABAMA_ISAIAS_COUNTIES.length,
+    fresh: now - declarationTime < 48 * 60 * 60 * 1000
+  }];
+};
+
 export const emergencyDeclarations = async ({ days = 45 } = {}) => {
   const windowDays = Math.max(7, Math.min(120, Math.round(Number(days) || 45)));
   if (cache.body && cache.windowDays === windowDays && Date.now() - cache.at < 5 * 60 * 1000) {
@@ -217,7 +286,8 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
 
   const settled = await Promise.allSettled([
     federalDeclarations(windowDays),
-    floridaStateEmergency(windowDays)
+    floridaStateEmergency(windowDays),
+    alabamaStateEmergency(windowDays)
   ]);
 
   const declarations = [];
@@ -240,7 +310,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
     .slice(0, 50);
 
   const body = {
-    source: 'Official state emergency-management sources + FEMA OpenFEMA',
+    source: 'State emergency sources (official and attributed reporting) + FEMA OpenFEMA',
     windowDays,
     fetchedAt: new Date().toISOString(),
     declarations: unique,
