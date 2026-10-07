@@ -25,7 +25,7 @@ export const DEFAULT_BRAIN = {
     gas: ['Let’s see how bad the gas pump is gonna hurt this week.', 'Gas price check, y’all. Hold onto your wallets.', 'Let’s see what it costs to fill up the truck this week.', 'Here’s your weekly gas prices. Don’t cry, it’s just money.'],
     gasRequest: '{name} asked about gas around {city}. Let’s see how bad it is, sugar.',
     rain: ['Let’s check the flash flood outlook from the Weather Prediction Center.', 'Time for the rain outlook, y’all.', 'Let’s see who’s gettin soaked. Here’s the flash flood outlook.'],
-    emergency: ['Here’s a federal emergency declaration update from FEMA.', 'Let’s check the latest FEMA emergency declarations.', 'Emergency declaration update, y’all. Here’s what FEMA has listed recently.'],
+    emergency: ['Here’s a state of emergency update.', 'Let’s check the latest emergency declarations.', 'Emergency declaration update, y’all. Here’s what officials have declared.'],
     // {city} becomes the train cam's town.
     train: ['Let’s check on the trains, y’all. This is {city}, live from SouthWest RailCams.', 'Train time! Here’s {city}, courtesy of SouthWest RailCams.', 'Let’s see if anything’s rollin through {city}. Live from SouthWest RailCams.'],
     surface: ['Here’s the national radar and the surface map, y’all.', 'Let’s check the big picture on radar.', 'Time to see what the whole country has got goin on.']
@@ -96,6 +96,7 @@ const OLD_DEFAULTS = {
   'lines.gas': ['Let’s check gas prices.', 'Time for a gas price check.', 'Let’s see what it costs to fill up this week.', 'Here’s your weekly gas price update.'],
   'lines.gasRequest': '{name} asked about gas prices around {city}.',
   'lines.surface': ['Here’s the national radar with the latest surface map.', 'Let’s check the national radar and the surface map.', 'Time for a look at the big picture on radar.'],
+  'lines.emergency': ['Here’s a federal emergency declaration update from FEMA.', 'Let’s check the latest FEMA emergency declarations.', 'Emergency declaration update, y’all. Here’s what FEMA has listed recently.'],
   'chat.hint': 'TYPE !FORECAST OR !GAS WITH A CITY OR ZIP IN CHAT · WEBOT WILL CHECK IT ON THE STREAM',
   'chat.readEverySeconds': [75, 45],
   'chat.sameViewerMinutes': [5, 3]

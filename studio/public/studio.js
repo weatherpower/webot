@@ -226,7 +226,7 @@ const SEGMENTS = [
   ['national', 'National overview', 'Every active warning', true, true],
   ['outlook', 'Severe outlook', 'Today’s SPC outlook (when there is one)', true, true],
   ['reports', 'Storm reports', 'Recent tornado, hail and wind reports', true, true],
-  ['emergency', 'Emergency declarations', 'Recent FEMA federal emergency declarations on the map', true, true],
+  ['emergency', 'State & federal emergencies', 'Governor state-of-emergency declarations plus FEMA federal emergencies', true, true],
   ['models', 'Weather models (after a check)', 'How long the model loop stays up', false, true],
   ['tropics', 'Tropics', 'Hurricanes and areas to watch', false, true]
 ];
@@ -244,7 +244,7 @@ const BRAIN = [
     { path: 'lines.surface', label: 'National radar openers', type: 'lines' },
     { path: 'lines.train', label: 'Train Cam openers ({city} = the cam’s town)', type: 'lines' },
     { path: 'lines.rain', label: 'Rain (WPC) outlook openers', type: 'lines' },
-    { path: 'lines.emergency', label: 'FEMA emergency declaration openers', type: 'lines' }
+    { path: 'lines.emergency', label: 'State/emergency declaration openers', type: 'lines' }
   ] },
   { id: 'chat', title: 'Chat', fields: [
     { path: 'chat.readAloud', label: 'Read regular chat messages out loud', type: 'bool' },
