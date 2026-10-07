@@ -2962,9 +2962,10 @@
         esc((d.sourceType === 'state' ? 'STATE · ' : 'FEMA · ') + (d.incidentType || 'Emergency') + ' · ' + emergencyDate(d.declarationDate) +
         (d.areaCount ? ' · ' + d.areaCount + (d.areaCount === 1 ? ' AREA' : ' AREAS') : '')) + '</span></div>').join('');
       const scope = focusState() ? esc(focusName().toUpperCase()) : top.length + ' RECENT DECLARATION' + (top.length === 1 ? '' : 'S');
+      const hasReportedState = top.some((d) => d.sourceType === 'state' && /reporting/i.test(d.source || ''));
       setCard('<div class="head"><div class="ico">' + icon('alert', 30) + '</div><div><h2>' +
         (hasState ? 'STATE OF EMERGENCY' : 'FEDERAL EMERGENCY DECLARATIONS') + '</h2><div class="sub">' +
-        (hasState ? 'OFFICIAL STATE EMERGENCY MANAGEMENT + FEMA' : 'FEMA') + ' · ' +
+        (hasState ? (hasReportedState ? 'STATE DECLARATIONS · VERIFIED REPORTING + FEMA' : 'OFFICIAL STATE EMERGENCY MANAGEMENT + FEMA') : 'FEMA') + ' · ' +
         scope + ' · LAST ' + esc(S.emergencies?.windowDays || 45) + ' DAYS</div></div><span class="status">EM</span></div><div class="rows">' + rows + '</div>', hasState ? '#ff3b3b' : '#ff7a2a');
 
       const geos = features.map((f) => f.geometry);
