@@ -261,9 +261,15 @@
     .prog { flex: none; width: 150px; height: 6px; background: rgba(0,0,0,.3); overflow: hidden; }
     .prog i { display: block; height: 100%; width: 0; background: #fff; }
     .now .cd { flex: none; width: 76px; text-align: right; font-weight: 700; color: #fff; }
-    .brandbox { flex: none; width: 250px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--violet-dark); }
+    .brandbox { flex: none; width: 286px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--violet-dark); }
     .brandbox img { width: 40px; height: 40px; }
-    .brandbox b { font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .14em; white-space: nowrap; }
+    .brandbox .bi { min-width: 0; }
+    .brandbox b { display: block; font-family: "WP Mono"; font-size: 13px; font-weight: 700; letter-spacing: .14em; white-space: nowrap; }
+    .brandbox .subs { display: flex; align-items: baseline; gap: 7px; margin-top: 5px; color: #d9d4f4; white-space: nowrap; }
+    .brandbox .subs strong { font-family: "WP Display"; font-size: 19px; line-height: 1; color: #fff; letter-spacing: .02em; }
+    .brandbox .subs span { font-family: "WP Mono"; font-size: 9px; font-weight: 700; letter-spacing: .15em; color: #bcb3e5; }
+    .brandbox.bump .subs strong { animation: subpop .7s ease-out; }
+    @keyframes subpop { 0% { transform: scale(1); color: #fff; } 35% { transform: scale(1.16); color: #78e3ff; } 100% { transform: scale(1); color: #fff; } }
 
     /* ---------- breaking takeover ---------- */
     .brk { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; background: var(--c, #c00); color: var(--ci, #fff); overflow: hidden; text-align: center; }
@@ -347,7 +353,7 @@
         <div class="l1"><span class="k" id="now-k">NOW TRACKING</span><b id="now-t">WEATHERPOWER LIVE</b><span class="hz" id="now-hz"></span></div>
         <div class="l2"><div class="crawl" id="crawl"><span id="crawl-s"></span></div><span class="ppl" id="now-ppl"></span><div class="prog"><i id="prog"></i></div><span class="cd" id="now-cd"></span></div>
       </div>
-      <div class="brandbox"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><b>WEATHERPOWER.APP</b></div>
+      <div class="brandbox" id="subbox"><img src="/warningcenter/public/assets/wp-logo.png" alt=""><div class="bi"><b>WEATHERPOWER.APP</b><div class="subs"><strong id="sub-count">—</strong><span>SUBSCRIBERS</span></div></div></div>
     </footer>
 
     <div class="brk" id="brk"></div>
@@ -435,7 +441,7 @@
       cycle: 0, shot: null, shotTimer: null, shotStart: 0, shotDur: 1, breaking: [], fresh: [], inBreaking: false,
       lastCmd: null, control: { rev: -1, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null },
       map: null, styleReady: false, step: 0, local: null, localKey: '', velOn: false, siteMarker: null, sel: null,
-      headlines: [], hlIndex: 0, lastRoundup: Date.now(), lastTip: Date.now()
+      headlines: [], hlIndex: 0, lastRoundup: Date.now(), lastTip: Date.now(), subscribers: null
     };
 
     /* ---------------- helpers ---------------- */
@@ -446,6 +452,22 @@
     };
     const fmtNum = (n) => Number(n).toLocaleString('en-US');
     const shortNum = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : fmtNum(n);
+    const loadAudience = async () => {
+      try {
+        const st = await getJson('/api/v3/webot/status');
+        const next = Number(st.chat?.subscribers);
+        if (!Number.isFinite(next)) return;
+        const changed = Number.isFinite(S.subscribers) && next !== S.subscribers;
+        S.subscribers = next;
+        $('sub-count').textContent = fmtNum(next);
+        if (changed) {
+          $('subbox').classList.remove('bump');
+          void $('subbox').offsetWidth;
+          $('subbox').classList.add('bump');
+          setTimeout(() => $('subbox').classList.remove('bump'), 900);
+        }
+      } catch {}
+    };
     const tzClock = (tz, opts = {}) => {
       try { return new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', ...opts }); } catch { return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...opts }); }
     };
@@ -3830,6 +3852,8 @@
       poll(loadAlerts, 20000);
       poll(loadLive, 6000);
       poll(loadRadar, 120000);
+      loadAudience();
+      poll(loadAudience, 60000);
       loadTropics().catch(() => {});
       loadSurface().catch(() => {});
       loadEmergencies().catch(() => {});
