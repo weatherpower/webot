@@ -1680,15 +1680,31 @@
       clearLocal();
       S.localKey = site.id;
       let body;
-      try { body = lite(await getJson('/api/v3/live/radar?site=' + encodeURIComponent(site.id))); } catch { body = null; }
-      if (S.localKey !== site.id || !body || !body.reflectivity.length) return;
-      body.reflectivity.forEach((f, i) => {
-        S.map.addSource('lr' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256, maxzoom: 11 });
-        S.map.addLayer({ id: 'lr' + i, type: 'raster', source: 'lr' + i, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0 } }, 'a-fill');
-      });
-      if (body.velocity) {
-        S.map.addSource('vel', { type: 'raster', tiles: [body.velocity.tiles], tileSize: 256, maxzoom: 11 });
-        S.map.addLayer({ id: 'vel', type: 'raster', source: 'vel', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9, 'raster-fade-duration': 0 } }, 'a-fill');
+      // Level 2 first (NEXRAD resolution, from the owner's PC via /radar-l2); the IEM site tiles if it isn't there.
+      const l2 = await level2For(site).catch(() => null);
+      if (S.localKey !== site.id) return;
+      if (l2) {
+        body = l2;
+        const coords = [[l2.bounds[0], l2.bounds[3]], [l2.bounds[2], l2.bounds[3]], [l2.bounds[2], l2.bounds[1]], [l2.bounds[0], l2.bounds[1]]];
+        body.reflectivity.forEach((f, i) => {
+          S.map.addSource('lr' + i, { type: 'image', url: f.url, coordinates: coords });
+          S.map.addLayer({ id: 'lr' + i, type: 'raster', source: 'lr' + i, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' } }, 'a-fill');
+        });
+        if (body.velocity) {
+          S.map.addSource('vel', { type: 'image', url: body.velocity.url, coordinates: coords });
+          S.map.addLayer({ id: 'vel', type: 'raster', source: 'vel', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9, 'raster-fade-duration': 0, 'raster-resampling': 'nearest' } }, 'a-fill');
+        }
+      } else {
+        try { body = lite(await getJson('/api/v3/live/radar?site=' + encodeURIComponent(site.id))); } catch { body = null; }
+        if (S.localKey !== site.id || !body || !body.reflectivity.length) return;
+        body.reflectivity.forEach((f, i) => {
+          S.map.addSource('lr' + i, { type: 'raster', tiles: [f.tiles], tileSize: 256, maxzoom: 11 });
+          S.map.addLayer({ id: 'lr' + i, type: 'raster', source: 'lr' + i, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0 } }, 'a-fill');
+        });
+        if (body.velocity) {
+          S.map.addSource('vel', { type: 'raster', tiles: [body.velocity.tiles], tileSize: 256, maxzoom: 11 });
+          S.map.addLayer({ id: 'vel', type: 'raster', source: 'vel', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9, 'raster-fade-duration': 0 } }, 'a-fill');
+        }
       }
       S.local = { ...body, site };
       const el = document.createElement('div');
@@ -1696,6 +1712,26 @@
       el.innerHTML = '<i></i><span>' + esc(siteLabel(site)) + '</span>';
       S.siteMarker = new maplibregl.Marker({ element: el, anchor: 'top' }).setLngLat([site.lon, site.lat]).addTo(S.map);
       renderRadarPanel();
+    };
+    // The Level 2 index (/radar-l2/index.json, refreshed every minute): the last 4 frames of a site as a
+    // local loop with the same shape the IEM loop has, so the rest of the radar code doesn't care which it is.
+    const L2 = { at: 0, body: null };
+    const level2For = async (site) => {
+      if (Date.now() - L2.at > 60000) {
+        L2.at = Date.now();
+        try { L2.body = await fetch('/radar-l2/index.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)); } catch { L2.body = null; }
+      }
+      const s = L2.body?.sites?.[siteLabel(site)];
+      if (!s?.frames?.length || Date.now() - Date.parse(s.frames[s.frames.length - 1].time) > 20 * 60000) return null;
+      const frames = s.frames.slice(-(OPT.lite ? 3 : 4)).filter((f) => f.files?.ref);
+      if (!frames.length) return null;
+      const last = frames[frames.length - 1];
+      return {
+        level2: true, bounds: s.bounds, tilt: s.tilts?.ref,
+        reflectivity: frames.map((f) => ({ time: f.time, url: '/radar-l2/' + f.files.ref + '?t=' + f.time })),
+        velocity: last.files?.vel ? { time: last.time, url: '/radar-l2/' + last.files.vel + '?t=' + last.time } : null,
+        validAt: last.time
+      };
     };
     const setVelocity = (on) => {
       if (!S.local?.velocity || !S.styleReady) return;
