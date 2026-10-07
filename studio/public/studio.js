@@ -73,6 +73,7 @@ const renderOverview = (o) => {
   $('s-now').textContent = st.brb ? 'Be right back' : now ? (KINDS[now.type] || now.type) + (now.title ? ' · ' + now.title : '') : '—';
   $('s-viewers').textContent = st.chat?.viewers ?? '—';
   $('s-views').textContent = st.chat?.totalViews != null ? Number(st.chat.totalViews).toLocaleString() : '—';
+  $('s-subs').textContent = st.chat?.subscribers != null ? Number(st.chat.subscribers).toLocaleString() : '—';
   S.liveSince = st.chat?.startedAt ? Date.parse(st.chat.startedAt) : null;
   tickUptime();
   if (!srv.error) {
