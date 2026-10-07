@@ -139,6 +139,19 @@ const where = (home, g) => {
     } catch (e) { console.log('[notify] puter check:', e.message); }
   }
 
+  /* ---------- Level 2 radar from the owner's PC: stale = the PC or the worker is down ---------- */
+  try {
+    const idx = JSON.parse(fs.readFileSync('/app/data/radar-l2/index.json', 'utf8'));
+    const ageMin = (now - Date.parse(idx.generatedAt || 0)) / 60000;
+    if (ageMin > 20 && !s.radarDownSent) {
+      s.radarDownSent = true;
+      await push({ title: 'Level 2 radar stopped updating', message: `No new radar images for ${Math.round(ageMin)} minutes. Is the PC on and the "WeatherPower Level 2 radar" window running? Check WeBot Studio → Overview → Level 2 radar.`, priority: 4, tags: ['satellite'] });
+    } else if (ageMin <= 20 && s.radarDownSent) {
+      s.radarDownSent = false;
+      await push({ title: 'Level 2 radar is back', message: 'Radar images are flowing from the PC again.', priority: 3, tags: ['white_check_mark'] });
+    }
+  } catch (e) { console.log('[notify] radar-l2:', e.message); }
+
   if (process.argv.includes('--test')) await push({ title: 'WeatherPower alerts are on', message: `You’ll get tornado warnings near ${placeName} and a heads-up if the stream goes down.`, click: WATCH, tags: ['white_check_mark'] });
   save(s);
 })().catch((e) => { console.error('[notify]', e.message); process.exit(1); });
