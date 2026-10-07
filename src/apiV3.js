@@ -169,7 +169,7 @@ export const webotStatus = async () => {
     focus: control.state || '',
     talk: control.talk || 'auto',
     pinned: Boolean(control.pin),
-    chat: (({ enabled, live, viewers, startedAt, totalViews }) => ({ enabled, live, viewers, startedAt, totalViews }))(chatStatus()),
+    chat: (({ enabled, live, viewers, startedAt, totalViews, subscribers }) => ({ enabled, live, viewers, startedAt, totalViews, subscribers }))(chatStatus()),
     wis: wis?.loaded ? { score: Math.round(wis.score), label: wis.label, trend: wis.trend ?? null } : null,
     tallies: talliesFor(alerts),
     // Same warning type in the same place (one per county zone) shows once, with a count.
