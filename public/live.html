@@ -272,6 +272,43 @@
     .brandbox.bump .subs strong { animation: subpop .7s ease-out; }
     @keyframes subpop { 0% { transform: scale(1); color: #fff; } 35% { transform: scale(1.16); color: #78e3ff; } 100% { transform: scale(1); color: #fff; } }
 
+
+    /* Radar 3.1 launch showcase: graphic only, not meteorological data. */
+    .radar31 { position:absolute;inset:80px 0;z-index:17;display:none;overflow:hidden;
+      color:#f5faff;background:radial-gradient(ellipse 760px 650px at 83% 46%,rgba(29,118,217,.19),transparent 72%),
+      linear-gradient(110deg,#050c18,#0a1a2e 68%,#07101d); }
+    .radar31.show {display:block;animation:r31in .6s ease-out}
+    @keyframes r31in {from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .radar31:after {content:"";position:absolute;inset:0;opacity:.5;pointer-events:none;
+      background:repeating-linear-gradient(0deg,transparent 0 60px,rgba(90,188,255,.07) 61px 62px),
+      repeating-linear-gradient(90deg,transparent 0 60px,rgba(90,188,255,.07) 61px 62px)}
+    .r31-wrap {position:relative;z-index:2;padding:74px 78px;width:1250px}
+    .r31-kicker {display:flex;align-items:center;gap:13px;font:700 18px "WP Mono",monospace;letter-spacing:.22em;color:#62d5ff}
+    .r31-kicker i {width:12px;height:12px;border-radius:50%;background:#43d3ff;box-shadow:0 0 22px #43d3ff}
+    .r31-date {display:inline-block;margin:38px 0 12px;padding:9px 14px;background:rgba(54,173,255,.14);
+      border:1px solid rgba(63,174,255,.48);font:700 16px "WP Mono",monospace;letter-spacing:.16em}
+    .radar31 h2 {margin:10px 0 0;font:700 160px/.9 "WP Display",Impact,sans-serif;color:#fff;letter-spacing:-.025em}
+    .radar31 h2 em {font-style:normal;color:#53bfff}
+    .r31-lead {font:500 31px/1.35 "WP Sans",sans-serif;color:#bfd2e8;max-width:1110px;margin:30px 0 34px}
+    .r31-grid {display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:1120px}
+    .r31-grid article {padding:19px 18px;min-height:103px;border:1px solid rgba(104,180,255,.24);
+      border-left:3px solid #51caff;background:rgba(17,34,59,.82)}
+    .r31-grid b {display:block;font:700 24px "WP Display",sans-serif;text-transform:uppercase;color:#fff}
+    .r31-grid small {display:block;margin-top:8px;font:700 13px "WP Mono",monospace;letter-spacing:.08em;color:#91b4d4;text-transform:uppercase}
+    .r31-cta {display:flex;align-items:center;gap:25px;margin-top:34px;font:700 25px "WP Mono",monospace;letter-spacing:.09em}
+    .r31-cta strong {padding:12px 18px;background:#58c5ff;color:#061626;font-size:18px}
+    .r31-radar {position:absolute;right:-100px;top:128px;width:780px;height:780px;border-radius:50%;opacity:.86;
+      background:repeating-radial-gradient(circle,transparent 0 70px,rgba(77,169,255,.3) 71px 73px),
+      radial-gradient(circle,rgba(30,146,248,.2),transparent 65%)}
+    .r31-radar:before {content:"";position:absolute;inset:170px 110px 170px 100px;border-radius:45%;
+      filter:blur(18px);transform:rotate(-27deg);
+      background:radial-gradient(ellipse at 64% 35%,#ff4255 0 7%,#ffdc49 17%,#42db67 31%,#1687db 52%,transparent 72%)}
+    .r31-radar:after {content:"";position:absolute;top:50%;left:4%;width:92%;height:1px;
+      background:rgba(99,197,255,.4);transform:rotate(-36deg)}
+    .r31-visual-label {position:absolute;right:85px;bottom:64px;color:#6f96bc;
+      font:700 13px "WP Mono",monospace;letter-spacing:.12em}
+    @media (prefers-reduced-motion:reduce){.radar31.show{animation:none}}
+
     /* ---------- breaking takeover ---------- */
     .brk { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; background: var(--c, #c00); color: var(--ci, #fff); overflow: hidden; text-align: center; }
     .brk.show { display: flex; animation: brkIn .4s ease-out; }
@@ -303,6 +340,27 @@
     <div class="mapfade" id="mapfade"></div>
     <div class="train" id="train"><div class="tl"><b>🚂 TRAIN CAM</b><div><strong id="train-place"></strong><small id="train-line"></small></div></div></div>
     <div class="shade"></div>
+
+    <section id="radar31" class="radar31" aria-hidden="true" aria-label="Radar 3.1 launch announcement">
+      <div class="r31-radar" aria-hidden="true"></div>
+      <div class="r31-wrap">
+        <div class="r31-kicker"><i></i>WEATHERPOWER · MAJOR PRODUCT UPDATE</div>
+        <div class="r31-date">OFFICIALLY LIVE · OCTOBER 7, 2026</div>
+        <h2>RADAR <em>3.1</em></h2>
+        <p class="r31-lead">The next generation of WeatherPower radar is here. More detail, better analysis, and a whole new perspective on storms.</p>
+        <div class="r31-grid">
+          <article><b>More radar products</b><small>Multi-tilt · REF · VEL · SRV</small></article>
+          <article><b>3D Storm Scope</b><small>Level II volumes · Beta</small></article>
+          <article><b>Model Studio</b><small>HRRR · NAM · GFS · ECMWF</small></article>
+          <article><b>Rainfall analysis</b><small>MRMS · Rain gauges · Swaths</small></article>
+          <article><b>Travel &amp; tropics</b><small>Route weather · NHC tracking</small></article>
+          <article><b>Custom colors</b><small>GR · WxTools palette import</small></article>
+        </div>
+        <div class="r31-cta"><strong>EXPLORE IT NOW</strong> WEATHERPOWER.APP</div>
+      </div>
+      <div class="r31-visual-label">BACKGROUND GRAPHIC · NOT LIVE RADAR DATA</div>
+    </section>
+
 
     <header class="top">
       <div class="tally">
