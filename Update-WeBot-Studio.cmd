@@ -113,23 +113,51 @@ if errorlevel 1 (
   exit /b 1
 )
 
-git merge-base --is-ancestor HEAD origin/master
-if errorlevel 1 (
-  echo.
-  echo ERROR: Your local master has commits that do not fast-forward to GitHub.
-  echo Nothing was overwritten.
-  popd
-  pause
-  exit /b 1
+set "AHEAD=0"
+set "BEHIND=0"
+for /f "tokens=1,2" %%A in ('git rev-list --left-right --count HEAD...origin/master') do (
+  set "AHEAD=%%A"
+  set "BEHIND=%%B"
 )
 
-git merge --ff-only origin/master
-if errorlevel 1 (
+if "!AHEAD!"=="0" (
+  git merge --ff-only origin/master
+  if errorlevel 1 (
+    echo.
+    echo ERROR: Update failed. Nothing was force-overwritten.
+    popd
+    pause
+    exit /b 1
+  )
+) else (
   echo.
-  echo ERROR: Update failed. Nothing was force-overwritten.
-  popd
-  pause
-  exit /b 1
+  echo Your local Studio has !AHEAD! local commit(s) that are not on GitHub.
+  echo GitHub also has !BEHIND! newer commit(s).
+  echo.
+  echo I will preserve your local commits on a backup branch,
+  echo then make local master match origin/master so Studio can update.
+  echo Nothing committed will be deleted.
+  echo.
+  set "STAMP="
+  for /f "delims=" %%T in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "STAMP=%%T"
+  set "BACKUP=studio-local-backup-!STAMP!"
+  git branch "!BACKUP!" HEAD
+  if errorlevel 1 (
+    echo ERROR: Could not create the safety backup branch.
+    popd
+    pause
+    exit /b 1
+  )
+  echo Safety backup created: !BACKUP!
+  git reset --hard origin/master
+  if errorlevel 1 (
+    echo.
+    echo ERROR: Could not reset master to the latest GitHub version.
+    echo Your backup branch still exists: !BACKUP!
+    popd
+    pause
+    exit /b 1
+  )
 )
 
 for /f "delims=" %%H in ('git rev-parse --short HEAD') do set "AFTER=%%H"
