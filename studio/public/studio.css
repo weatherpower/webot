@@ -886,3 +886,52 @@ textarea:focus {
   .chatmon-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chatmon-summary > div:last-child { grid-column: span 2; }
 }
+
+
+/* WeatherPower Radar 3.1 launch segment — Studio overview control. */
+.radar31-control {
+  border-color: rgba(73, 199, 238, .27);
+  background:
+    radial-gradient(ellipse 70% 140% at 100% 20%, rgba(53, 129, 209, .15), transparent 70%),
+    linear-gradient(135deg, #101925, #0f141d 70%);
+  padding: 20px 22px 22px;
+}
+.radar31-control:before { border-color: #64d4f6; }
+.radar31-control-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.radar31-control-head > div { min-width: 0; }
+.radar31-kicker {
+  display: inline-flex; align-items: center; gap: 9px;
+  color: #82defb; font: 700 10px/1.3 "WP Mono", monospace; letter-spacing: .16em;
+}
+.radar31-kicker i { display: inline-block; width: 7px; height: 7px; background: #6bd1fa;
+  border-radius: 50%; box-shadow: 0 0 0 4px rgba(73, 199, 238, .11); }
+.radar31-control-head h2 {
+  margin: 15px 0 10px; font: 700 42px/.98 "WP Display", sans-serif;
+  letter-spacing: -.015em; color: #f4faff; text-transform: uppercase;
+}
+.radar31-control-head h2 em { color: #65cfff; font-style: normal; }
+.radar31-control-head p {
+  margin: 0; max-width: 650px; color: #9fb3c9; font-size: 13px; line-height: 1.6;
+}
+.radar31-live-tag {
+  flex: none; border: 1px solid rgba(100, 207, 255, .42); color: #9ce3ff;
+  font: 700 10px/1 "WP Mono", monospace; letter-spacing: .1em;
+  padding: 8px 10px; margin-top: 2px; background: rgba(44, 158, 233, .08);
+}
+.radar31-control-actions {
+  margin-top: 23px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.radar31-control-actions .btn.primary {
+  background: #258fcb; border-color: #419fd9; color: #fff; font-weight: 700;
+}
+.radar31-control-actions > .k { margin-left: auto; }
+.radar31-help {
+  margin: 14px 0 0; border-top: 1px solid rgba(111, 165, 213, .17);
+  padding-top: 12px; font-size: 11px; line-height: 1.5; color: #8198b2;
+}
+@media(max-width: 700px) {
+  .radar31-control-head { flex-wrap: wrap; }
+  .radar31-control-head h2 { font-size: 35px; }
+  .radar31-control-actions > .k { margin-left: 0; }
+  .radar31-control-actions .btn.primary { width: 100%; }
+}
