@@ -160,8 +160,8 @@ const renderOverview = (o) => {
     pressed('c-subcount', ctl.subCount === false ? 'off' : 'on');
     pressed('c-r31', ctl.radar31 === false ? 'off' : 'on');
     $('c-r31-status').textContent = ctl.radar31 === false
-      ? 'Auto rotation is off. Play now remains available when emergency coverage allows.'
-      : 'Auto rotation is on: calm weather only, no more than once every 2 hours through Oct 31. Emergency updates take priority.';
+      ? 'Auto rotation is off. Play Now still works immediately, except during breaking alerts or BRB.'
+      : 'Auto rotation is on for calm weather through Oct 31. Play Now ignores calm-weather limits; breaking alerts and BRB take priority.';
     $('c-r31-now').disabled = false;
     if (document.activeElement !== $('c-mode')) $('c-mode').value = ctl.mode || 'auto';
     $('c-brb').textContent = ctl.brb ? 'End BRB' : 'Start BRB';
@@ -251,7 +251,7 @@ segClick('c-genre', (v) => act({ action: 'music', genre: v }, 'Radio style: ' + 
 segClick('c-chat', (v) => act({ action: 'chat-read', on: v === 'on' }, v === 'on' ? 'WeBot reads chat' : 'Chat: commands only'));
 segClick('c-subcount', (v) => act({ action: 'sub-count', on: v === 'on' }, v === 'on' ? 'Subscriber count shown on stream' : 'Subscriber count hidden from stream'));
 segClick('c-r31', (v) => act({ action: 'radar31', on: v === 'on' }, v === 'on' ? 'Radar 3.1 auto rotation enabled' : 'Radar 3.1 auto rotation disabled'));
-$('c-r31-now').addEventListener('click', () => act({ action: 'radar31-now' }, 'Radar 3.1 announcement queued for safe weather conditions'));
+$('c-r31-now').addEventListener('click', () => act({ action: 'radar31-now' }, 'Radar 3.1 Play Now request sent to stream'));
 $('c-mode').addEventListener('change', () => act({ action: 'mode', mode: $('c-mode').value }, 'Show: ' + $('c-mode').selectedOptions[0].textContent));
 $('c-brb').addEventListener('click', async () => {
   if (S.brb) return act({ action: 'brb', on: false }, 'BRB ended');

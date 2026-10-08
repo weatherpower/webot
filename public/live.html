@@ -2355,6 +2355,10 @@
         !S.inBreaking && !S.breaking.length && !S.fresh.length &&
         !S.pendingEmergency && !S.control.pin && !S.control.brb;
     };
+    // A producer's Play Now request must not be blocked by WIS, an unplayed
+    // state declaration, the promo cooldown, the automatic rotation switch,
+    // or a non-breaking pinned/model/weather scene.
+    const radar31ManualAllowed = () => !S.control.brb && !S.inBreaking;
     const radar31Eligible = () => {
       const now = Date.now();
       return S.control.radar31 !== false && now >= RADAR31_START && now < RADAR31_END &&
@@ -2542,6 +2546,12 @@
         const key = S.fresh.shift();
         if (byKey(key)) shot = { type: 'alert', alert: byKey(key), fresh: true };
       }
+      // Explicit Play Now runs before normal scenes, but any queued breaking or
+      // fresh warning above retains priority and can interrupt it later.
+      if (!shot && S.radar31Requested && radar31ManualAllowed()) {
+        shot = { type: 'radar31', manual: true };
+        S.radar31Requested = false;
+      }
       // Pinning from Live Control switches right away, even in the middle of a model check.
       if (!shot && force && S.control.pin && byKey(S.control.pin)) shot = { type: 'alert', alert: byKey(S.control.pin), pinned: true };
       // A think shot always hands over to its model check (if the models came back in time).
@@ -2565,7 +2575,6 @@
         shot = { type: req.kind, request: req };
         if (S.chatQueue.length) setTimeout(scheduleChatJump, 1000);
       }
-      if (!shot && S.radar31Requested && radar31Safe()) { shot = { type: 'radar31', manual: true }; S.radar31Requested = false; }
       if (!shot && S.control.mode === 'models') shot = { type: 'think' };
       else if (!shot && S.control.mode && S.control.mode !== 'auto') shot = { type: S.control.mode };
       if (!shot) {
@@ -3770,7 +3779,7 @@
           else if (cmd.type === 'segment' && cmd.kind === 'gas') { S.forceShot = { type: 'gas' }; nextShot(true); }
           else if (cmd.type === 'segment' && cmd.kind === 'radar31') {
              S.radar31Requested = true;
-             if (radar31Safe()) nextShot(true);
+             nextShot(true);
            }
            else if (cmd.type === 'segment' && cmd.kind === 'emergency') {
             loadEmergencies().finally(() => { S.forceShot = { type: 'emergency' }; nextShot(true); });
