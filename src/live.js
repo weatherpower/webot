@@ -242,7 +242,7 @@ const DEFAULT_TTS = { engine: 'puter', voice: 'af_alloy', openaiVoice: 'alloy', 
 const DEFAULT_CAMERA = { mode: 'auto', id: null, name: '' };
 // Top/bottom bar themes. 'auto' follows the weather; the rest are fixed looks.
 export const THEMES = ['auto', 'violet', 'clear', 'storm', 'tornado', 'flood', 'winter', 'heat', 'tropical', 'night', 'afterdark', 'fall'];
-const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, chatRead: true, subCount: true, costume: 'auto', commands: [] };
+const DEFAULT_CONTROL = { rev: 0, pin: null, state: '', mode: 'auto', voice: true, sound: true, banner: null, music: DEFAULT_MUSIC, tts: DEFAULT_TTS, camera: DEFAULT_CAMERA, theme: 'auto', talk: 'auto', talkGap: 2, tvSafe: 3, brb: null, headlines: 'alertsweather', gas: true, radar31: true, chatRead: true, subCount: true, costume: 'auto', commands: [] };
 const TALK_GAPS = [0, 1, 2, 3, 5, 10, 15];
 let control = null;
 
@@ -282,7 +282,7 @@ export const noteStreamBeat = (query = {}) => {
 };
 
 // WeBot status (public page): the segment on now, the planned next few, recent segments and lines he said.
-const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'emergency', 'forecast', 'gas', 'rain', 'train']);
+const SEG_KINDS = new Set(['alert', 'think', 'models', 'national', 'outlook', 'reports', 'tropics', 'surface', 'emergency', 'forecast', 'gas', 'rain', 'train', 'radar31']);
 const webot = { seg: null, plan: [], requests: [], history: [], said: [], saidKeys: new Set() };
 // Where the show was (segment, plan, recent segments, lines said) survives restarts: saved to
 // data/webot-activity.json at most every 15 s, loaded at startup. The stream page picks up from it.
@@ -527,6 +527,12 @@ export const applyLiveCommand = async (body = {}) => {
       break;
     case 'gas-now':
       pushCommand({ type: 'segment', kind: 'gas' });
+      break;
+    case 'radar31':
+      current.radar31 = body.on !== false;
+      break;
+    case 'radar31-now':
+      pushCommand({ type: 'segment', kind: 'radar31' });
       break;
     case 'emergency-now':
       pushCommand({ type: 'segment', kind: 'emergency' });
