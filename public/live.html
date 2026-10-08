@@ -503,7 +503,7 @@
       headlines: [], hlIndex: 0, lastRoundup: Date.now(), lastTip: Date.now(), subscribers: null
     };
 
-    const EMERGENCY_SEEN_KEY = 'wp-live-emergency-seen-v1';
+    const EMERGENCY_SEEN_KEY = 'wp-live-emergency-seen-v2';
     const loadEmergencySeen = () => {
       try {
         const raw = JSON.parse(localStorage.getItem(EMERGENCY_SEEN_KEY) || '[]');
@@ -2979,13 +2979,19 @@
         const declarations = body.declarations || [];
         const st = focusState();
 
-        // Persist declarations that have already aired so a page/server refresh does not announce
-        // the same State of Emergency all over again. On the very first run after this feature is
-        // installed, treat the declarations already on the feed as the baseline instead of "new".
+        // Persist only declarations that really aired. The old first-run
+        // baseline silently marked brand-new declarations as "already seen",
+        // so WeBot never announced Alabama. On the first load, ignore older
+        // notices but let state proclamations from the past 72 hours air.
         if (!S.emergencySeen) {
           S.emergencySeen = loadEmergencySeen();
           if (!localStorage.getItem(EMERGENCY_SEEN_KEY)) {
-            declarations.forEach((d) => { if (d?.id) S.emergencySeen.add(d.id); });
+            const cutoff = Date.now() - 72 * 60 * 60 * 1000;
+            declarations.forEach((d) => {
+              if (d?.id && (d.sourceType !== 'state' || Date.parse(d.declarationDate || 0) < cutoff)) {
+                S.emergencySeen.add(d.id);
+              }
+            });
             saveEmergencySeen(S.emergencySeen);
           }
         }
@@ -3000,7 +3006,9 @@
 
         // Keep a genuinely new declaration pending until it has actually made it on air.
         if (newState) S.pendingEmergency = newState.id;
-        const pending = S.pendingEmergency && declarations.find((d) => d.id === S.pendingEmergency && (!st || d.state === st));
+        let pending = S.pendingEmergency && declarations.find((d) => d.id === S.pendingEmergency && (!st || d.state === st));
+        // An expired/stale pending ID must not block Radar 3.1 or other segments.
+        if (S.pendingEmergency && !pending) { S.pendingEmergency = null; pending = null; }
         if (pending && S.control.mode === 'auto' && !S.control.pin) {
           S.forceShot = { type: 'emergency', emergencyId: pending.id };
           if (S.styleReady && S.shot && !S.inBreaking) setTimeout(() => nextShot(true), 350);
@@ -3039,13 +3047,21 @@
     const emergencyShot = async (shot) => {
       const list = emergencyList();
       if (!list.length) { nationalShot(); return; }
+      await loadShapes();
+      if (S.shot !== shot || shot.type !== 'emergency') return;
+      // Only mark the notice announced once its scene can actually go on air.
       if (shot.emergencyId) {
         if (S.pendingEmergency === shot.emergencyId) S.pendingEmergency = null;
         rememberEmergency(shot.emergencyId);
+        // Queue the next new state declaration for the next scene, not an
+        // interruption of this one. Handles both Alabama and Florida.
+        const next = list.find((d) => d.sourceType === 'state' && d.id !== shot.emergencyId &&
+          !S.emergencySeen.has(d.id));
+        if (next && S.control.mode === 'auto' && !S.control.pin) {
+          S.pendingEmergency = next.id;
+          S.forceShot = { type: 'emergency', emergencyId: next.id };
+        }
       }
-
-      await loadShapes();
-      if (S.shot !== shot || shot.type !== 'emergency') return;
       ensureEmergencyLayers();
 
       const seen = new Set();
@@ -3095,7 +3111,7 @@
         k: hasState ? 'STATE OF EMERGENCY' : fresh ? 'NEW EMERGENCY DECLARATION' : 'EMERGENCY DECLARATIONS',
         title: focusState()
           ? 'Emergency declaration update for ' + focusName()
-          : hasState ? 'Active state of emergency declarations' : 'Recent federal emergency declarations',
+          : hasState ? 'State of emergency declarations' : 'Recent federal emergency declarations',
         color: hasState ? '#ff3b3b' : '#ff7a2a',
         crawl: top.map((d) => (STATE_NAMES[d.state] || d.state) + ': ' + (d.incidentType || 'Emergency') +
           (d.orderNumber ? ' · EO ' + d.orderNumber : '') + ' · signed ' + emergencyDate(d.declarationDate)).join('   ◆   ')
@@ -3105,10 +3121,13 @@
       const names = top.slice(0, 3).map((d) => STATE_NAMES[d.state] || d.state);
       let detail;
       if (lead?.sourceType === 'state') {
-        detail = (STATE_NAMES[lead.state] || lead.state) + ' is under a state of emergency for ' +
-          String(lead.incidentType || 'an emergency').toLowerCase() + '.' +
-          (lead.orderNumber ? ' Executive Order ' + lead.orderNumber + ' is in effect.' : '') +
-          (lead.areaCount ? ' The declaration covers ' + lead.areaCount + (lead.areaCount === 1 ? ' area.' : ' counties or areas.') : '');
+        const place = STATE_NAMES[lead.state] || lead.state;
+        const storm = String(lead.incidentType || 'the weather threat').toLowerCase();
+        const governor = lead.declaringAuthority || 'the governor';
+        detail = 'In ' + place + ', ' + governor + ' declared a state of emergency ahead of ' + storm + '.' +
+          (lead.orderNumber ? ' The original Executive Order is number ' + lead.orderNumber + '.' : '') +
+          (lead.areaCount ? ' The declaration covers ' + lead.areaCount + (lead.areaCount === 1 ? ' county or area.' : ' counties or areas.') : '') +
+          (lead.originalIncidentType ? ' The original order used the earlier storm designation ' + lead.originalIncidentType.toLowerCase() + '.' : '');
       } else if (top.length === 1) {
         detail = 'FEMA lists a recent federal emergency declaration for ' + names[0] + ' following ' + String(top[0].incidentType || 'an emergency').toLowerCase() + '.';
       } else {
