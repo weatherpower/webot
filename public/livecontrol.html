@@ -118,6 +118,11 @@
           <div class="seg" id="gas-auto"><button data-v="on">Gas in rotation</button><button data-v="off">Off</button></div>
         </div>
         <div class="row">
+          <button class="btn primary" id="radar31-now">Announce Radar 3.1 now 📡</button>
+          <div class="seg" id="radar31-auto"><button data-v="on">Launch segment: auto</button><button data-v="off">Off</button></div>
+        </div>
+        <p class="status">Occasional launch announcement during calm conditions through Oct 31. Manual requests wait for emergency and severe-weather coverage.</p>
+        <div class="row">
           <span class="status">CHAT</span>
           <div class="seg" id="chat-read"><button data-v="on">WeBot reads chat</button><button data-v="off">Commands only</button></div>
         </div>
@@ -376,6 +381,7 @@
       const pinned = control.pin && alerts.find((a) => a.key === control.pin);
       $('state-line').innerHTML = 'PINNED: <b>' + esc(pinned ? pinned.eventLabel + ' · ' + pinned.area : control.pin ? 'expired alert' : 'nothing') + '</b>';
       $('unpin').disabled = !control.pin;
+      document.querySelectorAll('#radar31-auto button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === 'on') === (control.radar31 !== false))));
       const tts = control.tts || {};
       $('tts-engine').value = tts.engine || 'neural';
       fillVoices();
@@ -646,6 +652,8 @@
     $('reload').addEventListener('click', () => act({ action: 'reload' }, 'Stream will reload'));
     $('chat-read').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'chat-read', on: v === 'on' }, v === 'on' ? 'WeBot reads chat out loud' : 'Chat: only !forecast and !gas'); });
     $('gas-now').addEventListener('click', () => act({ action: 'gas-now' }, 'WeBot is checking gas prices'));
+    $('radar31-now').addEventListener('click', () => act({ action: 'radar31-now' }, 'Radar 3.1 launch announcement queued for safe conditions'));
+    $('radar31-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action:'radar31', on:v === 'on' }, v === 'on' ? 'Radar 3.1 announcement enabled' : 'Radar 3.1 announcement rotation disabled'); });
     $('gas-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'gas', on: v === 'on' }, v === 'on' ? 'Gas prices: in the calm-day rotation' : 'Gas prices: only when you press the button'); });
     $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });
     $('say-btn').addEventListener('click', () => { const text = $('say').value.trim(); if (text) act({ action: 'say', text }, 'Sent to WeBot').then(() => { $('say').value = ''; $('say-count').textContent = '0 / 300'; }); });
