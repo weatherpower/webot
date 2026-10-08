@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="/studio.css?v=7">
+  <link rel="stylesheet" href="/studio.css?v=9">
 </head>
 <body>
   <!-- phones: top bar with the menu button (the rail slides out) -->
@@ -110,6 +110,24 @@
               <div class="row"><span class="k" style="width:70px">Overlay</span><span class="k">Sub count</span><div class="seg" id="c-subcount"><button data-v="on">Show</button><button data-v="off">Hide</button></div><span class="dim">Bottom-right stream corner</span></div>
               <div class="row" style="flex-wrap:nowrap"><input type="text" id="c-say" maxlength="300" placeholder="Make WeBot say something on the stream…"><button class="btn primary" id="c-say-btn">Say it</button></div>
             </div>
+          </div>
+
+
+          <div class="panel s7 radar31-control">
+            <div class="radar31-control-head">
+              <div>
+                <span class="radar31-kicker"><i></i>WEATHERPOWER · PRODUCT ANNOUNCEMENT</span>
+                <h2>Radar <em>3.1</em> is live.</h2>
+                <p>Air the dedicated launch segment with WeBot's narration, the 3D Storm Scope beta, Model Studio, new radar products and WeatherPower.app.</p>
+              </div>
+              <span class="radar31-live-tag">OCT 7 RELEASE</span>
+            </div>
+            <div class="radar31-control-actions">
+              <button class="btn primary" id="c-r31-now" type="button">Play Radar 3.1 announcement</button>
+              <span class="k">Auto rotation</span>
+              <div class="seg" id="c-r31"><button data-v="on" type="button">On</button><button data-v="off" type="button">Off</button></div>
+            </div>
+            <p class="radar31-help" id="c-r31-status">Airs during calm weather, never ahead of emergency alerts. Automatic rotation ends October 31.</p>
           </div>
 
           <div class="panel s5 weather-panel">
@@ -327,6 +345,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
-  <script src="/studio.js?v=8"></script>
+  <script src="/studio.js?v=10"></script>
 </body>
 </html>
