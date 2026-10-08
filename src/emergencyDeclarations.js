@@ -22,7 +22,7 @@ const FLORIDA_BOOTSTRAP_URLS = [
 // emergency proclamation ahead of Isaias. Expire after October 14 CDT.
 const ALABAMA_ISAIAS_SOURCE = 'https://alabamareflector.com/2026/10/07/gov-kay-ivey-declares-state-of-emergency-as-isaias-approaches-gulf-coast/';
 const ALABAMA_ISAIAS_COUNTIES = ["Autauga","Baldwin","Barbour","Bibb","Bullock","Butler","Chambers","Chilton","Clarke","Choctaw","Coffee","Conecuh","Coosa","Covington","Crenshaw","Dale","Dallas","Elmore","Escambia","Geneva","Greene","Hale","Henry","Houston","Lee","Lowndes","Macon","Marengo","Mobile","Monroe","Montgomery","Perry","Pickens","Pike","Russell","Sumter","Tallapoosa","Tuscaloosa","Washington","Wilcox"];
-const ALABAMA_ISAIAS_DATE = '2026-10-07T12:00:00.000Z'; // Calendar date only, NOT an exact signature time.
+const ALABAMA_ISAIAS_DATE = '2026-10-07T21:00:00.000Z'; // State of emergency took effect at 4 PM CDT.
 const ALABAMA_ISAIAS_END = '2026-10-15T04:59:59.000Z'; // October 14, 11:59pm CDT.
 const ALABAMA_OFFICIAL_INDEXES = [
   'https://governor.alabama.gov/newsroom/category/state-of-emergency/',
@@ -319,7 +319,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
   for (const item of declarations) {
     if (item.state === 'FL' && item.orderNumber === '26-202') {
       item.originalIncidentType = item.incidentType;
-      item.incidentType = nhc?.incidentType || 'Isaias (formerly Tropical Depression Nine)';
+      item.incidentType = nhc?.incidentType || 'Isaias'; // When NHC is offline, use current name without guessing storm strength.
       item.title = clean('State of Emergency — ' + item.incidentType, 120);
       if (nhc) item.stormSourceUrl = nhc.sourceUrl;
     }

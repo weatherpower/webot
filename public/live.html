@@ -3128,8 +3128,7 @@
         const governor = lead.declaringAuthority || 'the governor';
         detail = 'In ' + place + ', ' + governor + ' declared a state of emergency ahead of ' + storm + '.' +
           (lead.orderNumber ? ' The original Executive Order is number ' + lead.orderNumber + '.' : '') +
-          (lead.areaCount ? ' The declaration covers ' + lead.areaCount + (lead.areaCount === 1 ? ' county or area.' : ' counties or areas.') : '') +
-          (lead.originalIncidentType ? ' The original order used the earlier storm designation ' + lead.originalIncidentType.toLowerCase() + '.' : '');
+          (lead.areaCount ? ' The declaration covers ' + lead.areaCount + (lead.areaCount === 1 ? ' county or area.' : ' counties or areas.') : '');
       } else if (top.length === 1) {
         detail = 'FEMA lists a recent federal emergency declaration for ' + names[0] + ' following ' + String(top[0].incidentType || 'an emergency').toLowerCase() + '.';
       } else {
