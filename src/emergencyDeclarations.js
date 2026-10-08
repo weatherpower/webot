@@ -4,6 +4,7 @@
 // emergencies are separate, so state providers are added from official state
 // emergency-management / governor sources. Florida is the first state provider.
 const FEMA_URL = 'https://www.fema.gov/api/open/v1/DisasterDeclarationsSummaries';
+const NHC_URL = 'https://www.nhc.noaa.gov/CurrentStorms.json';
 const FLORIDA_INDEX_URLS = [
   'https://www.floridadisaster.org/news-media/',
   'https://www.floridadisaster.org/news-media/news/',
@@ -13,6 +14,7 @@ const FLORIDA_INDEX_URLS = [
 // Keep the current official article as a bootstrap while the index pages update.
 // It naturally ages out of the requested time window.
 const FLORIDA_BOOTSTRAP_URLS = [
+  'https://flgov.com/eog/news/press/2026/governor-ron-desantis-issues-executive-order-preparation-tropical-depression-nine',
   'https://www.floridadisaster.org/news-media/news/icymi-governor-ron-desantis-issues-executive-order-in-preparation-for-tropical-depression-nine/'
 ];
 
@@ -158,7 +160,10 @@ const parseFloridaEmergencyPage = (html, sourceUrl, windowDays) => {
   const orderNumber = clean(declaration[1], 24);
   const expectedAreas = Number(declaration[2]) || 0;
   const incidentType = clean(declaration[3], 100);
-  const declarationDate = parseUsDate(text);
+  // Florida's October 6 order was reposted by Florida Disaster on October 7.
+  const declarationDate = orderNumber === '26-202'
+    ? '2026-10-06T16:00:00.000Z' // Date known, clock time not asserted.
+    : parseUsDate(text);
   if (!declarationDate) return null;
 
   const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
@@ -179,6 +184,7 @@ const parseFloridaEmergencyPage = (html, sourceUrl, windowDays) => {
       : 'Executive Office of the Governor of Florida',
     sourceUrl,
     orderNumber,
+    declaringAuthority: 'Governor Ron DeSantis',
     state: 'FL',
     title: clean(`State of Emergency — ${incidentType}`, 120),
     incidentType,
@@ -267,6 +273,7 @@ const alabamaStateEmergency = async (windowDays) => {
     source,
     sourceUrl,
     state: 'AL',
+    declaringAuthority: 'Governor Kay Ivey',
     title: 'State of Emergency — Tropical Storm Isaias',
     incidentType: 'Tropical Storm Isaias',
     declarationDate: ALABAMA_ISAIAS_DATE,
@@ -278,16 +285,28 @@ const alabamaStateEmergency = async (windowDays) => {
   }];
 };
 
+// The governor's order keeps its original wording; NHC supplies the current
+// name/classification for broadcast when AL092026 is active.
+const nhcIsaias = async () => {
+  const body = await fetchTimed(NHC_URL, {json:true});
+  const storm = (body?.activeStorms || []).find((s) =>
+    String(s?.id || '').toLowerCase() === 'al092026' &&
+    String(s?.name || '').toLowerCase() === 'isaias');
+  if (!storm) return null;
+  const type = ({HU:'Hurricane',TS:'Tropical Storm',TD:'Tropical Depression',
+    SS:'Subtropical Storm',SD:'Subtropical Depression'})[String(storm.classification || '').toUpperCase()];
+  return type ? {incidentType: type + ' Isaias', sourceUrl:'https://www.nhc.noaa.gov/'} : null;
+};
+
 export const emergencyDeclarations = async ({ days = 45 } = {}) => {
   const windowDays = Math.max(7, Math.min(120, Math.round(Number(days) || 45)));
   if (cache.body && cache.windowDays === windowDays && Date.now() - cache.at < 5 * 60 * 1000) {
     return cache.body;
   }
 
-  const settled = await Promise.allSettled([
-    federalDeclarations(windowDays),
-    floridaStateEmergency(windowDays),
-    alabamaStateEmergency(windowDays)
+  const [settled, nhc] = await Promise.all([
+    Promise.allSettled([federalDeclarations(windowDays), floridaStateEmergency(windowDays), alabamaStateEmergency(windowDays)]),
+    nhcIsaias().catch(() => null)
   ]);
 
   const declarations = [];
@@ -295,6 +314,20 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
   for (const result of settled) {
     if (result.status === 'fulfilled') declarations.push(...result.value);
     else errors.push(clean(result.reason?.message || result.reason, 200));
+  }
+
+  for (const item of declarations) {
+    if (item.state === 'FL' && item.orderNumber === '26-202') {
+      item.originalIncidentType = item.incidentType;
+      item.incidentType = nhc?.incidentType || 'Isaias (formerly Tropical Depression Nine)';
+      item.title = clean('State of Emergency — ' + item.incidentType, 120);
+      if (nhc) item.stormSourceUrl = nhc.sourceUrl;
+    }
+    if (item.state === 'AL' && item.id === 'AL-SOE-ISAIAS-2026-10-07' && nhc) {
+      item.incidentType = nhc.incidentType;
+      item.title = clean('State of Emergency — ' + item.incidentType, 120);
+      item.stormSourceUrl = nhc.sourceUrl;
+    }
   }
 
   if (!declarations.length && cache.body) return { ...cache.body, stale: true, errors };
