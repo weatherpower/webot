@@ -3029,7 +3029,8 @@
       const color = ['case', ['==', ['get', 'sourceType'], 'state'], '#ff3b3b', ['==', ['get', 'fresh'], 1], '#ff7a2a', '#ff9f2a'];
       S.map.addLayer({
         id: 'fema-emergency-fill', type: 'fill', source: 'fema-emergency',
-        paint: { 'fill-color': color, 'fill-opacity': 0.24 }
+        // State outlines are geographic context, not a claim that every county is covered.
+         paint: { 'fill-color': color, 'fill-opacity': ['case', ['==', ['get', 'sourceType'], 'state'], 0.035, 0.24] }
       }, 'a-fill');
       S.map.addLayer({
         id: 'fema-emergency-line', type: 'line', source: 'fema-emergency',
@@ -3097,7 +3098,8 @@
       setCard('<div class="head"><div class="ico">' + icon('alert', 30) + '</div><div><h2>' +
         (hasState ? 'STATE OF EMERGENCY' : 'FEDERAL EMERGENCY DECLARATIONS') + '</h2><div class="sub">' +
         (hasState ? (hasReportedState ? 'STATE DECLARATIONS · VERIFIED REPORTING + FEMA' : 'OFFICIAL STATE EMERGENCY MANAGEMENT + FEMA') : 'FEMA') + ' · ' +
-        scope + ' · LAST ' + esc(S.emergencies?.windowDays || 45) + ' DAYS</div></div><span class="status">EM</span></div><div class="rows">' + rows + '</div>', hasState ? '#ff3b3b' : '#ff7a2a');
+        scope + ' · LAST ' + esc(S.emergencies?.windowDays || 45) + ' DAYS</div></div><span class="status">EM</span></div><div class="rows">' + rows +
+        (hasState ? '<div class="rowi" style="--rc:#71adff"><i></i><span>STATE OUTLINES FOR CONTEXT · DECLARATIONS COVER SPECIFIED COUNTIES</span></div>' : '') + '</div>', hasState ? '#ff3b3b' : '#ff7a2a');
 
       const geos = features.map((f) => f.geometry);
       fly(geos.length ? bboxOf({ type: 'GeometryCollection', geometries: geos }) : viewBounds(), {
