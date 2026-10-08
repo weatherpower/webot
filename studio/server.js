@@ -264,7 +264,7 @@ app.get('/api/overview', api(async () => {
     status: val(status),
     server: val(server),
     radar: val(radar),
-    control: c.error ? c : { mode: c.mode, talk: c.talk, theme: c.theme, voice: c.voice, sound: c.sound, brb: c.brb, pin: c.pin, music: c.music, headlines: c.headlines, gas: c.gas, chatRead: c.chatRead, tts: c.tts, state: c.state, stream: c.stream }
+    control: c.error ? c : { mode: c.mode, talk: c.talk, theme: c.theme, voice: c.voice, sound: c.sound, brb: c.brb, pin: c.pin, music: c.music, headlines: c.headlines, gas: c.gas, radar31: c.radar31, chatRead: c.chatRead, tts: c.tts, state: c.state, stream: c.stream }
   };
 }));
 

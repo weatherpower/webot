@@ -36,7 +36,7 @@ const getPath = (obj, p) => p.split('.').reduce((o, k) => (o == null ? o : o[k])
 const setPath = (obj, p, v) => { const ks = p.split('.'); let o = obj; ks.slice(0, -1).forEach((k) => { o = o[k] = o[k] || {}; }); o[ks[ks.length - 1]] = v; };
 const KINDS = {
   alert: 'Top alert', pinned: 'Pinned alert', think: 'Model check', models: 'Weather models', national: 'National overview',
-  outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', emergency: 'Emergency declarations', forecast: 'Daily forecast', gas: 'Gas prices'
+  outlook: 'Severe outlook', reports: 'Storm reports', tropics: 'Tropics', surface: 'Radar & fronts', emergency: 'Emergency declarations', radar31: 'Radar 3.1 announcement', forecast: 'Daily forecast', gas: 'Gas prices'
 };
 
 /* ---------------- navigation ---------------- */
@@ -158,10 +158,18 @@ const renderOverview = (o) => {
     pressed('c-genre', ctl.music?.genre || 'mix');
     pressed('c-chat', ctl.chatRead === false ? 'off' : 'on');
     pressed('c-subcount', ctl.subCount === false ? 'off' : 'on');
+    pressed('c-r31', ctl.radar31 === false ? 'off' : 'on');
+    $('c-r31-status').textContent = ctl.radar31 === false
+      ? 'Auto rotation is off. Play now remains available when emergency coverage allows.'
+      : 'Auto rotation is on: calm weather only, no more than once every 2 hours through Oct 31. Emergency updates take priority.';
+    $('c-r31-now').disabled = false;
     if (document.activeElement !== $('c-mode')) $('c-mode').value = ctl.mode || 'auto';
     $('c-brb').textContent = ctl.brb ? 'End BRB' : 'Start BRB';
     $('c-brb').classList.toggle('danger', Boolean(ctl.brb));
     S.brb = Boolean(ctl.brb);
+  } else {
+    $('c-r31-now').disabled = true;
+    $('c-r31-status').textContent = 'Stream controls are unavailable: ' + (ctl.error || 'not connected');
   }
 };
 const tickSeg = () => {
@@ -242,6 +250,8 @@ segClick('c-voice', (v) => act({ action: 'voice', on: v === 'on' }, 'Voice ' + v
 segClick('c-genre', (v) => act({ action: 'music', genre: v }, 'Radio style: ' + v));
 segClick('c-chat', (v) => act({ action: 'chat-read', on: v === 'on' }, v === 'on' ? 'WeBot reads chat' : 'Chat: commands only'));
 segClick('c-subcount', (v) => act({ action: 'sub-count', on: v === 'on' }, v === 'on' ? 'Subscriber count shown on stream' : 'Subscriber count hidden from stream'));
+segClick('c-r31', (v) => act({ action: 'radar31', on: v === 'on' }, v === 'on' ? 'Radar 3.1 auto rotation enabled' : 'Radar 3.1 auto rotation disabled'));
+$('c-r31-now').addEventListener('click', () => act({ action: 'radar31-now' }, 'Radar 3.1 announcement queued for safe weather conditions'));
 $('c-mode').addEventListener('change', () => act({ action: 'mode', mode: $('c-mode').value }, 'Show: ' + $('c-mode').selectedOptions[0].textContent));
 $('c-brb').addEventListener('click', async () => {
   if (S.brb) return act({ action: 'brb', on: false }, 'BRB ended');
@@ -319,6 +329,7 @@ const SEGMENTS = [
   ['outlook', 'Severe outlook', 'Today’s SPC outlook (when there is one)', true, true],
   ['reports', 'Storm reports', 'Recent tornado, hail and wind reports', true, true],
   ['emergency', 'State & federal emergencies', 'Governor state-of-emergency declarations plus FEMA federal emergencies', true, true],
+  ['radar31', 'Radar 3.1 launch announcement', 'Product launch promo · calm days through October 31, 2026 · at most every 2 hours', true, true],
   ['models', 'Weather models (after a check)', 'How long the model loop stays up', false, true],
   ['tropics', 'Tropics', 'Hurricanes and areas to watch', false, true]
 ];
@@ -336,7 +347,8 @@ const BRAIN = [
     { path: 'lines.surface', label: 'National radar openers', type: 'lines' },
     { path: 'lines.train', label: 'Train Cam openers ({city} = the cam’s town)', type: 'lines' },
     { path: 'lines.rain', label: 'Rain (WPC) outlook openers', type: 'lines' },
-    { path: 'lines.emergency', label: 'State/emergency declaration openers', type: 'lines' }
+    { path: 'lines.emergency', label: 'State/emergency declaration openers', type: 'lines' },
+    { path: 'lines.radar31', label: 'Radar 3.1 announcement script (one option per line)', type: 'lines' }
   ] },
   { id: 'chat', title: 'Chat', fields: [
     { path: 'chat.readAloud', label: 'Read regular chat messages out loud', type: 'bool' },
@@ -428,7 +440,7 @@ const segmentsHtml = () => {
       <td>${hasS ? `<input type="number" min="5" step="5" value="${s}" data-path="calmSeconds.${key}" data-type="num">` : ''}</td></tr>`;
   }).join('');
   const total = SEGMENTS.filter((x) => x[3]).reduce((a, [k]) => a + (Number(BR.work.calmWeights[k]) || 0), 0);
-  const SHORT = { surface: 'Radar', forecast: 'Forecasts', alert: 'Alerts', gas: 'Gas', train: 'Trains', rain: 'Rain', think: 'Models', national: 'Overview', outlook: 'Outlook', reports: 'Reports' };
+  const SHORT = { surface: 'Radar', forecast: 'Forecasts', alert: 'Alerts', gas: 'Gas', train: 'Trains', rain: 'Rain', think: 'Models', national: 'Overview', outlook: 'Outlook', reports: 'Reports', emergency: 'Emergencies', radar31: 'Radar 3.1' };
   const share = SEGMENTS.filter((x) => x[3]).map(([k]) => `${SHORT[k]} ${total ? Math.round((BR.work.calmWeights[k] / total) * 100) : 0}%`).join(' · ');
   return `<div class="panel"><h2>Calm-day segments <span class="r">severe weather always takes over</span></h2>
     <table class="seg-table"><tr><th>Segment</th><th>How often (weight)</th><th>Seconds on screen</th></tr>${rows}</table>
