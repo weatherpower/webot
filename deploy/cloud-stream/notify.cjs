@@ -56,14 +56,14 @@ const where = (home, g) => {
   const s = load();
   const now = Date.now();
 
-  /* ---------- the stream ---------- */
+  /* ---------- the stream (skipped while it's switched off on purpose) ---------- */
   let up = true, why = '';
-  try {
+  if (process.env.STREAM_OFF !== 'true') try {
     const live = await getJson('/api/v3/live');
     const beat = live.control?.stream?.at ? Date.parse(live.control.stream.at) : 0;
     if (!beat || now - beat > 90000) { up = false; why = 'The stream page stopped checking in.'; }
   } catch (e) { up = false; why = 'The WeatherPower server isn’t answering (' + e.message + ').'; }
-  if (up) { try { execSync('pgrep -x ffmpeg', { stdio: 'ignore' }); } catch { up = false; why = 'ffmpeg (the part that sends video to YouTube) isn’t running.'; } }
+  if (up && process.env.STREAM_OFF !== 'true') { try { execSync('pgrep -x ffmpeg', { stdio: 'ignore' }); } catch { up = false; why = 'ffmpeg (the part that sends video to YouTube) isn’t running.'; } }
   // Two bad checks in a row (2 minutes) before saying anything: restarts and page reloads are quick.
   s.down = up ? 0 : (s.down || 0) + 1;
   if (!up && s.down >= 2 && !s.downSent) {

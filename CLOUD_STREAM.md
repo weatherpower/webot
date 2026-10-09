@@ -151,7 +151,10 @@ docker compose up -d --build                      # after copying a new version
 
 ## Notes
 
-- Safe mode is on: it never posts to Discord or X, and auto Shorts rendering is off.
+- Safe mode is on: it never posts to Discord or X. Shorts are off by default (they compete with the stream for CPU);
+  set SHORTS_ENABLED=true and SHORTS_AUTO_ENABLED=true in .env to turn them on.
+- `STREAM_OFF=true` in .env keeps the server, Warning Center, Shorts and phone alerts running but stops drawing and
+  sending the stream (frees ~4 cores). Remove it and run `docker compose up -d` to stream again.
 - On the cloud server, only the server itself counts as "home network". The Puter link and the free
   voice are never handed to anyone else.
 - Cameras stay off air (`CAMERA_ON_AIR=false`) until you have permission to broadcast them.

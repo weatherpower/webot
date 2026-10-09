@@ -28,8 +28,10 @@ if [ -n "${STREAM_OUTPUT:-}" ]; then
 elif [ -n "${YOUTUBE_STREAM_KEY:-}" ]; then
   OUTPUT="${RTMP_URL}/${YOUTUBE_STREAM_KEY}"
 else
-  echo "[stream] Set YOUTUBE_STREAM_KEY (or STREAM_OUTPUT for a test run) and start again." >&2
-  exit 1
+  if [ "${STREAM_OFF:-false}" != true ]; then
+    echo "[stream] Set YOUTUBE_STREAM_KEY (or STREAM_OUTPUT for a test run) and start again." >&2
+    exit 1
+  fi
 fi
 
 log() { echo "[$(date -u +%H:%M:%S)] $*"; }
@@ -60,6 +62,13 @@ export AUTO_RENDER_CARDS="${AUTO_RENDER_CARDS:-false}"
 pids+=($!)
 for _ in $(seq 1 120); do curl -sf "http://127.0.0.1:${PORT}/warningcenter/api/v3/live" >/dev/null && break; sleep 1; done
 log "server is up"
+
+# STREAM_OFF=true in .env: keep the server (Warning Center, Shorts, alerts) but don't draw or send the stream.
+if [ "${STREAM_OFF:-false}" = true ]; then
+  log "stream is OFF (STREAM_OFF=true): not sending to YouTube"
+  wait
+  exit 0
+fi
 
 # 3. Chrome, full screen on the virtual screen. Software WebGL (SwiftShader) draws the map without a GPU.
 CHROME="${CHROME_BIN:-$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)}"
