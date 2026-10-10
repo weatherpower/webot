@@ -16,7 +16,9 @@ import { dataDir } from './paths.js';
 const API = 'https://www.googleapis.com/youtube/v3';
 const KEY = () => process.env.YOUTUBE_API_KEY || '';
 const DAILY_BUDGET = Number(process.env.YOUTUBE_DAILY_UNITS || 9000);
-const BASE_MS = 60 * 1000;
+// Quiet chat is read every 90 s (5 units a read), busy chat every 30 s: a 24/7 stream stays inside the
+// 10,000-unit daily YouTube quota.
+const BASE_MS = 90 * 1000;
 const ACTIVE_MS = 30 * 1000;
 
 
@@ -485,7 +487,9 @@ const loop = async () => {
     if (overBudget()) wait = 15 * 60 * 1000;
     else {
       if (!state.chatId && Date.now() - state.lastFind > 5 * 60 * 1000) await findLive();
-      else if (state.chatId && Date.now() - state.viewersAt > 3 * 60 * 1000) await findLive();
+      // Viewer counts and the live check every 5 minutes. (This used to key off viewersAt, which never
+      // updates when YouTube hides the viewer count, so it ran on every read and burned the quota by midday.)
+      else if (state.chatId && Date.now() - state.lastFind > 5 * 60 * 1000) await findLive();
       if (state.chatId) {
         const min = await readChat();
         wait = Math.max(min, Date.now() < state.activeUntil ? ACTIVE_MS : BASE_MS);
