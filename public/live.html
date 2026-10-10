@@ -447,8 +447,12 @@
       // graphics card: map drawn at the output size, no slow drift, 6 radar frames, lighter music.
       lite: (P.has('tv') && P.get('tv') !== '0') || (P.has('lite') && P.get('lite') !== '0'),
       safe: P.has('safe') ? Math.min(10, Math.max(0, Number(P.get('safe')) || 0)) : null,
-      tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone
+      tz: P.get('tz') || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // ?scene=recon (or any scene name) shows that scene first, for previews.
+      scene: (P.get('scene') || '').toLowerCase()
     };
+    // Scenes Live Control (and ?scene=) can call up by name.
+    const SCENE_KINDS = ['recon'];
     const STATE_NAMES = {
       AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'D.C.', FL: 'Florida',
       GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
@@ -2319,7 +2323,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, outlook: 70, rain: 70, reports: 70, emergency: 75, radar31: 50, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, recon: 80, outlook: 70, rain: 70, reports: 70, emergency: 75, radar31: 50, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -2330,6 +2334,7 @@
       else if (shot.type === 'think') s = 13;
       else if (shot.type === 'models') s = 32;
       else if (shot.type === 'tropics') s = 26;
+      else if (shot.type === 'recon') s = 26;
       else if (shot.type === 'surface') s = 22;
       else if (shot.type === 'forecast') s = 22;
       else if (shot.type === 'gas') s = 22;
@@ -2597,6 +2602,7 @@
       if (shot.type === 'outlook' && !outlooks().length) shot = { type: 'national' };
       if (shot.type === 'reports' && !enoughReports()) shot = { type: 'national' };
       if (shot.type === 'tropics' && !(tropicsActive() && tropicsHere())) shot = { type: 'national' };
+      if (shot.type === 'recon' && !reconEligible()) shot = { type: 'national' };
       if (shot.type === 'surface' && !S.surface) shot = { type: 'national' };
       if (shot.type === 'emergency' && !emergencyList().length) shot = { type: 'national' };
       runShot(shot);
@@ -2617,6 +2623,7 @@
         // Recent FEMA federal emergency declarations. Fresh declarations get extra airtime.
         emergency: emergencyList().length ? (emergencyList().some((d) => d.fresh) ? 2.4 : 1.1) : 0,
         radar31: radar31Eligible() ? 0.85 : 0,
+        recon: reconEligible() ? (S.recon.flying ? 2.6 : 1.1) : 0,
         // Focused on a state: the tropics only come up if that state has tropical alerts.
         tropics: tropicsActive() && tropicsHere() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
         // The national radar + surface map is the quiet-day staple (like Ryan's).
@@ -2638,7 +2645,8 @@
         // Train Cam (SouthWest RailCams) only on calm days, when some cams are live.
         train: S.trainCams?.length && S.control.train !== false ? num(bw.train, 0) : 0,
         rain: S.wpc?.days?.[0]?.max ? num(bw.rain, 0.8) * (S.wpc.days[0].max >= 3 ? 2 : 1) : 0,
-        radar31: radar31Eligible() ? num(bw.radar31, 0.85) : 0 });
+        radar31: radar31Eligible() ? num(bw.radar31, 0.85) : 0,
+        recon: reconEligible() ? num(bw.recon, 1.1) * (S.recon.flying ? 2 : 1) : 0 });
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
         // On calm days the radar map may come back sooner; nothing else repeats back to back.
@@ -2709,6 +2717,7 @@
       if (shot.type !== 'think') setThinking(false);
       if (shot.type !== 'models') hideModels();
       if (shot.type !== 'tropics') hideTropics();
+      if (shot.type !== 'recon') hideRecon();
       if (shot.type !== 'surface') hideSurface();
       if (shot.type !== 'forecast' && shot.type !== 'gas') hideCity();
       if (shot.type !== 'gas') hideGas();
@@ -2747,6 +2756,14 @@
         setOutlookVisible(false);
         $('rp').classList.remove('show');
         tropicsShot();
+        return;
+      }
+      if (shot.type === 'recon') {
+        setSelected('');
+        clearLocal();
+        setOutlookVisible(false);
+        $('rp').classList.remove('show');
+        reconShot();
         return;
       }
       if (shot.type === 'think') {
@@ -3388,6 +3405,97 @@
       }
     };
 
+    /* ---------------- Hurricane Hunters (NHC aircraft recon: HDOB flight tracks + vortex fixes) ---------------- */
+    const loadRecon = async () => { S.recon = await getJson('/api/v3/recon'); };
+    // A flight from the last 10 hours, or a center fix from the last 12.
+    const reconEligible = () => Boolean(S.recon && (S.recon.missions.length || S.recon.vdms.some((v) => Date.now() - Date.parse(v.at) < 12 * 3600000)));
+    // Flight-level wind (kt) colors on the Saffir-Simpson steps used by the tropics scene.
+    const RECON_STEPS = [0, '#8fd3ff', 34, '#3fa9ff', 64, '#ffd34d', 83, '#ff9f2a', 96, '#ff5a2a', 113, '#ff2a5f', 137, '#d23cff'];
+    const reconColor = (kt) => { let c = RECON_STEPS[1]; for (let i = 0; i < RECON_STEPS.length; i += 2) if ((kt || 0) >= RECON_STEPS[i]) c = RECON_STEPS[i + 1]; return c; };
+    const RECON_LAYERS = ['recon-track', 'recon-fix'];
+    const ensureReconLayers = () => {
+      if (S.map.getSource('recon-track')) return;
+      const empty = { type: 'FeatureCollection', features: [] };
+      S.map.addSource('recon-track', { type: 'geojson', data: empty });
+      S.map.addSource('recon-fix', { type: 'geojson', data: empty });
+      S.map.addLayer({ id: 'recon-track', type: 'line', source: 'recon-track', layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': ['step', ['get', 'kt'], ...RECON_STEPS.slice(1)], 'line-width': 4.5 } }, 'a-case');
+      S.map.addLayer({ id: 'recon-fix', type: 'circle', source: 'recon-fix',
+        paint: { 'circle-radius': ['case', ['get', 'latest'], 9, 6], 'circle-color': '#ffffff', 'circle-stroke-width': 3, 'circle-stroke-color': '#ff2a5f' } }, 'a-case');
+    };
+    const hideRecon = () => {
+      (S.reconMarkers || []).forEach((m) => m.remove());
+      S.reconMarkers = [];
+      if (!S.styleReady || !S.map.getSource('recon-track')) return;
+      RECON_LAYERS.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+    };
+    const reconShot = () => {
+      const rc = S.recon;
+      setMood('calm');
+      // A plane in the storm right now comes first; otherwise the most recent flight.
+      const m = rc.missions.find((x) => x.flying) || rc.missions[0] || null;
+      const stormName = m ? m.storm : rc.vdms[0]?.storm || '';
+      const fixes = rc.vdms.filter((v) => !stormName || v.storm === stormName);
+      const fix = fixes[0] || null;
+      ensureReconLayers();
+      const feats = [];
+      if (m) for (let i = 1; i < m.track.length; i += 1) {
+        const [a, b] = [m.track[i - 1], m.track[i]];
+        feats.push({ type: 'Feature', properties: { kt: b[2] ?? a[2] ?? 0 }, geometry: { type: 'LineString', coordinates: [[a[0], a[1]], [b[0], b[1]]] } });
+      }
+      S.map.getSource('recon-track').setData({ type: 'FeatureCollection', features: feats });
+      S.map.getSource('recon-fix').setData({ type: 'FeatureCollection', features: fixes.map((v, i) => ({ type: 'Feature', properties: { latest: i === 0 }, geometry: { type: 'Point', coordinates: [v.lon, v.lat] } })) });
+      RECON_LAYERS.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'visible'));
+      ['a-fill', 'a-case', 'a-line', 'w-line'].forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+      const color = reconColor(m?.peakFl?.kt ?? fix?.maxFlWindKt);
+      S.reconMarkers = [];
+      if (m) S.reconMarkers.push(tcMarker(m.last.lon, m.last.lat, m.flying ? 'IN THE STORM NOW' : 'LAST REPORT ' + ago(m.lastAt), color, '✈'));
+      if (fix) S.reconMarkers.push(tcMarker(fix.lon, fix.lat, 'CENTER FIX ' + (fix.pressureMb ? fix.pressureMb + ' MB' : ''), '#ff2a5f', '◎'));
+      const flMph = ktToMph(m?.peakFl?.kt ?? fix?.maxFlWindKt);
+      const sfcMph = ktToMph(m?.peakSfmr?.kt);
+      const rows = [
+        ['AIRCRAFT', '<dd>' + esc(m ? m.aircraftLabel.toUpperCase() + ' · ' + m.aircraft : fix ? fix.aircraft : 'n/a') + '</dd>'],
+        ['STATUS', '<dd>' + (m ? (m.flying ? 'IN THE STORM NOW' : 'LAST REPORT ' + ago(m.lastAt)) : 'NO FLIGHT NOW') + '</dd>'],
+        ['CENTER FIX', '<dd>' + (fix ? (fix.pressureMb ? fix.pressureMb + ' MB · ' : '') + ago(fix.at) : 'n/a') + '</dd>'],
+        ['FLIGHT-LEVEL WIND', '<dd>' + (flMph ? flMph + ' MPH' : 'n/a') + '</dd>'],
+        ...(sfcMph ? [['SURFACE WIND (SFMR)', '<dd>' + sfcMph + ' MPH</dd>']] : []),
+        ['LOWEST PRESSURE', '<dd>' + (m?.minMb ? m.minMb.mb.toFixed(1) + ' MB' : fix?.pressureMb ? fix.pressureMb + ' MB' : 'n/a') + '</dd>']
+      ];
+      setCard('<div class="head"><div class="ico">' + icon('tropical', 30) + '</div><div><h2>HURRICANE HUNTERS</h2><div class="sub">' + esc((stormName ? titleCase(stormName) + ' · ' : '') + 'NHC RECON DATA') + '</div></div>'
+        + (m?.flying ? '<span class="status">LIVE</span>' : '') + '</div>'
+        + '<dl>' + rows.map(([k, v]) => '<dt>' + k + '</dt>' + v).join('') + '</dl>', color);
+      const pts = [...(m ? m.track.map((p) => [p[0], p[1]]) : []), ...fixes.map((v) => [v.lon, v.lat])];
+      const b = pts.length ? bboxOf({ type: 'MultiPoint', coordinates: pts }) : null;
+      if (b) fly(b, { padding: { top: 150, bottom: 150, left: 640, right: 380 }, maxZoom: 7 });
+      setNow({
+        k: 'RECON',
+        title: 'Hurricane Hunters' + (stormName ? ' · ' + titleCase(stormName) : '') + (fix?.pressureMb ? ' · ' + fix.pressureMb + ' mb' : ''),
+        color,
+        crawl: [m ? m.aircraftLabel.toUpperCase() + ' ' + m.aircraft + ' MISSION ' + m.mission : '', m?.flying ? 'IN THE STORM NOW' : m ? 'LAST REPORT ' + ago(m.lastAt) : '',
+          fix ? 'CENTER FIX ' + Math.abs(fix.lat).toFixed(1) + (fix.lat >= 0 ? 'N' : 'S') + ' ' + Math.abs(fix.lon).toFixed(1) + (fix.lon < 0 ? 'W' : 'E') + (fix.pressureMb ? ' · ' + fix.pressureMb + ' MB' : '') : '',
+          flMph ? 'MAX FLIGHT-LEVEL WIND ' + flMph + ' MPH' : '', sfcMph ? 'PEAK SURFACE WIND ' + sfcMph + ' MPH' : ''].filter(Boolean).join(' · ')
+      });
+      const said = 'recon:' + (m ? m.id + ':' + m.lastAt.slice(0, 15) : '') + (fix ? fix.at : '');
+      if (S.spoken.has(said)) {
+        chatter(pick(['Checking back on the Hurricane Hunters. ', 'Back to the recon data. ']) + (fix?.pressureMb ? 'Their latest center fix was ' + fix.pressureMb + ' millibars.' : ''));
+        return;
+      }
+      S.spoken.add(said);
+      let text = m?.flying
+        ? 'The Hurricane Hunters are flying through ' + titleCase(stormName) + ' right now. '
+        : 'Let’s look at the Hurricane Hunter data from ' + (stormName ? titleCase(stormName) : 'the tropics') + '. ';
+      if (m) text += 'This is the ' + m.aircraftLabel.replace('Hurricane Hunters', 'Hurricane Hunter') + ' flight track, colored by the wind the plane measured. ';
+      if (fix?.pressureMb) text += 'Their latest center fix, ' + agoWords(fix.at) + ', found a pressure of ' + fix.pressureMb + ' millibars. ';
+      if (flMph) text += 'The strongest flight-level wind was ' + flMph + ' miles per hour. ';
+      if (sfcMph) text += 'Their surface wind instrument measured ' + sfcMph + ' miles per hour. ';
+      if (fixes.length > 1 && fixes[0].pressureMb && fixes[fixes.length - 1].pressureMb) {
+        const d = fixes[0].pressureMb - fixes[fixes.length - 1].pressureMb;
+        if (d <= -4) text += 'The pressure has dropped ' + -d + ' millibars across their fixes, so the storm is strengthening. ';
+        else if (d >= 4) text += 'The pressure has risen ' + d + ' millibars across their fixes, so the storm is weakening. ';
+      }
+      say(text.trim());
+    };
+
     /* ---------------- WeBot talks on every shot ---------------- */
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
     // Commentary never piles up: if WeBot is still talking, the new line is skipped.
@@ -3797,6 +3905,7 @@
           else if (cmd.type === 'reload') location.reload();
           else if (cmd.type === 'music-next') musicNext();
           else if (cmd.type === 'segment' && cmd.kind === 'gas') { S.forceShot = { type: 'gas' }; nextShot(true); }
+          else if (cmd.type === 'segment' && SCENE_KINDS.includes(cmd.kind)) { S.forceShot = { type: cmd.kind }; nextShot(true); }
           else if (cmd.type === 'segment' && cmd.kind === 'radar31') {
              S.radar31Requested = true;
              nextShot(true);
@@ -4067,6 +4176,7 @@
       loadAudience();
       poll(loadAudience, 60000);
       loadTropics().catch(() => {});
+      loadRecon().catch(() => {}).finally(() => { if (OPT.scene) { S.forceShot = { type: OPT.scene }; nextShot(true); } });
       loadSurface().catch(() => {});
       loadEmergencies().catch(() => {});
       setTimeout(loadEmergencies, 5000);
@@ -4075,6 +4185,7 @@
       loadNewsHeadlines();
       poll(loadNewsHeadlines, 10 * 60 * 1000);
       poll(loadTropics, 5 * 60 * 1000);
+      poll(loadRecon, 5 * 60 * 1000);
     };
     boot().catch((error) => { $('boot').textContent = 'WEATHERPOWER LIVE · RECONNECTING…'; console.error(error); setTimeout(() => location.reload(), 15000); });
     // Long-running stream: a reload every 6 hours keeps browser memory in check.

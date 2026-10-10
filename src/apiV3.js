@@ -17,6 +17,7 @@ import { openaiSpeech, openaiTtsStatus } from './voice.js';
 import { localSpeech, localVoiceStatus, warmLocalVoice } from './localVoice.js';
 import { wisSummary } from './wis.js';
 import { tropicalOverview } from './nhc.js';
+import { reconOverview } from './recon.js';
 import { surfaceAnalysis } from './surface.js';
 import { cityForecast, randomCityForecast } from './cityForecast.js';
 import { chatCommandStatus, chatStatus, retryChatCommand } from './youtubeChat.js';
@@ -524,6 +525,16 @@ export const apiV3Router = () => {
     try {
       res.set('Cache-Control', 'public, max-age=120');
       res.json(await tropicalOverview());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Hurricane Hunter flights (NHC recon HDOB tracks) and the latest measured center fixes (VDMs).
+  router.get('/recon', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=120');
+      res.json(await reconOverview());
     } catch (error) {
       next(error);
     }

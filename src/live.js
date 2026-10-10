@@ -537,6 +537,10 @@ export const applyLiveCommand = async (body = {}) => {
     case 'emergency-now':
       pushCommand({ type: 'segment', kind: 'emergency' });
       break;
+    case 'scene-now':
+      // Newer scenes by name (the stream page keeps the list in SCENE_KINDS).
+      if (['recon'].includes(body.kind)) pushCommand({ type: 'segment', kind: body.kind });
+      break;
     case 'brb':
       // Be-right-back card over the stream (host switches, maintenance). WeBot and the show pause under it.
       current.brb = body.on ? { message: cleanText(body.message, 140), since: new Date().toISOString() } : null;
