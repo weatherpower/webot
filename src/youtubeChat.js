@@ -10,6 +10,7 @@ import { STATE_NAMES } from './broadcast.js';
 import { applyLiveCommand, liveControl } from './live.js';
 import { loadBrain } from './brain.js';
 import { replyTo, expandSlang } from './personality.js';
+import { aiReplyTo } from './aiBrain.js';
 import { dataDir } from './paths.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
@@ -262,8 +263,11 @@ const readOne = async (messages) => {
     state.readUsers.set(userKey, now);
     if (state.readUsers.size > 500) state.readUsers.delete(state.readUsers.keys().next().value);
     const user = safeName(author.displayName);
-    // WeBot's comeback (src/personality.js): written lines only, so it can't come out crude.
-    await applyLiveCommand({ action: 'chat-say', user, text, speak: expandSlang(text), reply: replyTo(text, user, brain, { uptime: uptimeWords() }) });
+    // WeBot's comeback: usually his AI brain (src/aiBrain.js, filtered like chat), otherwise his written
+    // lines (src/personality.js). Personality off means the plain written replies only.
+    const ctx = { uptime: uptimeWords() };
+    const ai = brain.personality?.on === false ? null : await aiReplyTo(text, user, brain, ctx);
+    await applyLiveCommand({ action: 'chat-say', user, text, speak: expandSlang(text), reply: ai || replyTo(text, user, brain, ctx) });
     console.log('[chat] answering a viewer message');
   }
 };

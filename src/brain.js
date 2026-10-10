@@ -56,6 +56,15 @@ export const DEFAULT_BRAIN = {
   },
   // WeBot's personality: a sassy Southern robot who talks back to chat (src/personality.js).
   personality: DEFAULT_PERSONALITY,
+  // WeBot's AI brain for chat replies (src/aiBrain.js), through Puter. sharePercent of replies come from the
+  // AI; the rest (and any time the AI is off, unlinked, capped or failing) from the local lines above.
+  ai: {
+    enabled: true,
+    model: 'openai:openai/gpt-6.1-sol',
+    sharePercent: 75,
+    maxPerHour: 40,
+    maxChars: 220
+  },
   radio: {
     // Share of calm/chill songs that are country when the style is Mix (0 to 1).
     countryShare: 0.45,

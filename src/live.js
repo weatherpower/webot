@@ -423,6 +423,9 @@ export const streamKeyOk = (key) => {
   return Boolean(expected) && given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 };
 
+// The linked Puter sign-in for the server's own calls (WeBot's AI brain). Never sent to a browser.
+export const serverPuterToken = async () => (await loadSecrets()).puterToken || null;
+
 export const puterTokenFor = async (key, { homeNetwork = false } = {}) => {
   const expected = streamKey();
   const given = String(key || '');
