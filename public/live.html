@@ -589,8 +589,11 @@
     const isCalm = () => wisScore() < 100 && !(S.live?.tallies?.tor);
     // Viewer forecast/gas requests are more important than the ordinary calm-day rotation.
     // They may run during busy weather, but never while a breaking cut-in is active or a tornado warning is out.
-    const chatRequestSafe = () => !S.inBreaking && !(S.live?.tallies?.tor);
-    const chatReplySafe = () => !S.control.brb && !S.inBreaking && !(S.live?.tallies?.tor);
+    // Chat keeps working through a few tornado warnings (requests spaced out, see chatGapMs); only an
+    // outbreak (OUTBREAK_TOR+ tornado warnings) or a breaking warning on screen holds it.
+    const OUTBREAK_TOR = 10;
+    const chatRequestSafe = () => !S.inBreaking && !S.shot?.breaking && (S.live?.tallies?.tor || 0) < OUTBREAK_TOR;
+    const chatReplySafe = () => !S.control.brb && !S.inBreaking && (S.live?.tallies?.tor || 0) < OUTBREAK_TOR;
     // Weather quiet enough for daily forecasts (in the focused state when there is one).
     const forecastWeather = () => {
       const st = focusState();
@@ -2572,7 +2575,7 @@
       }
       if (!shot && S.control.pin && byKey(S.control.pin)) shot = { type: 'alert', alert: byKey(S.control.pin), pinned: true };
       if (!shot && S.forceShot) { shot = S.forceShot; S.forceShot = null; }
-      // Viewer requests from YouTube chat: next in line when it's calm (they wait out severe weather, up to 30 min).
+      // Viewer requests from YouTube chat: next in line between segments (they wait out an outbreak or a breaking warning, up to 30 min).
       S.chatQueue = (S.chatQueue || []).filter((r) => Date.now() - r.at < 30 * 60 * 1000);
       if (!shot && S.chatQueue.length && chatRequestSafe() && !S.control.pin && Date.now() - (S.chatAt || 0) > chatGapMs()) {
         const req = S.chatQueue.shift();
@@ -4074,7 +4077,7 @@
     const brainLines = (key, fallback) => (B.brain?.lines?.[key]?.length ? B.brain.lines[key] : fallback);
     const brainLine = (key, fallback) => B.brain?.lines?.[key] || fallback;
     const fillLine = (tpl, vars) => String(tpl).replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : m));
-    const chatGapMs = () => (Number.isFinite(B.brain?.chat?.requestEveryMinutes) ? B.brain.chat.requestEveryMinutes : 2) * 60 * 1000;
+    const chatGapMs = () => Math.max((Number.isFinite(B.brain?.chat?.requestEveryMinutes) ? B.brain.chat.requestEveryMinutes : 2), S.live?.tallies?.tor ? 6 : 0) * 60 * 1000;
     const applyBrain = () => {
       const b = B.brain;
       if (!b) return;
