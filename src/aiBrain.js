@@ -5,6 +5,7 @@
 import { serverPuterToken } from './live.js';
 import { blockedText } from './youtubeChat.js';
 import { wisSummary } from './wis.js';
+import { tropicalOverview } from './nhc.js';
 
 const PUTER_CALL = 'https://api.puter.com/drivers/call';
 const TIMEOUT_MS = 12000;
@@ -27,7 +28,7 @@ const persona = (brain) => {
   ].join('\n');
 };
 
-const rightNow = (ctx = {}) => {
+const rightNow = async (ctx = {}) => {
   const notes = [];
   try {
     const w = wisSummary({ alerts: 3 });
@@ -35,6 +36,15 @@ const rightNow = (ctx = {}) => {
       notes.push(`Weather Intensity Score ${w.scoreText} (${w.label}), ${w.counts.total} active alerts nationwide.`);
       for (const a of w.alerts || []) notes.push(`Top alert: ${[a.event || a.title, a.area || a.areaDesc || a.place].filter(Boolean).join(' for ').slice(0, 160)}`);
     }
+  } catch {}
+  try {
+    // NHC: the active storms (the same cached data the tropics scene uses).
+    const tr = await tropicalOverview();
+    for (const st of (tr.storms || []).slice(0, 4)) {
+      const mph = Number.isFinite(st.intensityKt) ? Math.round(st.intensityKt * 1.15078 / 5) * 5 : st.intensityMph;
+      notes.push(`Tropics: ${[st.classificationLabel, st.name].filter(Boolean).join(' ')} in the ${st.basin}, ${mph ? mph + ' mph winds' : ''}${st.pressureMb ? ', ' + st.pressureMb + ' mb' : ''}${st.movementCompass ? ', moving ' + st.movementCompass + ' at ' + st.movementSpeedMph + ' mph' : ''}, near ${Math.abs(st.latitude).toFixed(1)}${st.latitude >= 0 ? 'N' : 'S'} ${Math.abs(st.longitude).toFixed(1)}${st.longitude < 0 ? 'W' : 'E'} (NHC advisory ${st.advisoryNumber}).`);
+    }
+    if (!(tr.storms || []).length) notes.push('Tropics: no named storms right now.');
   } catch {}
   if (ctx.uptime) notes.push(`The stream has been live for ${ctx.uptime}.`);
   notes.push(`Current time: ${new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' })} Central.`);
@@ -87,7 +97,7 @@ export const aiReplyTo = async (text, user, brain, ctx = {}) => {
   state.calls.push(now);
   try {
     const { text: raw, cents } = await callPuter(token, ai.model, [
-      { role: 'system', content: `${persona(brain)}\n\nRight now:\n${rightNow(ctx)}` },
+      { role: 'system', content: `${persona(brain)}\n\nRight now:\n${await rightNow(ctx)}` },
       { role: 'user', content: `Viewer "${String(user || 'someone').slice(0, 40)}" says in chat: ${String(text).slice(0, 300)}` }
     ]);
     const reply = shorten(tidy(raw), ai.maxChars);
