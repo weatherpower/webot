@@ -5,7 +5,7 @@ import { requireControllerToken } from './auth.js';
 import { getRenderedState } from './autoRenderer.js';
 import { compactPublicGeometry } from './publicFeed.js';
 import { compositeValidTime } from './shortVideo.js';
-import { getShort, listShorts, queueShort, requestShort, shortsByKey, shortsStatus } from './shorts.js';
+import { getShort, listShorts, queueShort, requestShort, shortSig, shortsByKey, shortsStatus } from './shorts.js';
 import {
   SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
@@ -127,7 +127,10 @@ const currentAlerts = async () => {
   const now = Date.now();
   const alerts = (state.items || [])
     .filter((item) => !Date.parse(item.expiresAt || '') || Date.parse(item.expiresAt) > now)
-    .map((item) => toV3Alert(item, shorts.get(item.key)))
+    .map((item) => {
+      const own = shorts.get(item.key);
+      return toV3Alert(item, own?.path ? own : shorts.get(`sig:${shortSig(item)}`) || own);
+    })
     .sort((a, b) => a.rank - b.rank || Date.parse(b.issuedAt || 0) - Date.parse(a.issuedAt || 0));
   return { state, alerts };
 };
@@ -245,7 +248,7 @@ export const apiV3Router = () => {
         res.status(404).json({ ok: false, error: 'Alert not found or expired' });
         return;
       }
-      const short = await getShort(item.key);
+      const short = await getShort(item.key, item);
       const alert = toV3Alert(item, short?.short ? { ...short.short, status: short.status } : { status: short?.status }, { detail: true });
       res.set('Cache-Control', 'public, max-age=5');
       res.json(alert);
@@ -310,7 +313,7 @@ export const apiV3Router = () => {
       }
       const result = await requestShort(item, req.ip);
       res.set('Cache-Control', 'no-store');
-      res.json({ ok: true, ...result, short: await getShort(item.key) });
+      res.json({ ok: true, ...result, short: await getShort(item.key, item) });
     } catch (error) {
       if (error.retryAfterSeconds) res.set('Retry-After', String(error.retryAfterSeconds));
       next(error);

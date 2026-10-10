@@ -56,8 +56,9 @@ pactl set-default-sink stream
 export HOST="${HOST:-0.0.0.0}" PORT LIVE_TRUST_LAN=false SHORTS_ENABLED="${SHORTS_ENABLED:-false}" SHORTS_AUTO_ENABLED="${SHORTS_AUTO_ENABLED:-false}"
 export AUTO_RENDER_ENABLED="${AUTO_RENDER_ENABLED:-true}"
 # The stream draws its own warnings: skip the card images (a second headless Chrome that starves the
-# stream of CPU, which makes the audio sputter).
-export AUTO_RENDER_CARDS="${AUTO_RENDER_CARDS:-false}"
+# stream of CPU, which makes the audio sputter). With the stream off there's room, so cards come back on.
+CARDS_DEFAULT=false; [ "${STREAM_OFF:-false}" = true ] && CARDS_DEFAULT=true
+export AUTO_RENDER_CARDS="${AUTO_RENDER_CARDS:-$CARDS_DEFAULT}"
 (while true; do bash scripts/dev-safe.sh; log "server stopped (exit $?), restarting in 5 s"; sleep 5; done) &
 pids+=($!)
 for _ in $(seq 1 120); do curl -sf "http://127.0.0.1:${PORT}/warningcenter/api/v3/live" >/dev/null && break; sleep 1; done

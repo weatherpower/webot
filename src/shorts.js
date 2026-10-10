@@ -50,6 +50,7 @@ const load = async () => {
   // The in-memory queue does not survive restarts; release stranded jobs so they can requeue.
   for (const entry of Object.values(store.items)) {
     if (entry.status === 'queued' || entry.status === 'rendering') entry.status = entry.short ? 'ready' : 'idle';
+    entry.sig ||= shortSig(entry);
   }
   return store;
 };
@@ -122,9 +123,28 @@ const publicEntry = (key, entry) => entry && ({
   } : null
 });
 
-export const getShort = async (key) => {
+// NWS gives a warning a new ID on every update (hurricanes and surge every few hours), so a short is also
+// found by "same warning": event + area. Without this, finished shorts stop showing after an update.
+export const shortSig = (w = {}) => [w.event, w.areaDesc].map((s) => String(s || '').trim().toLowerCase()).join('|');
+const SAME_WARNING_MS = Math.max(0, Number(process.env.SHORTS_SAME_WARNING_HOURS ?? 3)) * 3600000;
+
+const newestBySig = (sig) => {
+  let best = null;
+  for (const [key, entry] of Object.entries(store.items)) {
+    if (entry.sig !== sig || !entry.short) continue;
+    if (!best || Date.parse(entry.short.renderedAt || 0) > Date.parse(best[1].short.renderedAt || 0)) best = [key, entry];
+  }
+  return best;
+};
+
+export const getShort = async (key, warning = null) => {
   await load();
-  return publicEntry(key, store.items[key]) || null;
+  const entry = store.items[key];
+  if (!entry?.short && warning) {
+    const found = newestBySig(shortSig(warning));
+    if (found) return { ...publicEntry(found[0], found[1]), key, status: entry?.status === 'queued' || entry?.status === 'rendering' ? entry.status : 'ready' };
+  }
+  return publicEntry(key, entry) || null;
 };
 
 export const listShorts = async ({ readyOnly = true } = {}) => {
@@ -141,12 +161,15 @@ export const shortsByKey = async () => {
   await load();
   const map = new Map();
   for (const [key, entry] of Object.entries(store.items)) {
-    map.set(key, {
+    const value = {
       status: entry.status,
       path: entry.short?.path,
       posterPath: entry.short?.posterPath,
       renderedAt: entry.short?.renderedAt
-    });
+    };
+    map.set(key, value);
+    const sigKey = entry.sig && `sig:${entry.sig}`;
+    if (sigKey && value.path && !(Date.parse(map.get(sigKey)?.renderedAt || 0) > Date.parse(value.renderedAt || 0))) map.set(sigKey, value);
   }
   return map;
 };
@@ -215,10 +238,22 @@ export const queueShort = async (warning, { reason = 'auto', force = false } = {
   if (!force && entry?.status === 'error' && entry.hash === hash && Date.now() - Date.parse(entry.updatedAt || 0) < 15 * 60 * 1000) {
     return { queued: false, reason: 'Recent render failed; retrying later' };
   }
+  const sig = shortSig(warning);
+  if (!force) {
+    // Same warning under an older NWS ID: reuse it instead of filming it again every update.
+    const same = Object.entries(store.items).filter(([k, e]) => k !== key && e.sig === sig);
+    if (same.some(([, e]) => e.status === 'queued' || e.status === 'rendering')) return { queued: true, existing: true };
+    const fresh = newestBySig(sig);
+    if (fresh && reason === 'auto' && Date.now() - Date.parse(fresh[1].short.renderedAt || 0) < SAME_WARNING_MS) return { queued: false, ready: true };
+    if (same.some(([, e]) => e.status === 'error' && Date.now() - Date.parse(e.updatedAt || 0) < 15 * 60 * 1000)) {
+      return { queued: false, reason: 'Recent render failed; retrying later' };
+    }
+  }
   if (queue.length >= config.shorts.maxQueue) return { queued: false, reason: 'Render queue is full; try again in a few minutes' };
   store.items[key] = {
     ...(entry || {}),
     status: 'queued',
+    sig,
     pendingHash: hash,
     event: warning.event,
     areaDesc: warning.areaDesc,
