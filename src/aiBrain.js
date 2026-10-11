@@ -110,6 +110,8 @@ export const aiReplyTo = async (text, user, brain, ctx = {}) => {
     // Out of Puter usage or Puter down: back off (2, 4, 8... up to 30 minutes) and let the local brain talk.
     state.failures += 1;
     state.pausedUntil = now + Math.min(30, 2 ** state.failures) * 60000;
+    // Out of Puter credit: the voice uses the same account, so the AI brain steps aside for 6 hours.
+    if (/\b402\b|credit|funding|balance/i.test(error.message)) state.pausedUntil = now + 6 * 3600000;
     state.last = { at: new Date().toISOString(), ok: false, error: error.message.slice(0, 160) };
     console.warn('[ai-brain]', error.message);
     return null;

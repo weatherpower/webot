@@ -332,6 +332,8 @@
     body.lite .bot .rig img, body.lite .bot .eye { filter: none !important; }
     .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
     .boot.done { opacity: 0; pointer-events: none; }
+    /* Never show Puter's account popups on air (see the MutationObserver near startPuter). */
+    usage-limit-dialog, puter-dialog { display: none !important; }
   </style>
 </head>
 <body>
@@ -846,6 +848,13 @@
     const puterGate = () => {
       $('puter-gate').hidden = !(pt.state === 'signed-out' && voiceOn() && ttsCfg().engine === 'puter');
     };
+    // Puter.js puts its own "Low Balance" / upgrade popups on the page when the account runs out, which shows
+    // on air. Remove them the moment they appear and treat Puter as failed, so the free local voice takes over.
+    new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) {
+        if (n.nodeType === 1 && /^(usage-limit-dialog|puter-dialog)$/i.test(n.tagName)) { n.remove(); pt.failedAt = Date.now(); console.warn('Puter usage popup hidden; local voice until it resets'); }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
     const startPuter = () => {
       if (pt.state !== 'off') return;
       pt.state = 'loading';
