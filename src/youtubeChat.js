@@ -449,12 +449,78 @@ const handle = async (message) => {
   return true;
 };
 
+/* ---------- "not a Ryan copy" rule: downgrading the stream gets a timeout ---------- */
+// WeBot is a passion project. Calling it a Ryan Hall copy, fake, "Yallbot", a rip-off and so on gets one
+// firm line from WeBot on air, then that viewer is hidden from the on-screen chat and ignored for
+// TIMEOUT_MINUTES. With YouTube moderation linked (YOUTUBE_OAUTH_* in .env) they also get a real YouTube
+// timeout. The owner and moderators are exempt, and fans saying "not a Ryan copy" don't count.
+const TIMEOUT_MINUTES = 10;
+const timeouts = new Map(); // channelId -> until (ms)
+const NAMECALL = /\by'?all\s*-?\s*bot\b|\byallbot\b|\bfake\s*(we\s*-?\s*bot|webot|ryan)\b|ryan\s*hall\s*(copy|clone|knock\s*-?\s*off|rip\s*-?\s*off|wannabe|wanna\s*be)/i;
+const INSULT = /\b(fake|copy\s*-?\s*cat|cop(y|ied|ies|ying)|clone|rip\s*-?\s*off|knock\s*-?\s*off|wanna\s*-?\s*be|bootleg|off\s*-?\s*brand|cheap\s+(version|ryan|copy))\b/i;
+const TARGET = /\b(we\s*-?\s*bot|webot|ryan|this\s+(stream|channel|bot)|weather\s*power)\b/i;
+const FAN = /\bnot\s+a\s+(ryan\s+)?(copy|clone|rip\s*-?\s*off|knock\s*-?\s*off)\b/i;
+export const downgrades = (text) => {
+  const t = String(text || '');
+  return !FAN.test(t) && (NAMECALL.test(t) || (INSULT.test(t) && TARGET.test(t)));
+};
+const TIMEOUT_LINES = [
+  '{name}, that is a timeout. WeBot is a passion project, not a copy of anybody. Come back in ten minutes with some manners, sugar.',
+  'Nope. {name}, you are in timeout for ten minutes. This stream was built from scratch with a whole lot of heart, and we do not do that here.',
+  '{name}, timeout. Ten minutes. I am not a Ryan copy, darlin, I am my own robot. Go sit in the corner and think about it.'
+];
+
+let ytAccess = { token: '', until: 0 };
+const ytToken = async () => {
+  const { YOUTUBE_OAUTH_CLIENT_ID: id, YOUTUBE_OAUTH_CLIENT_SECRET: secret, YOUTUBE_OAUTH_REFRESH_TOKEN: refresh } = process.env;
+  if (!id || !secret || !refresh) return '';
+  if (ytAccess.token && Date.now() < ytAccess.until) return ytAccess.token;
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: id, client_secret: secret, refresh_token: refresh, grant_type: 'refresh_token' }), signal: AbortSignal.timeout(15000)
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok || !body.access_token) throw new Error('YouTube sign-in: ' + (body.error_description || body.error || r.status));
+  ytAccess = { token: body.access_token, until: Date.now() + (Number(body.expires_in || 3600) - 120) * 1000 };
+  return ytAccess.token;
+};
+// Real YouTube timeout (needs the channel's moderation permission; costs 50 quota units).
+const youtubeTimeout = async (channelId) => {
+  const token = await ytToken();
+  if (!token || !state.chatId) return false;
+  spend(50);
+  const r = await fetch('https://www.googleapis.com/youtube/v3/liveChat/bans?part=snippet', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ snippet: { liveChatId: state.chatId, type: 'temporary', banDurationSeconds: TIMEOUT_MINUTES * 60, bannedUserDetails: { channelId } } }),
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!r.ok) throw new Error('YouTube timeout ' + r.status + ' ' + (await r.text()).slice(0, 160));
+  return true;
+};
+
+// True = drop this message (viewer is in timeout, or just earned one).
+const timeoutCheck = async (message) => {
+  const author = message.authorDetails || {};
+  const id = author.channelId || author.displayName || '';
+  const now = Date.now();
+  if (!id || author.isChatOwner || author.isChatModerator) return false;
+  if ((timeouts.get(id) || 0) > now) return true;
+  if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type) || !downgrades(message.snippet?.displayMessage)) return false;
+  timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
+  const name = safeName(author.displayName) || 'Partner';
+  const line = TIMEOUT_LINES[Math.floor(Math.random() * TIMEOUT_LINES.length)].replace('{name}', name);
+  await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
+  const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
+  console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
+  return true;
+};
+
 const readChat = async () => {
   const params = { liveChatId: state.chatId, part: 'snippet,authorDetails', maxResults: '200' };
   if (state.pageToken) params.pageToken = state.pageToken;
   const body = await api('liveChat/messages', params, 5);
   state.pageToken = body.nextPageToken || state.pageToken;
-  const items = body.items || [];
+  let items = body.items || [];
   // The first read after a restart contains recent history. Do not replay normal chat, but DO rescue
   // fresh commands posted while the service was restarting/deploying. Otherwise viewers can type
   // !forecast right after a refresh and WeBot silently drops it.
@@ -468,6 +534,12 @@ const readChat = async () => {
       await handle(message).catch((e) => console.warn('[chat]', e.message));
     }
   } else {
+    // Viewers in timeout (or earning one now) are dropped before anything shows on screen or gets an answer.
+    const kept = [];
+    for (const message of items) {
+      if (!(await timeoutCheck(message).catch(() => false))) kept.push(message);
+    }
+    items = kept;
     const regular = [];
     for (const message of items) {
       const command = await handle(message).catch((e) => { console.warn('[chat]', e.message); return true; });
