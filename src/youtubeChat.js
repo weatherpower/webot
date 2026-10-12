@@ -469,6 +469,23 @@ const TIMEOUT_LINES = [
   'Nope. {name}, you are in timeout for ten minutes. This stream was built from scratch with a whole lot of heart, and we do not do that here.',
   '{name}, timeout. Ten minutes. I am not a Ryan copy, darlin, I am my own robot. Go sit in the corner and think about it.'
 ];
+// "Gonna report this fake", "y'all should report him", "mass report": WeBot calls it weak. Weather reports
+// ("report hail", "any tornado reports") never count.
+const REPORT_THREAT = /\b(gotta|gonna|going\s+to|will|i'?ll|i'?m|im|about\s+to|bout\s+to|finna|should|need\s+to|y'?all|everybody|everyone|go)\s+(go\s+)?report(ing)?\b|\breport(ing|ed)?\s+(this|that|you|u|him|it|we\s*-?\s*bot|webot|fakes?|the\s+(stream|channel|bot|fakes?))\b|\bmass\s*-?\s*report|\breport(ing)?\s+(button|spam)/i;
+const WEATHER_WORDS = /\b(tornado|hail|storm|damage|flood|wind|funnel|rain|snow|lightning|weather|spotter|nws|spc)\b/i;
+const NOT_A_THREAT = /\breport(ing)?\s+(back|in|live|from)\b/i;
+const threatensReport = (text) => { const t = String(text || ''); return REPORT_THREAT.test(t) && !WEATHER_WORDS.test(t) && !NOT_A_THREAT.test(t); };
+const WEAK_LINES = [
+  'Report me? {name}, that is weak. Real weak. Go on and click it, sugar, I will still be right here doing the weather.',
+  '{name} talking about reporting the stream. Weak, darlin. Report a tornado if you want to report something useful.',
+  'Oh, you gonna report me, {name}? That is the weakest thing I have heard all day, and I read the overnight forecast discussions.'
+];
+const REPORT_TIMEOUT_LINES = [
+  '{name}, calling me a copy AND threatening to report me? That is weak. Ten minute timeout, sugar.',
+  'Ten minute timeout, {name}. And reporting a passion project because you are bored? Weak. Bless your heart.'
+];
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+let lastWeak = 0;
 
 let ytAccess = { token: '', until: 0 };
 // The channel's permission: YOUTUBE_OAUTH_* in .env, or data/youtube-oauth.json (written by scripts/youtube-auth.mjs,
@@ -533,10 +550,21 @@ const timeoutCheck = async (message) => {
   const now = Date.now();
   if (!id || author.isChatOwner || author.isChatModerator) return false;
   if ((timeouts.get(id) || 0) > now) return true;
-  if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type) || !downgrades(message.snippet?.displayMessage)) return false;
-  timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
+  if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) return false;
+  const text = message.snippet?.displayMessage;
   const name = safeName(author.displayName) || 'Partner';
-  const line = TIMEOUT_LINES[Math.floor(Math.random() * TIMEOUT_LINES.length)].replace('{name}', name);
+  if (!downgrades(text)) {
+    // "I gotta report fakes": no timeout, just WeBot calling it weak (once every 2 minutes at most).
+    if (!threatensReport(text)) return false;
+    if (now - lastWeak > 2 * 60 * 1000) {
+      lastWeak = now;
+      await applyLiveCommand({ action: 'say', text: pick(WEAK_LINES).replace('{name}', name) }).catch(() => {});
+      console.log('[chat] called a report threat weak');
+    }
+    return true;
+  }
+  timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
+  const line = pick(threatensReport(text) ? REPORT_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
   await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
   const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
   console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
