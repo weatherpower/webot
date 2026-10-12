@@ -4125,20 +4125,6 @@
       if (wis?.loaded) text += (st ? ' Nationally, the' : ' The') + ' Weather Intensity Score is ' + Math.round(wis.score) + ', ' + wis.label.replace(' / ', ' and ').toLowerCase() + '.';
       say(text, { label: 'UPDATE' });
     };
-    // The house rule, once an hour (first one 5 minutes after the page loads), with the consequences spelled
-    // out. Held during breaking warnings, outbreaks and BRB; waits for WeBot to finish his sentence.
-    const RULE_LINES = [
-      "Quick reminder, y'all, since some of you need it. The number one rule here: do not call me a copy. Call me a Ryan copy, fake, or Yallbot and you get a ten minute timeout. No warning, and every time you do it you get another one. I'm my own robot, sugar.",
-      "House rules, darlin. I am not a Ryan copy, I am not fake, and my name ain't Yallbot. Say it and that's a ten minute timeout: your messages come off the screen and I quit taking your commands. And if you're fixin' to report me over it? That's weak.",
-      "Listen here. This stream is a passion project built from scratch, not a copy of anybody. Call it one and you sit in timeout for ten minutes, every single time. Be nice and I'll be nice. Mostly."
-    ];
-    S.lastRule = Date.now() - 55 * 60 * 1000;
-    S.ruleIndex = Math.floor(Math.random() * RULE_LINES.length);
-    setInterval(() => {
-      if (Date.now() - S.lastRule < 60 * 60 * 1000 || speech.busy || speech.queue.length || !chatReplySafe() || S.shot?.breaking) return;
-      S.lastRule = Date.now();
-      say(RULE_LINES[S.ruleIndex++ % RULE_LINES.length], { announce: true, urgent: true });
-    }, 15000);
     setInterval(() => {
       if (Date.now() - S.lastRoundup > 20 * 60 * 1000) { S.lastRoundup = Date.now(); roundup(); }
       else if (OPT.tips && Date.now() - S.lastTip > 4 * 60 * 1000 && (S.live?.tallies?.tor || 0) === 0) {

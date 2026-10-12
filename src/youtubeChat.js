@@ -464,11 +464,19 @@ export const downgrades = (text) => {
   const t = String(text || '');
   return !FAN.test(t) && (NAMECALL.test(t) || (INSULT.test(t) && TARGET.test(t)));
 };
-const TIMEOUT_LINES = [
-  '{name}, that is a timeout. WeBot is a passion project, not a copy of anybody. Come back in ten minutes with some manners, sugar.',
-  'Nope. {name}, you are in timeout for ten minutes. This stream was built from scratch with a whole lot of heart, and we do not do that here.',
-  '{name}, timeout. Ten minutes. I am not a Ryan copy, darlin, I am my own robot. Go sit in the corner and think about it.'
+// One line per timeout (voice credits): the timeout plus the main rule for everybody watching. During a
+// pile-on (another timeout within 3 minutes) the rule was just said, so the next ones get the short line.
+const RULE_TIMEOUT_LINES = [
+  "{name}, that's a ten minute timeout. Y'all listen up: the number one rule here is do not call me a copy. Not a Ryan copy, not fake, not Yallbot. Say it and you're next, sugar.",
+  "Ten minute timeout, {name}. And for everybody else: I am not a Ryan copy, I'm not fake, and my name ain't Yallbot. That's the number one rule, and it gets you a timeout every time.",
+  "{name}, sit down, ten minute timeout. Rule number one in this chat: do not call me a copy. This is a passion project built from scratch. Call it fake and you're in timeout too, darlin."
 ];
+const TIMEOUT_LINES = [
+  '{name}, ten minute timeout. Rules are rules, sugar.',
+  'You too, {name}. Ten minutes. Bless your heart.',
+  '{name}, timeout. Did you not just hear me, darlin?'
+];
+let lastRuleLine = 0;
 // "Gonna report this fake", "y'all should report him", "mass report": WeBot calls it weak. Weather reports
 // ("report hail", "any tornado reports") never count.
 const REPORT_THREAT = /\b(gotta|gonna|going\s+to|will|i'?ll|i'?m|im|about\s+to|bout\s+to|finna|should|need\s+to|y'?all|everybody|everyone|go)\s+(go\s+)?report(ing)?\b|\breport(ing|ed)?\s+(this|that|you|u|him|it|we\s*-?\s*bot|webot|fakes?|the\s+(stream|channel|bot|fakes?))\b|\bmass\s*-?\s*report|\breport(ing)?\s+(button|spam)/i;
@@ -486,10 +494,6 @@ const REPORT_TIMEOUT_LINES = [
 ];
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 let lastWeak = 0;
-// Right after a timeout WeBot reads the main rule to the whole chat (at most once every 3 minutes, so a
-// pile-on doesn't loop it).
-const MAIN_RULE = "Alright y'all, listen up. The number one rule in this chat: do not call me a copy. I am not a Ryan copy, I am not fake, and my name sure ain't Yallbot. I'm my own robot, built from scratch with a whole lot of heart. Say it anyway and you're in timeout for ten minutes, sugar.";
-let lastMainRule = 0;
 
 let ytAccess = { token: '', until: 0 };
 // The channel's permission: YOUTUBE_OAUTH_* in .env, or data/youtube-oauth.json (written by scripts/youtube-auth.mjs,
@@ -568,12 +572,10 @@ const timeoutCheck = async (message) => {
     return true;
   }
   timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
-  const line = pick(threatensReport(text) ? REPORT_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
+  const withRule = now - lastRuleLine > 3 * 60 * 1000;
+  if (withRule) lastRuleLine = now;
+  const line = pick(threatensReport(text) ? REPORT_TIMEOUT_LINES : withRule ? RULE_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
   await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
-  if (now - lastMainRule > 3 * 60 * 1000) {
-    lastMainRule = now;
-    await applyLiveCommand({ action: 'say', text: MAIN_RULE }).catch(() => {});
-  }
   const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
   console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
   notifyTimeout(name, message.snippet?.displayMessage, real).catch((e) => console.warn('[chat] ntfy', e.message));
