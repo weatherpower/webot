@@ -511,6 +511,21 @@ const youtubeTimeout = async (channelId) => {
   return true;
 };
 
+// Phone heads-up (ntfy, same NTFY_TOPIC as the warning alerts) whenever WeBot times somebody out.
+const notifyTimeout = async (name, text, real) => {
+  const topic = process.env.NTFY_TOPIC;
+  if (!topic) return;
+  const server = (process.env.NTFY_SERVER || 'https://ntfy.sh').replace(/\/$/, '');
+  const said = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  // JSON publish (not headers) so emoji in names and messages come through.
+  const msg = {
+    topic, title: 'WeBot timed out ' + name, priority: 3, tags: ['no_entry', 'robot'],
+    message: 'They said: "' + said + '"\n' + (real ? '10-minute YouTube timeout.' : 'Hidden from the stream for 10 minutes (the YouTube timeout did not go through).')
+  };
+  if (state.videoId) msg.click = 'https://www.youtube.com/watch?v=' + state.videoId;
+  await fetch(server, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg), signal: AbortSignal.timeout(15000) });
+};
+
 // True = drop this message (viewer is in timeout, or just earned one).
 const timeoutCheck = async (message) => {
   const author = message.authorDetails || {};
@@ -525,6 +540,7 @@ const timeoutCheck = async (message) => {
   await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
   const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
   console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
+  notifyTimeout(name, message.snippet?.displayMessage, real).catch((e) => console.warn('[chat] ntfy', e.message));
   return true;
 };
 
