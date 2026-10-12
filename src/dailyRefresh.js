@@ -143,6 +143,12 @@ export const renderThumbnail = async () => {
 // The live broadcast: the chat reader's video, or the channel's /live page.
 const findVideo = async () => {
   if (liveVideoId()) return liveVideoId();
+  // With the channel linked, YouTube can just tell us its active broadcast (1 quota unit).
+  try {
+    const token = await ytToken();
+    const r = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id&broadcastStatus=active&broadcastType=all', { headers: { Authorization: 'Bearer ' + token } }).then((x) => x.json());
+    if (r.items?.[0]?.id) return r.items[0].id;
+  } catch {}
   const ch = process.env.YOUTUBE_CHANNEL_ID || '';
   const html = await fetch(`https://www.youtube.com/channel/${ch}/live`, { headers: { 'User-Agent': 'Mozilla/5.0 (WeatherPower Live)', 'Accept-Language': 'en-US' } }).then((r) => r.text()).catch(() => '');
   return (html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/) || [])[1] || '';

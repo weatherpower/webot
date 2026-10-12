@@ -57,5 +57,7 @@ const server = http.createServer(async (req, res) => {
 });
 server.listen(PORT, '127.0.0.1', () => {
   console.log('Opening Google sign-in. Sign in with the WeatherPower channel account and click Allow.');
-  spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' });
+  // Not `cmd /c start`: cmd treats the & in the link as a command separator and cuts it off.
+  spawn('rundll32', ['url.dll,FileProtocolHandler', url], { detached: true, stdio: 'ignore' });
+  console.log('If no tab opened, paste this into your browser:\n' + url);
 });
