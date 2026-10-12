@@ -41,9 +41,34 @@ const dayIndex = () => Math.floor(Date.parse(centralDate() + 'T12:00:00Z') / 864
 const pick = (list, salt = 0) => list[(dayIndex() + salt) % list.length];
 const fileUrl = (p) => 'file://' + p.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '/$1:');
 
-// The radar part of the live stream right now (between the side panels), or the stored radar picture.
+// Which scene the stream page is on, asked through the stream Chrome's debugging port ('' if unknown).
+// Scenes with colorful radar behind them (the tropics and outlook maps are mostly empty map).
+const MAP_SCENES = new Set(['national', 'surface', 'alert', 'reports', 'rain']);
+const currentScene = async () => {
+  try {
+    const pages = await fetch('http://127.0.0.1:9222/json', { signal: AbortSignal.timeout(3000) }).then((r) => r.json());
+    const target = pages.find((p) => p.type === 'page' && /warningcenter\/live/.test(p.url));
+    if (!target) return '';
+    const ws = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((ok, bad) => { ws.onopen = ok; ws.onerror = bad; setTimeout(bad, 3000); });
+    const value = await new Promise((ok) => {
+      ws.onmessage = (m) => ok(JSON.parse(m.data).result?.result?.value || '');
+      ws.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'window.WPLive?.S?.shot?.type || ""', returnByValue: true } }));
+      setTimeout(() => ok(''), 3000);
+    });
+    ws.close();
+    return value;
+  } catch {
+    return '';
+  }
+};
+
+// The radar part of the live stream (between the side panels) during a map scene, or the stored radar picture.
 const radarFrame = async () => {
   const shot = path.join(dataDir, 'daily-radar.png');
+  for (let i = 0; i < 12 && !MAP_SCENES.has(await currentScene()); i += 1) await new Promise((r) => setTimeout(r, 20000));
+  if (!MAP_SCENES.has(await currentScene())) return path.join(ASSETS, 'thumb-radar.png');
+  await new Promise((r) => setTimeout(r, 4000)); // let the map finish drawing after a cut
   try {
     await run('ffmpeg', ['-v', 'error', '-y', '-f', 'x11grab', '-draw_mouse', '0', '-i', process.env.DISPLAY || ':99', '-frames:v', '1',
       '-vf', 'crop=iw*0.578:ih*0.583:iw*0.281:ih*0.306,scale=1280:720', shot], { timeout: 20000 });
@@ -100,7 +125,8 @@ html, body { width: 1280px; height: 720px; overflow: hidden; background: #0a0d12
 export const renderThumbnail = async () => {
   const html = path.join(dataDir, 'daily-thumb.html');
   await fs.writeFile(html, await thumbHtml(await radarFrame()));
-  const browser = await chromium.launch({ headless: true, ...(config.renderer.browserChannel ? { channel: config.renderer.browserChannel } : {}), args: ['--no-sandbox', '--allow-file-access-from-files'] });
+  const channel = config.renderer.browserChannel || (existsSync('/opt/google/chrome/chrome') ? 'chrome' : '');
+  const browser = await chromium.launch({ headless: true, ...(channel ? { channel } : {}), args: ['--no-sandbox', '--allow-file-access-from-files'] });
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     await page.goto(fileUrl(html));
