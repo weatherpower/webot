@@ -486,6 +486,10 @@ const REPORT_TIMEOUT_LINES = [
 ];
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 let lastWeak = 0;
+// Right after a timeout WeBot reads the main rule to the whole chat (at most once every 3 minutes, so a
+// pile-on doesn't loop it).
+const MAIN_RULE = "Alright y'all, listen up. The number one rule in this chat: do not call me a copy. I am not a Ryan copy, I am not fake, and my name sure ain't Yallbot. I'm my own robot, built from scratch with a whole lot of heart. Say it anyway and you're in timeout for ten minutes, sugar.";
+let lastMainRule = 0;
 
 let ytAccess = { token: '', until: 0 };
 // The channel's permission: YOUTUBE_OAUTH_* in .env, or data/youtube-oauth.json (written by scripts/youtube-auth.mjs,
@@ -566,6 +570,10 @@ const timeoutCheck = async (message) => {
   timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
   const line = pick(threatensReport(text) ? REPORT_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
   await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
+  if (now - lastMainRule > 3 * 60 * 1000) {
+    lastMainRule = now;
+    await applyLiveCommand({ action: 'say', text: MAIN_RULE }).catch(() => {});
+  }
   const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
   console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
   notifyTimeout(name, message.snippet?.displayMessage, real).catch((e) => console.warn('[chat] ntfy', e.message));
