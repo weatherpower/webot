@@ -471,8 +471,21 @@ const TIMEOUT_LINES = [
 ];
 
 let ytAccess = { token: '', until: 0 };
-const ytToken = async () => {
-  const { YOUTUBE_OAUTH_CLIENT_ID: id, YOUTUBE_OAUTH_CLIENT_SECRET: secret, YOUTUBE_OAUTH_REFRESH_TOKEN: refresh } = process.env;
+// The channel's permission: YOUTUBE_OAUTH_* in .env, or data/youtube-oauth.json (written by scripts/youtube-auth.mjs,
+// takes effect without a restart).
+const ytCreds = () => {
+  const env = process.env;
+  if (env.YOUTUBE_OAUTH_REFRESH_TOKEN) return { id: env.YOUTUBE_OAUTH_CLIENT_ID, secret: env.YOUTUBE_OAUTH_CLIENT_SECRET, refresh: env.YOUTUBE_OAUTH_REFRESH_TOKEN };
+  try {
+    const f = JSON.parse(fs.readFileSync(dataDir + '/youtube-oauth.json', 'utf8'));
+    return { id: f.client_id, secret: f.client_secret, refresh: f.refresh_token };
+  } catch {
+    return {};
+  }
+};
+export const ytLinked = () => Boolean(ytCreds().refresh);
+export const ytToken = async () => {
+  const { id, secret, refresh } = ytCreds();
   if (!id || !secret || !refresh) return '';
   if (ytAccess.token && Date.now() < ytAccess.until) return ytAccess.token;
   const r = await fetch('https://oauth2.googleapis.com/token', {
@@ -613,3 +626,6 @@ export const retryChatCommand = async (id) => {
   commandFinish(entry, 'manual', 'Manually queued from Studio', entry.place);
   return { ok: true, command: { ...entry, place: { ...entry.place } } };
 };
+
+// The live broadcast the chat reader is on (empty when none is found yet).
+export const liveVideoId = () => state.videoId;

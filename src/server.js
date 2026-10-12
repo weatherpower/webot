@@ -25,6 +25,7 @@ import { generateForecastSearchCards } from './forecastSearch.js';
 import { geocodeMapRequest, publicMapConfig, routeMapRequest } from './mapServices.js';
 import { apiV3Router, webotStatus } from './apiV3.js';
 import { startYoutubeChat } from './youtubeChat.js';
+import { startDailyRefresh } from './dailyRefresh.js';
 import { shortsStatus } from './shorts.js';
 
 const app = express();
@@ -626,6 +627,7 @@ const startServer = async () => {
     startAutoRenderer();
     startWis().catch((error) => console.error('WIS', error.message));
     startYoutubeChat();
+    startDailyRefresh();
   });
   // PUBLIC_STATUS_PORT: a second, read-only listener with only the WeBot status page (safe to open to
   // the internet while the main port stays behind the home-IP firewall).
