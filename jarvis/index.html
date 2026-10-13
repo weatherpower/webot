@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WeBot</title>
+<style>
+  :root { --eye: #5ff2ff; --bg: #070b14; --ink: #e8f1ff; --muted: #8fa3c4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 38%, #14233f 0%, #0a1222 55%, var(--bg) 100%); color: var(--ink);
+    font: 15px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+  body { display: flex; flex-direction: column; align-items: center; }
+  .bot { position: relative; width: min(78vw, 340px); aspect-ratio: 384 / 393; margin-top: 7vh; cursor: pointer; }
+  .bot .rig { position: absolute; inset: 0; animation: bob 4.5s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-8px); } }
+  .bot img, .bot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .bot img { filter: drop-shadow(0 16px 24px rgba(0,0,0,.6)); }
+  .eye { fill: var(--eye); transform-box: fill-box; transform-origin: center; transition: fill .3s; filter: drop-shadow(0 0 7px var(--eye)); }
+  .rim { fill: none; stroke: var(--eye); stroke-width: 6; opacity: 0; transition: opacity .3s, stroke .3s; }
+  body.blink .eye { transform: scaleY(.1); }
+  body.listening { --eye: #5ff2ff; } body.listening .rim { opacity: .9; animation: glow 1.2s ease-in-out infinite; }
+  @keyframes glow { 50% { opacity: .25; } }
+  body.thinking { --eye: #ffc23d; } body.thinking .eye { animation: think 1s ease-in-out infinite; }
+  @keyframes think { 0%, 100% { transform: translateX(-5px); } 50% { transform: translateX(5px); } }
+  body.talking .eye { animation: talk .22s ease-in-out infinite alternate; }
+  @keyframes talk { from { transform: scaleY(1); } to { transform: scaleY(.55); } }
+  body.error { --eye: #ff4d5e; }
+  .status { margin-top: 18px; min-height: 22px; font: 600 13px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .said { width: 88%; max-width: 560px; margin-top: 14px; text-align: center; }
+  .said .you { color: var(--muted); font-size: 14px; min-height: 20px; }
+  .said .me { margin-top: 8px; font-size: 18px; line-height: 1.35; min-height: 50px; max-height: 26vh; overflow-y: auto; user-select: text; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: rgba(5,9,18,.75); border-top: 1px solid rgba(255,255,255,.08); }
+  .bar input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: #0f1830; color: var(--ink); font: inherit; }
+  .bar input:focus { outline: 2px solid #5ff2ff; outline-offset: 0; }
+  .bar button { flex: none; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: #142242; color: var(--ink); font: 600 13px "Segoe UI", sans-serif; cursor: pointer; }
+  .bar button.on { background: #0e5b66; border-color: #5ff2ff; }
+  .note { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); max-width: 92%; padding: 9px 14px; border-radius: 10px; background: #ffd34d; color: #111; font: 600 13px "Segoe UI", sans-serif; cursor: pointer; text-align: center; }
+  .note[hidden] { display: none; }
+  usage-limit-dialog, puter-dialog { display: none !important; }
+</style>
+</head>
+<body>
+  <button class="note" id="note" hidden></button>
+  <div class="bot" id="bot" title="Click (or press Space) to talk to WeBot">
+    <div class="rig">
+      <img src="/webot.png" alt="WeBot">
+      <svg viewBox="0 0 384 393">
+        <rect class="rim" x="82" y="81" width="198" height="101" rx="42"/>
+        <rect x="122" y="96" width="36" height="70" rx="17" fill="#1f2e3a"/><rect x="205" y="96" width="36" height="70" rx="17" fill="#1f2e3a"/>
+        <rect class="eye" x="127" y="101" width="26" height="60" rx="13"/>
+        <rect class="eye" x="210" y="101" width="26" height="60" rx="13"/>
+      </svg>
+    </div>
+  </div>
+  <div class="status" id="status">Starting up…</div>
+  <div class="said"><div class="you" id="you"></div><div class="me" id="me"></div></div>
+  <div class="bar">
+    <button id="mic" title="Always listen for “WeBot”">🎙 Hey WeBot</button>
+    <input id="type" placeholder="…or type to WeBot" autocomplete="off">
+    <button id="new" title="Start a new conversation">New</button>
+  </div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const body = document.body;
+  const setMode = (m) => { body.classList.remove('listening', 'thinking', 'talking', 'error'); if (m) body.classList.add(m); };
+  const status = (t) => { $('status').textContent = t; };
+  const note = (text, onClick) => { const n = $('note'); n.textContent = text; n.hidden = !text; n.onclick = onClick || null; };
+  setInterval(() => { body.classList.add('blink'); setTimeout(() => body.classList.remove('blink'), 130); }, 4300);
+  let save = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  let load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+
+  /* ---------------- voice: Puter (Alloy, like the stream), backup: Windows voice ---------------- */
+  const VOICE_STYLE = 'You are WeBot, a sassy, warm Southern robot assistant. Speak naturally and quickly, like a friend talking, with a little attitude.';
+  const pt = { ready: false, failedAt: 0 };
+  // Puter puts "Low Balance" popups on the page when the account runs out: remove them and use the backup voice.
+  new MutationObserver((list) => {
+    for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1 && /^(usage-limit-dialog|puter-dialog)$/i.test(n.tagName)) { n.remove(); pt.failedAt = Date.now(); note('Puter is out of credits, so WeBot is using the backup Windows voice for now.'); }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  const puterSignIn = async () => {
+    try { await puter.auth.signIn(); } catch (e) { console.warn(e); }
+    pt.ready = Boolean(window.puter?.auth?.isSignedIn());
+    note(pt.ready ? '' : 'Click to sign in to Puter for WeBot’s voice', pt.ready ? null : puterSignIn);
+  };
+  const s = document.createElement('script');
+  s.src = 'https://js.puter.com/v2/';
+  s.onload = () => { pt.ready = Boolean(puter.auth.isSignedIn()); if (!pt.ready) note('Click to sign in to Puter for WeBot’s voice', puterSignIn); };
+  s.onerror = () => note('Puter didn’t load (no internet?). Using the backup voice.');
+  document.head.appendChild(s);
+
+  let current = null; // what's playing now (audio element or 'synth')
+  const stopTalking = () => {
+    if (current instanceof HTMLMediaElement) { current.pause(); current.dispatchEvent(new Event('ended')); }
+    if (current === 'synth') speechSynthesis.cancel();
+    current = null;
+  };
+  const playEl = (el) => new Promise((resolve) => { current = el; el.onended = el.onerror = () => resolve(); el.play().catch(() => resolve()); });
+  const backupSay = (text) => new Promise((resolve) => {
+    const u = new SpeechSynthesisUtterance(text);
+    const v = speechSynthesis.getVoices();
+    u.voice = v.find((x) => /Guy|Christopher|Eric|Andrew/i.test(x.name) && /Natural|Online/i.test(x.name)) || v.find((x) => /en-US/i.test(x.lang)) || null;
+    u.rate = 1.05;
+    u.onend = u.onerror = () => resolve();
+    current = 'synth';
+    speechSynthesis.speak(u);
+  });
+  // Long answers are spoken a few sentences at a time; the next piece is fetched while this one plays.
+  const chunks = (text) => (text.match(/[^.!?]+[.!?]*\s*/g) || [text]).reduce((acc, p) => { const last = acc[acc.length - 1]; if (last && last.length + p.length < 500) acc[acc.length - 1] = last + p; else acc.push(p); return acc; }, []).map((c) => c.trim()).filter(Boolean);
+  const puterVoice = (text) => puter.ai.txt2speech(text, { provider: 'openai', model: 'gpt-4o-mini-tts', voice: 'alloy', instructions: VOICE_STYLE });
+  const speak = async (text) => {
+    stopListening();
+    setMode('talking');
+    status('WeBot');
+    const usePuter = pt.ready && Date.now() - pt.failedAt > 20 * 60 * 1000;
+    const parts = chunks(text);
+    let next = usePuter ? puterVoice(parts[0]).catch(() => null) : null;
+    for (let i = 0; i < parts.length; i++) {
+      const el = next ? await next : null;
+      next = usePuter && parts[i + 1] ? puterVoice(parts[i + 1]).catch(() => null) : null;
+      if (el) await playEl(el);
+      else { if (usePuter) pt.failedAt = Date.now(); await backupSay(parts[i]); }
+      if (current === null && i < parts.length - 1) break; // stopped by a click
+    }
+    current = null;
+    setMode('');
+    idle();
+  };
+
+  /* ---------------- ears: Edge speech recognition, "WeBot ..." wake word ---------------- */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const WAKE = /\b(?:hey\s+|okay\s+|ok\s+|yo\s+)?(?:we\s?-?bot|web\s?bot|webbot|wee\s?bot|we\s+bought|web\s+but)\b[,.!?]?\s*/i;
+  const ear = { rec: null, on: false, always: load('jarvis-always') !== '0', direct: false, directUntil: 0, busy: false };
+  const idle = () => {
+    if (ear.busy) return;
+    if (ear.always && SR) { status('Say “WeBot…”'); startListening(); } else status(SR ? 'Click WeBot or press Space to talk' : 'Type below to talk to WeBot');
+  };
+  const startListening = () => {
+    if (!SR || ear.on || ear.busy) return;
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (e) => {
+      let final = '';
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) (e.results[i].isFinal ? (final += e.results[i][0].transcript) : (interim += e.results[i][0].transcript));
+      const heard = (final || interim).trim();
+      const direct = ear.direct || Date.now() < ear.directUntil;
+      if (heard && (direct || WAKE.test(heard))) $('you').textContent = '“' + heard + '”';
+      if (!final.trim()) return;
+      const text = final.trim();
+      if (direct) { ear.direct = false; ear.directUntil = 0; return handle(text); }
+      const m = text.match(WAKE);
+      if (!m) return;
+      const rest = text.slice(m.index + m[0].length).trim();
+      if (rest.length > 1) return handle(rest);
+      // Just "WeBot": he perks up and takes the next thing you say.
+      ear.directUntil = Date.now() + 8000;
+      ding();
+      setMode('listening');
+      status('Yeah?');
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { ear.always = false; note('Allow the microphone for WeBot (click the mic icon by the address bar or in Edge settings), then click 🎙.'); }
+    };
+    rec.onend = () => { ear.on = false; ear.rec = null; if (!ear.busy && (ear.always || ear.direct)) setTimeout(startListening, 250); };
+    try { rec.start(); ear.rec = rec; ear.on = true; if (!body.classList.contains('listening')) setMode(ear.direct ? 'listening' : ''); } catch { /* already started */ }
+  };
+  const stopListening = () => { if (ear.rec) { const r = ear.rec; ear.rec = null; ear.on = false; r.onend = null; try { r.abort(); } catch {} } };
+  const talkNow = () => {
+    if (current) { stopTalking(); return; }
+    if (!SR) { $('type').focus(); return; }
+    ear.direct = true;
+    setMode('listening');
+    status('Listening…');
+    ding();
+    startListening();
+  };
+  let actx = null;
+  const ding = () => {
+    try {
+      actx ||= new AudioContext();
+      const o = actx.createOscillator(); const g = actx.createGain();
+      o.frequency.setValueAtTime(880, actx.currentTime); o.frequency.setValueAtTime(1320, actx.currentTime + 0.08);
+      g.gain.setValueAtTime(0.0001, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.12, actx.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.22);
+      o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.25);
+    } catch {}
+  };
+
+  /* ---------------- brain: your Claude Code ---------------- */
+  const handle = async (text) => {
+    if (ear.busy) return;
+    ear.busy = true;
+    stopListening();
+    $('you').textContent = '“' + text + '”';
+    $('me').textContent = '';
+    setMode('thinking');
+    status('Thinking…');
+    let r;
+    try { r = await (await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })).json(); }
+    catch { r = { error: 'I can’t reach my brain. Is the WeBot window’s server still running?' }; }
+    ear.busy = false;
+    if (r.needsLogin) {
+      setMode('error');
+      status('Claude Code needs sign-in');
+      note('Click here to sign in to Claude Code (one time)', async () => { await fetch('/api/login', { method: 'POST' }); note('Finish signing in, in the window that opened (type /login if it asks), then talk to WeBot again.'); });
+      return speak('I need you to sign me in to Claude Code first, sugar. Click the yellow bar up top.');
+    }
+    const reply = r.reply || r.error || 'Well, I drew a blank.';
+    if (r.error) setMode('error');
+    $('me').textContent = reply;
+    speak(reply);
+  };
+
+  $('bot').addEventListener('click', talkNow);
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && document.activeElement !== $('type')) { e.preventDefault(); talkNow(); }
+    if (e.key === 'Escape') stopTalking();
+  });
+  $('type').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const t = $('type').value.trim();
+    if (!t) return;
+    $('type').value = '';
+    stopTalking();
+    handle(t);
+  });
+  const micButton = () => { $('mic').classList.toggle('on', ear.always && Boolean(SR)); $('mic').disabled = !SR; };
+  $('mic').addEventListener('click', () => {
+    ear.always = !ear.always;
+    save('jarvis-always', ear.always ? '1' : '0');
+    micButton();
+    if (ear.always) idle(); else { stopListening(); status('Click WeBot or press Space to talk'); setMode(''); }
+  });
+  $('new').addEventListener('click', async () => {
+    await fetch('/api/new', { method: 'POST' });
+    $('you').textContent = '';
+    $('me').textContent = 'Fresh start. What do you need, darlin?';
+  });
+  micButton();
+  fetch('/api/status').then((r) => r.json()).then((st) => {
+    if (!st.claude) { setMode('error'); note('Claude Code wasn’t found. Open the Claude app once so it installs Claude Code.'); }
+  }).catch(() => {});
+  idle();
+})();
+</script>
+</body>
+</html>

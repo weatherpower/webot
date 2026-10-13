@@ -3,7 +3,7 @@
 Smart App Control blocks the unsigned "WeBot Studio.exe" / Electron build, so this launcher (run by the
 signed pythonw.exe, no console window) starts the app's server with the signed node.exe, opens it in its
 own Microsoft Edge app window (no tabs or address bar), and stops the server when that window closes.
-Usage: pythonw launch_signed.pyw studio|house
+Usage: pythonw launch_signed.pyw studio|house|jarvis
 """
 import os
 import shutil
@@ -17,6 +17,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APPS = {
     'studio': {'name': 'WeBot Studio', 'port': 7777, 'server': os.path.join('studio', 'server.js'), 'size': '1560,980'},
     'house': {'name': 'WeatherPower Stream House', 'port': 7788, 'server': os.path.join('house', 'server.js'), 'size': '1680,1000'},
+    # WeBot as your Jarvis: one small window, listens to you, thinks with your Claude Code, talks with Puter.
+    'jarvis': {'name': 'WeBot', 'port': 7790, 'server': os.path.join('jarvis', 'server.cjs'), 'size': '470,720'},
 }
 WHICH = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in APPS else 'studio'
 A = APPS[WHICH]
