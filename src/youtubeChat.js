@@ -365,7 +365,9 @@ const showChats = async (items) => {
 };
 
 // "!roast me": WeBot roasts the viewer who asked (src/personality.js → roastMe). Each viewer once per
-// commandCooldownMinutes (owner and mods any time), and it counts toward maxRepliesPerHour.
+// commandCooldownMinutes (owner and mods any time). Roasts have their own hourly cap (ROASTS_PER_HOUR) so
+// ordinary chat replies can't use them up: somebody who asks for a roast gets one.
+const ROASTS_PER_HOUR = 20;
 const roastRequest = async (message) => {
   const author = message.authorDetails || {};
   const userKey = author.channelId || author.displayName;
@@ -375,8 +377,8 @@ const roastRequest = async (message) => {
   state.activeUntil = now + 5 * 60 * 1000;
   state.roasted ||= new Map();
   if (!(author.isChatOwner || author.isChatModerator) && now - (state.roasted.get(userKey) || 0) < chat.commandCooldownMinutes * 60 * 1000) return;
-  state.replies = (state.replies || []).filter((t) => now - t < 3600 * 1000);
-  if (state.replies.length >= chat.maxRepliesPerHour) return;
+  state.roasts = (state.roasts || []).filter((t) => now - t < 3600 * 1000);
+  if (state.roasts.length >= ROASTS_PER_HOUR) return console.log('[chat] roast skipped: hourly roast cap');
   const control = await liveControl().catch(() => null);
   if (!control || control.chatRead === false) return;
   const list = brain.personality?.replies?.roastMe || [];
@@ -385,7 +387,7 @@ const roastRequest = async (message) => {
   const who = user || 'Sugar';
   const line = list[Math.floor(Math.random() * list.length)].replace(/\{name\}/g, who);
   state.roasted.set(userKey, now);
-  state.replies.push(now);
+  state.roasts.push(now);
   await applyLiveCommand({ action: 'chat-say', user, text: '!roast me', reply: line.charAt(0).toUpperCase() + line.slice(1) });
   console.log('[chat] roast request');
 };
