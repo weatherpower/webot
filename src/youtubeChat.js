@@ -462,8 +462,15 @@ const TARGET = /\b(we\s*-?\s*bot|webot|ryan|this\s+(stream|channel|bot)|weather\
 const FAN = /\bnot\s+a\s+(ryan\s+)?(copy|clone|rip\s*-?\s*off|knock\s*-?\s*off)\b/i;
 // "Stop stealing", "this is theft", "copyright infringement": accusing the stream of stealing counts too.
 // Storms stealing roofs and "stole the show / my heart" don't.
-const STEAL = /\b(steal(s|ing|er|ers)?|stole(n)?|theft|thie(f|ves|ving)|infring(e|es|ed|ing|ement)|plagiari(sm|ze|zed|zing)|ripp(ing|ed)\s+(him\s+|them\s+)?off|intellectual\s+property|trade\s*-?\s*dress|cease\s+and\s+desist|copyright(ed)?\s+(infringement|violation|strike|claim))\b/i;
-const STEAL_TARGET = /\b(you|your|you'?re|ur|u|this|that|stop|buddy|bro|webot|we\s*-?\s*bot|weather\s*power|ryan|hall|yallbot|y'?all\s*-?\s*bot)\b/i;
+const STEAL = /\b(steal(s|ing|er|ers)?|stole(n)?|theft|thie(f|ves|ving)|infring(e|es|ed|ing|ement)|plagiari(sm|ze|zed|zing)|ripp(ing|ed)\s+(him\s+|them\s+)?off|intellectual\s+property|trade\s*-?\s*dress|cease\s+and\s+desist|copyright(ed)?\s+(infringement|violation|strike|claim|content|material|work)|pira(cy|te|ted|ting)|unauthori[sz]ed\s+use|fbi\s+notice)\b/i;
+const STEAL_TARGET = /\b(you|your|you'?re|ur|u|this|that|stop|buddy|bro|webot|we\s*-?\s*bot|weather\s*power|ryan|hall|yallbot|y'?all\s*-?\s*bot|video|stream|channel|account|content)\b/i;
+// Accounts dressed up as the FBI, police, YouTube staff or Ryan Hall's company get a timeout on sight.
+const FAKE_AUTHORITY = /(^@?|[\s_.\-])fbi|federal\s*bureau|cyber\s*security\s*division|\bpolice\b|\bsheriff\b|youtube\s*(team|support|official|copyright|legal|safety|staff)|copyright\s*(team|office|enforcement|department)|hall\s*enterprises/i;
+const FAKE_AUTHORITY_LINES = [
+  "{name}, nice costume. The FBI does not hang out in YouTube chat, sugar. Ten minute timeout.",
+  "Oh look, {name} made a brand new official-sounding account. Real officials don't type in live chat, darlin. Ten minute timeout.",
+  "{name}, playin' dress-up in my chat? Bless your heart. That's a ten minute timeout."
+];
 const NOT_STEALING = /\b(tornado|hail|storm|wind|flood|roof|power|stole\s+(my|the)\s+(heart|show))\b/i;
 export const downgrades = (text) => {
   const t = String(text || '');
@@ -569,7 +576,8 @@ const timeoutCheck = async (message) => {
   if (!['textMessageEvent', 'superChatEvent'].includes(message.snippet?.type)) return false;
   const text = message.snippet?.displayMessage;
   const name = safeName(author.displayName) || 'Partner';
-  if (!downgrades(text)) {
+  const fakeAuthority = FAKE_AUTHORITY.test(String(author.displayName || ''));
+  if (!fakeAuthority && !downgrades(text)) {
     // "I gotta report fakes": no timeout, just WeBot calling it weak (once every 2 minutes at most).
     if (!threatensReport(text)) return false;
     if (now - lastWeak > 2 * 60 * 1000) {
@@ -582,7 +590,7 @@ const timeoutCheck = async (message) => {
   timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
   const withRule = now - lastRuleLine > 3 * 60 * 1000;
   if (withRule) lastRuleLine = now;
-  const line = pick(threatensReport(text) ? REPORT_TIMEOUT_LINES : withRule ? RULE_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
+  const line = pick(fakeAuthority ? FAKE_AUTHORITY_LINES : threatensReport(text) ? REPORT_TIMEOUT_LINES : withRule ? RULE_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
   await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
   const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
   console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
