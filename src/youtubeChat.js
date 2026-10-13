@@ -507,6 +507,27 @@ const REPORT_TIMEOUT_LINES = [
   '{name}, calling me a copy AND threatening to report me? That is weak. Ten minute timeout, sugar.',
   'Ten minute timeout, {name}. And reporting a passion project because you are bored? Weak. Bless your heart.'
 ];
+// When an account was made (YouTube shows it publicly; 1 quota unit). Throwaway accounts that get timed out
+// get it said on air: "that account is 11 minutes old".
+const accountMade = async (channelId) => {
+  if (!/^UC[\w-]{22}$/.test(channelId || '')) return null;
+  const body = await api('channels', { part: 'snippet', id: channelId }, 1);
+  const at = Date.parse(body.items?.[0]?.snippet?.publishedAt || '');
+  return Number.isFinite(at) ? at : null;
+};
+const ageWords = (ms) => {
+  const min = Math.max(1, Math.round(ms / 60000));
+  if (min < 60) return min + (min === 1 ? ' minute' : ' minutes');
+  const hr = Math.round(min / 60);
+  if (hr < 48) return hr + (hr === 1 ? ' hour' : ' hours');
+  return Math.round(hr / 24) + ' days';
+};
+const NEW_ACCOUNT_DAYS = 7;
+const NEW_ACCOUNT_LINES = [
+  "{name}, that account is {age} old. I can see that, sugar. Ten minute timeout.",
+  "Brand new account, {name}? {age} old. Bless your heart. Ten minute timeout.",
+  "{name}, you made that account {age} ago just to come say that? Ten minute timeout, darlin."
+];
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 let lastWeak = 0;
 
@@ -552,7 +573,7 @@ const youtubeTimeout = async (channelId) => {
 };
 
 // Phone heads-up (ntfy, same NTFY_TOPIC as the warning alerts) whenever WeBot times somebody out.
-const notifyTimeout = async (name, text, real) => {
+const notifyTimeout = async (name, text, real, age) => {
   const topic = process.env.NTFY_TOPIC;
   if (!topic) return;
   const server = (process.env.NTFY_SERVER || 'https://ntfy.sh').replace(/\/$/, '');
@@ -560,7 +581,7 @@ const notifyTimeout = async (name, text, real) => {
   // JSON publish (not headers) so emoji in names and messages come through.
   const msg = {
     topic, title: 'WeBot timed out ' + name, priority: 3, tags: ['no_entry', 'robot'],
-    message: 'They said: "' + said + '"\n' + (real ? '10-minute YouTube timeout.' : 'Hidden from the stream for 10 minutes (the YouTube timeout did not go through).')
+    message: 'They said: "' + said + '"\n' + (age != null ? 'Account made ' + ageWords(age) + ' ago.\n' : '') + (real ? '10-minute YouTube timeout.' : 'Hidden from the stream for 10 minutes (the YouTube timeout did not go through).')
   };
   if (state.videoId) msg.click = 'https://www.youtube.com/watch?v=' + state.videoId;
   await fetch(server, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg), signal: AbortSignal.timeout(15000) });
@@ -590,11 +611,15 @@ const timeoutCheck = async (message) => {
   timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
   const withRule = now - lastRuleLine > 3 * 60 * 1000;
   if (withRule) lastRuleLine = now;
-  const line = pick(fakeAuthority ? FAKE_AUTHORITY_LINES : threatensReport(text) ? REPORT_TIMEOUT_LINES : withRule ? RULE_TIMEOUT_LINES : TIMEOUT_LINES).replace('{name}', name);
+  const made = await accountMade(author.channelId).catch(() => null);
+  const age = made ? now - made : null;
+  const fresh = age != null && age < NEW_ACCOUNT_DAYS * 24 * 60 * 60 * 1000;
+  const line = pick(fresh ? NEW_ACCOUNT_LINES : fakeAuthority ? FAKE_AUTHORITY_LINES : threatensReport(text) ? REPORT_TIMEOUT_LINES : withRule ? RULE_TIMEOUT_LINES : TIMEOUT_LINES)
+    .replace('{name}', name).replace('{age}', fresh ? ageWords(age) : '');
   await applyLiveCommand({ action: 'say', text: line }).catch(() => {});
   const real = await youtubeTimeout(author.channelId).catch((e) => { console.warn('[chat]', e.message); return false; });
   console.log('[chat] timeout for downgrading the stream' + (real ? ' (YouTube timeout too)' : ' (on-stream only)'));
-  notifyTimeout(name, message.snippet?.displayMessage, real).catch((e) => console.warn('[chat] ntfy', e.message));
+  notifyTimeout(name, message.snippet?.displayMessage, real, age).catch((e) => console.warn('[chat] ntfy', e.message));
   return true;
 };
 
