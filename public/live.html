@@ -457,6 +457,8 @@
     .gate[hidden] { display: none; }
     body.tv, body.tv * { cursor: none !important; }
     body.lite .bot .rig img, body.lite .bot .eye { filter: none !important; }
+    /* Stream server: WeBot's gentle bob moves in steps (about 8 a second) instead of forcing 60 fps redraws. */
+    body.lite .bot .rig { animation-timing-function: steps(18); }
     .boot { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: grid; place-items: center; background: #070b14; font-family: "WP Mono"; letter-spacing: .2em; color: var(--muted); transition: opacity .8s; }
     .boot.done { opacity: 0; pointer-events: none; }
     /* Never show Puter's account popups on air (see the MutationObserver near startPuter). */
@@ -2425,7 +2427,10 @@
       requestAnimationFrame(() => {
         const w = span.scrollWidth;
         if (w > box.clientWidth && span.animate) {
-          span.animate([{ transform: 'translateX(' + box.clientWidth + 'px)' }, { transform: 'translateX(-' + w + 'px)' }], { duration: ((w + box.clientWidth) / 85) * 1000, iterations: Infinity });
+          // The stream is captured at 30 fps: on the stream server (lite) the crawl moves in 30-a-second steps, so
+          // Chrome's software graphics redraw half as often as a smooth 60 fps scroll.
+          const duration = ((w + box.clientWidth) / 85) * 1000;
+          span.animate([{ transform: 'translateX(' + box.clientWidth + 'px)' }, { transform: 'translateX(-' + w + 'px)' }], { duration, iterations: Infinity, easing: OPT.lite ? 'steps(' + Math.max(1, Math.round(duration / 1000 * 30)) + ')' : 'linear' });
         }
       });
     };
