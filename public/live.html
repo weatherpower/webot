@@ -2130,8 +2130,9 @@
       if (frame) $('rp-site').dataset.time = new Date(frame.time).toLocaleTimeString('en-US', { timeZone: S.shot?.alert?.timezone || OPT.tz, hour: 'numeric', minute: '2-digit' });
       updateSiteLine();
     };
-    // Lite mode (no graphics card) steps the radar loop less often: every step redraws the whole map.
-    setInterval(animate, OPT.lite ? 800 : 420);
+    // Lite mode (no graphics card) steps the radar loop less often: every step redraws the whole map in software
+    // (measured on the stream server: the loop is ~85% of Chrome's graphics load), so 1.2 s a frame there.
+    setInterval(animate, OPT.lite ? 1200 : 420);
 
     // State outline next to the state name in the radar box (US Census shapes via us-atlas).
     const SHAPES = { ready: null, byName: new Map(), nation: null, cache: new Map() };
