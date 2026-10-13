@@ -12,7 +12,9 @@ const { spawn } = require('node:child_process');
 
 const PORT = Number(process.env.JARVIS_PORT || 7790);
 const ROOT = __dirname;
-const DATA = path.join(process.env.LOCALAPPDATA || ROOT, 'WeatherPower', 'webot-jarvis');
+const DATA = process.platform === 'darwin'
+  ? path.join(process.env.HOME || ROOT, 'Library', 'Application Support', 'WeatherPower', 'webot-jarvis')
+  : path.join(process.env.LOCALAPPDATA || ROOT, 'WeatherPower', 'webot-jarvis');
 const HOME = path.join(DATA, 'home'); // Claude Code's working folder for these chats
 fs.mkdirSync(HOME, { recursive: true });
 
@@ -28,19 +30,25 @@ const TOOLS = 'WebSearch,WebFetch,Read,Glob,Grep';
 const IDLE_MS = 30 * 60 * 1000;
 
 // The Claude app keeps its Claude Code in a versioned folder that changes on updates: use the newest one.
+// (Windows: %APPDATA%\Claude\claude-code; macOS: ~/Library/Application Support/Claude/claude-code.)
+const MAC = process.platform === 'darwin';
+const HOMEDIR = process.env.HOME || process.env.USERPROFILE || '';
 const findClaude = () => {
-  const base = path.join(process.env.APPDATA || '', 'Claude', 'claude-code');
+  const base = MAC ? path.join(HOMEDIR, 'Library', 'Application Support', 'Claude', 'claude-code') : path.join(process.env.APPDATA || '', 'Claude', 'claude-code');
+  const name = MAC ? 'claude' : 'claude.exe';
   const found = [];
   try {
     for (const ver of fs.readdirSync(base)) {
       const vdir = path.join(base, ver);
       for (const sub of fs.readdirSync(vdir)) {
-        const exe = path.join(vdir, sub, 'claude.exe');
+        const exe = path.join(vdir, sub, name);
         if (fs.existsSync(exe)) found.push({ exe, t: fs.statSync(exe).mtimeMs });
       }
     }
   } catch { /* not installed there */ }
-  for (const exe of [path.join(process.env.USERPROFILE || '', '.local', 'bin', 'claude.exe')]) if (fs.existsSync(exe)) found.push({ exe, t: 0 });
+  // A standalone install (claude.ai/install.sh or Homebrew) works too.
+  const extra = MAC ? [path.join(HOMEDIR, '.local', 'bin', 'claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'] : [path.join(HOMEDIR, '.local', 'bin', 'claude.exe')];
+  for (const exe of extra) if (fs.existsSync(exe)) found.push({ exe, t: 0 });
   return found.sort((a, b) => b.t - a.t)[0]?.exe || null;
 };
 
@@ -87,6 +95,13 @@ const ask = (text) => {
 const openLogin = () => {
   const exe = findClaude();
   if (!exe) return false;
+  if (MAC) {
+    // Terminal opens a .command file: Claude Code with /login; you finish it in the browser.
+    const file = path.join(DATA, 'claude-login.command');
+    fs.writeFileSync(file, `#!/bin/bash\ncd "${HOME}"\n"${exe}" /login\n`, { mode: 0o755 });
+    spawn('open', [file], { detached: true, stdio: 'ignore' }).unref();
+    return true;
+  }
   spawn('cmd.exe', ['/c', 'start', '"Sign in to Claude Code"', '"' + exe + '"', '/login'], { cwd: HOME, detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref();
   return true;
 };

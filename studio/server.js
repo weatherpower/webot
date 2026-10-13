@@ -235,8 +235,18 @@ app.get('/api/control-url', api(async () => ({ url: `${WEB ? '' : CONTROL_BASE}/
 
 // Level 2 radar (radar-l2/radar_l2.py): is the worker on the PC running, and is the server's copy fresh?
 const L2_DIR = path.join(projectRoot, 'radar-l2');
+// On macOS the worker is a launchd agent (macos/setup-mac.sh installs it) instead of radar-l2/run.cmd.
+const MAC = process.platform === 'darwin';
+const L2_AGENT = 'com.weatherpower.radar-l2';
+const L2_PLIST = path.join(process.env.HOME || '', 'Library', 'LaunchAgents', L2_AGENT + '.plist');
+const macUid = () => (typeof process.getuid === 'function' ? process.getuid() : 501);
 const l2Worker = async () => {
   if (WEB) return null;
+  if (MAC) {
+    const r = await run('pgrep', ['-f', 'radar_l2.py'], { timeout: 10000 });
+    const log = await fs.readFile(path.join(L2_DIR, 'out', 'radar.log'), 'utf8').catch(() => '');
+    return { running: r.out.trim().length > 0, log: log.trim().split('\n').slice(-6) };
+  }
   const r = await run('powershell', ['-NoProfile', '-Command', "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -like '*radar_l2*' } | Measure-Object).Count"], { timeout: 15000 });
   const log = await fs.readFile(path.join(L2_DIR, 'out', 'radar.log'), 'utf8').catch(() => '');
   return { running: Number(r.out.trim()) > 0, log: log.trim().split('\n').slice(-6) };
@@ -274,12 +284,19 @@ app.post('/api/chat-commands/retry', api(async (req) => livePrivate('/live/chat-
 // Start / stop the Level 2 radar worker on this PC (desktop Studio only).
 app.post('/api/radar/start', api(async () => {
   if (WEB) throw Object.assign(new Error('The radar worker runs on the owner\'s PC: start it from the desktop Studio.'), { status: 400 });
+  if (MAC) {
+    await run('launchctl', ['bootstrap', `gui/${macUid()}`, L2_PLIST], { timeout: 15000 });
+    await run('launchctl', ['kickstart', `gui/${macUid()}/${L2_AGENT}`], { timeout: 15000 });
+    return { ok: true };
+  }
   const cmd = path.join(L2_DIR, 'run.cmd');
   await run('powershell', ['-NoProfile', '-Command', `Start-Process -FilePath '${cmd}' -WorkingDirectory '${L2_DIR}' -WindowStyle Minimized`], { timeout: 15000 });
   return { ok: true };
 }));
 app.post('/api/radar/stop', api(async () => {
   if (WEB) throw Object.assign(new Error('Stop it from the desktop Studio.'), { status: 400 });
+  // macOS: unload the launchd agent (otherwise KeepAlive restarts it). It comes back at the next login.
+  if (MAC) { await run('launchctl', ['bootout', `gui/${macUid()}/${L2_AGENT}`], { timeout: 20000 }); return { ok: true }; }
   // Kill the whole tree (the loop window, the Python loop and its worker processes), or the workers live on.
   await run('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'python.exe' -and $_.CommandLine -like '*radar_l2*') -or ($_.Name -eq 'cmd.exe' -and $_.CommandLine -like '*radar-l2*run.cmd*') } | ForEach-Object { taskkill /T /F /PID $_.ProcessId 2>$null | Out-Null }"], { timeout: 20000 });
   return { ok: true };
