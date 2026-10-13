@@ -456,13 +456,21 @@ const handle = async (message) => {
 // timeout. The owner and moderators are exempt, and fans saying "not a Ryan copy" don't count.
 const TIMEOUT_MINUTES = 10;
 const timeouts = new Map(); // channelId -> until (ms)
-const NAMECALL = /\by'?all\s*-?\s*bot\b|\byallbot\b|\bfake\s*(we\s*-?\s*bot|webot|ryan)\b|ryan\s*hall\s*(copy|clone|knock\s*-?\s*off|rip\s*-?\s*off|wannabe|wanna\s*be)/i;
+const NAMECALL = /\by'?all\s*-?\s*bot('?s)?\b|\byallbot('?s)?\b|\bfake\s*(we\s*-?\s*bot|webot|ryan)\b|ryan\s*hall\s*(copy|clone|knock\s*-?\s*off|rip\s*-?\s*off|wannabe|wanna\s*be)/i;
 const INSULT = /\b(fake|copy\s*-?\s*cat|cop(y|ied|ies|ying)|clone|rip\s*-?\s*off|knock\s*-?\s*off|wanna\s*-?\s*be|bootleg|off\s*-?\s*brand|cheap\s+(version|ryan|copy))\b/i;
 const TARGET = /\b(we\s*-?\s*bot|webot|ryan|this\s+(stream|channel|bot)|weather\s*power)\b/i;
 const FAN = /\bnot\s+a\s+(ryan\s+)?(copy|clone|rip\s*-?\s*off|knock\s*-?\s*off)\b/i;
+// "Stop stealing", "this is theft", "copyright infringement": accusing the stream of stealing counts too.
+// Storms stealing roofs and "stole the show / my heart" don't.
+const STEAL = /\b(steal(s|ing|er|ers)?|stole(n)?|theft|thie(f|ves|ving)|infring(e|es|ed|ing|ement)|plagiari(sm|ze|zed|zing)|ripp(ing|ed)\s+(him\s+|them\s+)?off|intellectual\s+property|copyright(ed)?\s+(infringement|violation|strike|claim))\b/i;
+const STEAL_TARGET = /\b(you|your|you'?re|ur|u|this|that|stop|buddy|bro|webot|we\s*-?\s*bot|weather\s*power|ryan|hall|yallbot|y'?all\s*-?\s*bot)\b/i;
+const NOT_STEALING = /\b(tornado|hail|storm|wind|flood|roof|power|stole\s+(my|the)\s+(heart|show))\b/i;
 export const downgrades = (text) => {
   const t = String(text || '');
-  return !FAN.test(t) && (NAMECALL.test(t) || (INSULT.test(t) && TARGET.test(t)));
+  if (FAN.test(t)) return false;
+  // A bare one- or two-word "thief" / "stealing!" is aimed at the stream too.
+  const aimed = STEAL_TARGET.test(t) || t.trim().split(/\s+/).length <= 2;
+  return NAMECALL.test(t) || (INSULT.test(t) && TARGET.test(t)) || (STEAL.test(t) && aimed && !NOT_STEALING.test(t));
 };
 // One line per timeout (voice credits): the timeout plus the main rule for everybody watching. During a
 // pile-on (another timeout within 3 minutes) the rule was just said, so the next ones get the short line.
