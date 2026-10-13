@@ -21,7 +21,7 @@
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; background: #0a0f18; color: var(--ink); font-family: "WP Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    #map { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    #map, #basemap { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
     /* Map moves fade through dark instead of zooming (no graphics card on the stream server). */
     .mapfade { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #0b1220; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
     .mapfade.on { opacity: 1; }
@@ -813,6 +813,7 @@
       S.fitKey = a.w + 'x' + a.h + '+' + a.x + ',' + a.y + '@' + tvSafe();
       S.stageScale = s;
       if (S.map && S.map.getPixelRatio && Math.abs(S.map.getPixelRatio() - mapPixelRatio()) > 0.01) S.map.setPixelRatio(mapPixelRatio());
+      if (S.baseMap && Math.abs(S.baseMap.getPixelRatio() - mapPixelRatio()) > 0.01) S.baseMap.setPixelRatio(mapPixelRatio());
       // The sound / sign-in reminders sit outside the stage; keep them centered in what's on screen.
       [['gate', 18], ['puter-gate', 72]].forEach(([id, top]) => {
         const el = $(id);
@@ -1980,6 +1981,33 @@
       map.addLayer({ id: 'reports', type: 'circle', source: 'reports', paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-color': '#000' } });
       S.styleReady = true;
     };
+    // Lite (no graphics card): the basemap's land, water, borders and roads draw in a second map underneath that only
+    // redraws when the camera moves, so each radar step redraws just the weather layers and the labels on top.
+    // Measured on the stream server: ~40 fps vs ~15 with one map (the basemap was most of every software redraw).
+    // ?split=0 turns it off.
+    const splitBasemap = () => {
+      if (!OPT.lite || /[?&]split=0\b/.test(location.search) || S.baseMap) return;
+      const st = S.map.getStyle();
+      const ids = st.layers.filter((l) => l.type === 'background' || (l.source === 'openmaptiles' && l.type !== 'symbol')).map((l) => l.id);
+      if (!ids.length) return;
+      const used = new Set(st.layers.filter((l) => ids.includes(l.id)).map((l) => l.source).filter(Boolean));
+      const div = document.createElement('div');
+      div.id = 'basemap';
+      $('map').before(div);
+      const base = new maplibregl.Map({
+        container: div, interactive: false, attributionControl: false, fadeDuration: 0, pixelRatio: mapPixelRatio(),
+        center: S.map.getCenter(), zoom: S.map.getZoom(), bearing: S.map.getBearing(), pitch: S.map.getPitch(),
+        style: { version: 8, glyphs: st.glyphs, sprite: st.sprite, sources: Object.fromEntries(Object.entries(st.sources).filter(([k]) => used.has(k))), layers: st.layers.filter((l) => ids.includes(l.id)) }
+      });
+      const follow = () => base.jumpTo({ center: S.map.getCenter(), zoom: S.map.getZoom(), bearing: S.map.getBearing(), pitch: S.map.getPitch() });
+      // The top map keeps its basemap until the one underneath has drawn, so there's never a blank map.
+      base.once('load', () => {
+        S.baseMap = base;
+        follow();
+        S.map.on('move', follow);
+        ids.forEach((id) => S.map.setLayoutProperty(id, 'visibility', 'none'));
+      });
+    };
     const setSelected = (key) => {
       S.sel = key || '';
       if (!S.styleReady) return;
@@ -2911,7 +2939,10 @@
           S.map.fitBounds(bounds, { padding: PAD, maxZoom: 9.4, ...opts, duration: 0 });
           let shown = false;
           const show = () => { if (shown) return; shown = true; fade.classList.remove('on'); };
-          S.map.once('idle', show);
+          let waiting = S.baseMap ? 2 : 1;
+          const drawn = () => { waiting -= 1; if (waiting <= 0) show(); };
+          S.map.once('idle', drawn);
+          S.baseMap?.once('idle', drawn);
           setTimeout(show, 1800);
         }, 380);
         return;
@@ -4524,6 +4555,7 @@
       };
       S.map.once('style.load', () => {
         installLayers();
+        splitBasemap();
         showHeadline();
         $('boot').classList.add('done');
         resumeShow().finally(() => {
