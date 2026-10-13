@@ -3,7 +3,8 @@
 // Nationwide federal EM declarations come from OpenFEMA. Governor-issued state
 // emergencies are separate, so state providers are added from official state
 // emergency-management / governor sources. Florida is the first state provider.
-const FEMA_URL = 'https://www.fema.gov/api/open/v1/DisasterDeclarationsSummaries';
+// v1 was retired (404s); v2 names the EM/DR/FM field declarationType.
+const FEMA_URL = 'https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries';
 const NHC_URL = 'https://www.nhc.noaa.gov/CurrentStorms.json';
 const FLORIDA_INDEX_URLS = [
   'https://www.floridadisaster.org/news-media/',
@@ -82,7 +83,7 @@ const parseUsDate = (text) => {
 
 const federalDeclarations = async (windowDays) => {
   const params = new URLSearchParams({
-    '$filter': "disasterType eq 'EM'",
+    '$filter': "declarationType eq 'EM'",
     '$orderby': 'declarationDate desc',
     '$top': '1000'
   });
@@ -287,6 +288,26 @@ const alabamaStateEmergency = async (windowDays) => {
 
 // The governor's order keeps its original wording; NHC supplies the current
 // name/classification for broadcast when AL092026 is active.
+// Names of every storm NHC is tracking right now (null if NHC can't be reached).
+const nhcActiveNames = async () => {
+  const body = await fetchTimed(NHC_URL, { json: true });
+  return (body?.activeStorms || []).map((s) => String(s?.name || '').toLowerCase()).filter(Boolean);
+};
+
+// Storm declarations go off the air once the storm is gone: a tropical declaration whose storm NHC no
+// longer tracks is dropped 3 days after it was declared (10 days if NHC can't be reached). Anything
+// whose incident period has ended is dropped too.
+const TROPICAL = /\b(hurricane|tropical|typhoon|subtropical|depression)\b/i;
+const stillCurrent = (item, activeNames, now = Date.now()) => {
+  if (item.incidentEndDate && Date.parse(item.incidentEndDate) < now) return false;
+  const text = [item.incidentType, item.title, item.originalIncidentType].join(' ');
+  if (!TROPICAL.test(text)) return true;
+  const age = now - Date.parse(item.declarationDate || 0);
+  if (!activeNames) return age < 10 * 24 * 60 * 60 * 1000;
+  const named = activeNames.some((n) => new RegExp('\\b' + n + '\\b', 'i').test(text));
+  return named || age < 3 * 24 * 60 * 60 * 1000;
+};
+
 const nhcIsaias = async () => {
   const body = await fetchTimed(NHC_URL, {json:true});
   const storm = (body?.activeStorms || []).find((s) =>
@@ -304,9 +325,10 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
     return cache.body;
   }
 
-  const [settled, nhc] = await Promise.all([
+  const [settled, nhc, activeNames] = await Promise.all([
     Promise.allSettled([federalDeclarations(windowDays), floridaStateEmergency(windowDays), alabamaStateEmergency(windowDays)]),
-    nhcIsaias().catch(() => null)
+    nhcIsaias().catch(() => null),
+    nhcActiveNames().catch(() => null)
   ]);
 
   const declarations = [];
@@ -336,6 +358,7 @@ export const emergencyDeclarations = async ({ days = 45 } = {}) => {
   }
 
   const unique = [...new Map(declarations.map((item) => [item.id, item])).values()]
+    .filter((item) => stillCurrent(item, activeNames))
     .sort((a, b) => {
       if (a.sourceType !== b.sourceType) return a.sourceType === 'state' ? -1 : 1;
       return Date.parse(b.declarationDate || 0) - Date.parse(a.declarationDate || 0);
