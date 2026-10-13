@@ -120,6 +120,7 @@
         <div class="row">
           <button class="btn primary" id="radar31-now">Announce Radar 3.1 now 📡</button>
           <button class="btn" id="recon-now">Hurricane Hunters now ✈</button>
+          <button class="btn" id="cdn-now">Countdowns now ⏳</button>
           <div class="seg" id="radar31-auto"><button data-v="on">Launch segment: auto</button><button data-v="off">Off</button></div>
         </div>
         <p class="status">Auto rotation runs on calm days through Oct 31. Play Now works immediately unless a breaking alert or BRB is active.</p>
@@ -670,6 +671,7 @@
     $('gas-now').addEventListener('click', () => act({ action: 'gas-now' }, 'WeBot is checking gas prices'));
     $('radar31-now').addEventListener('click', () => act({ action: 'radar31-now' }, 'Radar 3.1 Play Now request sent to stream'));
     $('recon-now').addEventListener('click', () => act({ action: 'scene-now', kind: 'recon' }, 'Hurricane Hunters scene sent to stream'));
+    $('cdn-now').addEventListener('click', () => act({ action: 'scene-now', kind: 'countdowns' }, 'Countdowns sent to stream'));
     $('radar31-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action:'radar31', on:v === 'on' }, v === 'on' ? 'Radar 3.1 announcement enabled' : 'Radar 3.1 announcement rotation disabled'); });
     $('gas-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'gas', on: v === 'on' }, v === 'on' ? 'Gas prices: in the calm-day rotation' : 'Gas prices: only when you press the button'); });
     $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });

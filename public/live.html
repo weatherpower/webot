@@ -34,6 +34,37 @@
     .train .tl div { padding: 10px 18px 11px; }
     .train .tl strong { display: block; font: 700 30px/1.05 "WP Display"; letter-spacing: .02em; text-transform: uppercase; color: #fff; }
     .train .tl small { display: block; margin-top: 4px; font: 700 13px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+    /* Countdowns segment: full board between the header and the bottom bar (WeBot stays in his corner). */
+    .cdn { position: absolute; left: 0; top: 80px; width: 1920px; height: 920px; z-index: 11; opacity: 0; pointer-events: none; transition: opacity .6s ease; overflow: hidden;
+      background: radial-gradient(ellipse at 30% 20%, #1b2a4a 0%, #0c1426 55%, #070b14 100%); }
+    .cdn.on { opacity: 1; }
+    .cdn-h { position: absolute; left: 48px; top: 26px; display: flex; align-items: baseline; gap: 22px; }
+    .cdn-h b { font: 700 66px/1 "WP Display"; letter-spacing: .04em; text-transform: uppercase; color: #fff; }
+    .cdn-h small { font: 700 17px/1 "WP Mono"; letter-spacing: .2em; color: var(--muted, #8fa3c4); text-transform: uppercase; }
+    .cdn-live { position: absolute; left: 48px; top: 126px; width: 1530px; height: 150px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 18px; }
+    .cdn-grid { position: absolute; left: 48px; width: 1530px; bottom: 96px; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 18px; }
+    .cdn-c { position: relative; display: flex; flex-direction: column; padding: 20px 22px 18px; background: rgba(9,16,30,.82); border: 1px solid rgba(255,255,255,.1); border-top: 5px solid var(--ac); box-shadow: 0 14px 30px rgba(0,0,0,.4); overflow: hidden; }
+    .cdn-c .ic { font-size: 40px; line-height: 1; }
+    .cdn-c .lb { margin-top: 10px; font: 700 31px/1.02 "WP Display"; letter-spacing: .03em; text-transform: uppercase; color: #fff; }
+    .cdn-c .dt { margin-top: 6px; font: 700 15px/1 "WP Mono"; letter-spacing: .14em; color: var(--ac); text-transform: uppercase; }
+    .cdn-c .big { margin-top: auto; display: flex; align-items: baseline; gap: 10px; color: #fff; }
+    .cdn-c .big strong { font: 700 92px/.9 "WP Display"; letter-spacing: .01em; }
+    .cdn-c .big span { font: 700 26px/1 "WP Display"; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.75); }
+    .cdn-c .hms { margin-top: 8px; font: 700 30px/1 "WP Mono"; letter-spacing: .06em; color: rgba(255,255,255,.88); font-variant-numeric: tabular-nums; }
+    .cdn-c.today .big strong { font-size: 70px; color: var(--ac); }
+    .cdn-live .cdn-c { justify-content: space-between; padding: 14px 20px 12px; border-top: 0; border-left: 8px solid var(--ac); background: linear-gradient(90deg, rgba(120,10,20,.55), rgba(9,16,30,.85)); }
+    .cdn-live .cdn-c .lb { margin: 0; font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cdn-live .cdn-c .ar { margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 700 14px/1.15 "WP Mono"; letter-spacing: .08em; color: rgba(255,255,255,.75); text-transform: uppercase; }
+    .cdn-live .cdn-c .hms { margin: 0; font-size: 44px; color: #fff; }
+    .cdn-live .cdn-c .tm { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .cdn-live .cdn-c .ex { font: 700 13px/1 "WP Mono"; letter-spacing: .16em; color: var(--ac); }
+    .cdn-next { position: absolute; left: 1606px; top: 140px; width: 282px; height: 470px; padding: 22px; background: linear-gradient(180deg, var(--ac), rgba(9,16,30,.92) 62%); border: 1px solid rgba(255,255,255,.14); display: flex; flex-direction: column; color: #fff; box-shadow: 0 14px 30px rgba(0,0,0,.45); }
+    .cdn-next .k { font: 700 16px/1 "WP Mono"; letter-spacing: .24em; }
+    .cdn-next .ic { margin-top: 18px; font-size: 64px; line-height: 1; }
+    .cdn-next .lb { margin-top: 12px; font: 700 38px/1 "WP Display"; text-transform: uppercase; }
+    .cdn-next .big { margin-top: auto; font: 700 150px/.85 "WP Display"; }
+    .cdn-next .u { margin-top: 6px; font: 700 24px/1 "WP Display"; letter-spacing: .1em; color: rgba(255,255,255,.8); text-transform: uppercase; }
+    .cdn-next .hms { margin-top: 10px; font: 700 30px/1 "WP Mono"; font-variant-numeric: tabular-nums; }
     .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,0) 12%, rgba(0,0,0,0) 86%, rgba(0,0,0,.35)); }
 
     /* ---------- top bar ---------- */
@@ -364,6 +395,7 @@
     <div id="map"></div>
     <div class="mapfade" id="mapfade"></div>
     <div class="train" id="train"><div class="tl"><b>🚂 TRAIN CAM</b><div><strong id="train-place"></strong><small id="train-line"></small></div></div></div>
+    <div class="cdn" id="cdn"></div>
     <div class="shade"></div>
 
     <section id="radar31" class="radar31" aria-hidden="true" aria-label="Radar 3.1 launch announcement">
@@ -477,7 +509,7 @@
       scene: (P.get('scene') || '').toLowerCase()
     };
     // Scenes Live Control (and ?scene=) can call up by name.
-    const SCENE_KINDS = ['recon'];
+    const SCENE_KINDS = ['recon', 'countdowns'];
     const STATE_NAMES = {
       AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'D.C.', FL: 'Florida',
       GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
@@ -2415,7 +2447,7 @@
     const dwellFor = (shot) => {
       // Calm days: scenes hold for a minute or more (the radar map up to 3), like a chill quiet-mode stream.
       if (isCalm() && !shot.breaking && !shot.fresh) {
-        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, recon: 80, outlook: 70, rain: 70, reports: 70, emergency: 75, radar31: 50, forecast: 75, gas: 70, train: 90, think: 13, ...(B.brain?.calmSeconds || {}) };
+        const CALM = { surface: 180, national: 100, alert: 75, models: 85, tropics: 80, recon: 80, outlook: 70, rain: 70, reports: 70, emergency: 75, radar31: 50, forecast: 75, gas: 70, train: 90, countdowns: 60, think: 13, ...(B.brain?.calmSeconds || {}) };
         return (CALM[shot.type] || 90) * OPT.speed * 1000;
       }
       let s = 15;
@@ -2427,6 +2459,7 @@
       else if (shot.type === 'models') s = 32;
       else if (shot.type === 'tropics') s = 26;
       else if (shot.type === 'recon') s = 26;
+      else if (shot.type === 'countdowns') s = 18;
       else if (shot.type === 'surface') s = 22;
       else if (shot.type === 'forecast') s = 22;
       else if (shot.type === 'gas') s = 22;
@@ -2716,6 +2749,8 @@
         emergency: emergencyList().length ? (emergencyList().some((d) => d.fresh) ? 2.4 : 1.1) : 0,
         radar31: radar31Eligible() ? 0.85 : 0,
         recon: reconEligible() ? (S.recon.flying ? 2.6 : 1.1) : 0,
+        // Countdowns: holidays/seasons/clock changes plus live warning expirations. Off in big outbreaks.
+        countdowns: busy >= 10 ? 0 : busy ? 0.5 : 0.8,
         // Focused on a state: the tropics only come up if that state has tropical alerts.
         tropics: tropicsActive() && tropicsHere() ? (S.tropics.storms.length ? 2.2 : 0.9) : 0,
         // The national radar + surface map is the quiet-day staple (like Ryan's).
@@ -2738,7 +2773,8 @@
         train: S.trainCams?.length && S.control.train !== false ? num(bw.train, 0) : 0,
         rain: S.wpc?.days?.[0]?.max ? num(bw.rain, 0.8) * (S.wpc.days[0].max >= 3 ? 2 : 1) : 0,
         radar31: radar31Eligible() ? num(bw.radar31, 0.85) : 0,
-        recon: reconEligible() ? num(bw.recon, 1.1) * (S.recon.flying ? 2 : 1) : 0 });
+        recon: reconEligible() ? num(bw.recon, 1.1) * (S.recon.flying ? 2 : 1) : 0,
+        countdowns: num(bw.countdowns, 0.9) });
       Object.keys(w).forEach((k) => {
         if (k === 'alert' || !recent.slice(-3).includes(k)) return;
         // On calm days the radar map may come back sooner; nothing else repeats back to back.
@@ -2814,6 +2850,7 @@
       if (shot.type !== 'forecast' && shot.type !== 'gas') hideCity();
       if (shot.type !== 'gas') hideGas();
       if (shot.type !== 'train') hideTrain();
+      if (shot.type !== 'countdowns') hideCountdowns();
       if (shot.type !== 'rain') hideWpc();
       if (shot.type !== 'emergency') hideEmergency();
       $('radar31').classList.toggle('show', shot.type === 'radar31');
@@ -2879,6 +2916,13 @@
         rainShot();
         renderRadarPanel();
         $('rp').classList.add('show');
+        return;
+      }
+      if (shot.type === 'countdowns') {
+        setSelected('');
+        setOutlookVisible(false);
+        $('rp').classList.remove('show');
+        countdownsShot(shot);
         return;
       }
       if (shot.type === 'train') {
@@ -3314,6 +3358,139 @@
     };
     setTimeout(loadTrainCams, 20000);
     setInterval(loadTrainCams, 30 * 60 * 1000);
+    /* ---------------- Countdowns (holidays, clock changes, weather seasons, live warnings) ---------------- */
+    // Everything counts down in Central time (the stream's home). Date-only events count to midnight and
+    // show "TODAY" for that whole day. Live warnings/watches tick down to their NWS expiration.
+    const CT = 'America/Chicago';
+    const CT_FMT = new Intl.DateTimeFormat('en-US', { timeZone: CT, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23' });
+    const ctParts = (t) => Object.fromEntries(CT_FMT.formatToParts(new Date(t)).filter((p) => p.type !== 'literal').map((p) => [p.type, Number(p.value)]));
+    const ctTime = (y, mo, d, h = 0) => {
+      const guess = Date.UTC(y, mo - 1, d, h);
+      const p = ctParts(guess);
+      return guess - (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - guess);
+    };
+    // nth weekday of a month (weekday 0 = Sunday): Thanksgiving = 4th Thursday, clocks = 1st/2nd Sunday.
+    const nthDay = (y, mo, wd, n) => 1 + ((wd - new Date(Date.UTC(y, mo - 1, 1)).getUTCDay() + 7) % 7) + (n - 1) * 7;
+    const CDN_COLORS = { holiday: '#ff8a1e', clock: '#ffd34d', season: '#38d6c4', storm: '#ff2a35' };
+    const cdnEvents = (y) => [
+      { k: 'halloween', ic: '🎃', lb: 'Halloween', cat: 'holiday', at: ctTime(y, 10, 31) },
+      { k: 'fallback', ic: '🕑', lb: 'Clocks fall back', cat: 'clock', at: ctTime(y, 11, nthDay(y, 11, 0, 1), 2), time: true, note: '2 AM · extra hour' },
+      { k: 'thanksgiving', ic: '🦃', lb: 'Thanksgiving', cat: 'holiday', at: ctTime(y, 11, nthDay(y, 11, 4, 4)) },
+      { k: 'hurricane-end', ic: '🌀', lb: 'Hurricane season ends', cat: 'season', at: ctTime(y, 12, 1), time: true, dateText: 'NOV 30 · MIDNIGHT' },
+      { k: 'winter', ic: '❄️', lb: 'First day of winter', cat: 'season', at: ctTime(y, 12, 21) },
+      { k: 'christmas', ic: '🎄', lb: 'Christmas', cat: 'holiday', at: ctTime(y, 12, 25) },
+      { k: 'newyear', ic: '🎆', lb: "New Year's Day", cat: 'holiday', at: ctTime(y, 1, 1) },
+      { k: 'met-spring', ic: '⛈️', lb: 'Spring severe season', cat: 'season', at: ctTime(y, 3, 1), note: 'Meteorological spring' },
+      { k: 'springforward', ic: '⏰', lb: 'Clocks spring forward', cat: 'clock', at: ctTime(y, 3, nthDay(y, 3, 0, 2), 2), time: true, note: '2 AM · lose an hour' },
+      { k: 'spring', ic: '🌷', lb: 'First day of spring', cat: 'season', at: ctTime(y, 3, 20) },
+      { k: 'hurricane-start', ic: '🌀', lb: 'Hurricane season starts', cat: 'season', at: ctTime(y, 6, 1) },
+      { k: 'summer', ic: '☀️', lb: 'First day of summer', cat: 'season', at: ctTime(y, 6, 21) },
+      { k: 'july4', ic: '🎇', lb: 'Fourth of July', cat: 'holiday', at: ctTime(y, 7, 4) },
+      { k: 'fall', ic: '🍂', lb: 'First day of fall', cat: 'season', at: ctTime(y, 9, 22) }
+    ];
+    // The next time each event happens (still "on" for its whole day if it's date-only).
+    const cdnUpcoming = (now = Date.now()) => {
+      const y = ctParts(now).year;
+      const best = new Map();
+      for (const e of [...cdnEvents(y), ...cdnEvents(y + 1)]) {
+        const ends = e.at + (e.time ? 0 : 86400000);
+        if (ends <= now) continue;
+        if (!best.has(e.k) || e.at < best.get(e.k).at) best.set(e.k, e);
+      }
+      return [...best.values()].sort((a, b) => a.at - b.at);
+    };
+    const CDN_LIVE = /TORNADO EMERGENCY|TORNADO WARNING|SEVERE THUNDERSTORM WARNING|FLASH FLOOD (WARNING|EMERGENCY)|TORNADO WATCH|SEVERE THUNDERSTORM WATCH/;
+    const cdnLive = (now = Date.now()) => {
+      const st = focusState();
+      return (S.alerts || [])
+        .filter((a) => CDN_LIVE.test(a.eventLabel || '') && Date.parse(a.expiresAt) > now && (!st || (a.states || []).includes(st)))
+        .sort((a, b) => (a.rank - b.rank) || (Date.parse(a.expiresAt) - Date.parse(b.expiresAt)))
+        .slice(0, 3);
+    };
+    const two = (n) => String(n).padStart(2, '0');
+    const cdnSplit = (ms) => {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      return { d: Math.floor(s / 86400), hms: two(Math.floor((s % 86400) / 3600)) + ':' + two(Math.floor((s % 3600) / 60)) + ':' + two(s % 60) };
+    };
+    const cdnDate = (e) => e.dateText || (new Date(e.at).toLocaleDateString('en-US', { timeZone: CT, weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase().replace(',', ' ·') + (e.note ? ' · ' + e.note.toUpperCase() : ''));
+    const CDN_LINES = {
+      halloween: ['{n} till Halloween, y’all. I’ve had my witch hat on since the first of the month.', 'Halloween’s {n} out. Y’all better have the good candy this year.'],
+      fallback: ['Clocks fall back in {n}. That’s one extra hour of sleep, and you know I’m gonna use it.'],
+      thanksgiving: ['{n} till Thanksgiving. Save me a plate, sugar. I don’t eat, but it’s the thought that counts.'],
+      'hurricane-end': ['Hurricane season ends in {n}. Don’t you dare jinx it.'],
+      winter: ['First day of winter is {n} out. And don’t forget, tornadoes don’t always take the winter off down South.'],
+      christmas: ['{n} till Christmas. I’ve been real good this year. Mostly.'],
+      newyear: ['{n} left in the year. Hang in there, darlin.'],
+      'met-spring': ['Spring severe season starts in {n}. Go check them weather radios.'],
+      springforward: ['Clocks spring forward in {n}. Somebody’s gonna be late to church.'],
+      spring: ['{n} till spring. Storm season’s knockin’.'],
+      'hurricane-start': ['Hurricane season starts back up in {n}.'],
+      summer: ['{n} till summer. Get the sweet tea ready.'],
+      july4: ['{n} till the Fourth of July. Keep them fireworks away from me.'],
+      fall: ['{n} till fall. Pumpkin spice is comin’ whether you like it or not.']
+    };
+    const cdnSpan = (ms) => {
+      const d = Math.floor(ms / 86400000);
+      if (d >= 2) return d + ' days';
+      const h = Math.round(ms / 3600000);
+      return d === 1 || h >= 24 ? 'one day' : h >= 2 ? h + ' hours' : 'less than two hours';
+    };
+    const cdnTalk = (live, next) => {
+      const now = Date.now();
+      if (live.length) {
+        const a = live[0];
+        const left = Date.parse(a.expiresAt) - now;
+        return 'That ' + a.eventLabel.toLowerCase() + ' for ' + placeOf(a) + ' runs until ' + (a.times?.expires || 'later') + ', about ' + (left < 3600000 ? Math.max(1, Math.round(left / 60000)) + ' minutes' : cdnSpan(left)) + ' from now. Don’t let your guard down till it’s gone.';
+      }
+      if (!next) return '';
+      if (next.at <= now) return 'It’s ' + next.lb + ' today, y’all!';
+      return fillLine(pick(CDN_LINES[next.k] || ['{n} till ' + next.lb + '.']), { n: cdnSpan(next.at - now) });
+    };
+    const hideCountdowns = () => {
+      clearInterval(S.cdnTick);
+      $('cdn').classList.remove('on');
+    };
+    const countdownsShot = (shot) => {
+      const el = $('cdn');
+      const now = Date.now();
+      const live = cdnLive(now);
+      const all = cdnUpcoming(now);
+      const next = all[0];
+      const cards = all.slice(1, live.length ? 5 : 9);
+      const card = (e) => '<div class="cdn-c" style="--ac:' + CDN_COLORS[e.cat] + '" data-at="' + e.at + '" data-time="' + (e.time ? 1 : 0) + '"><div class="ic">' + e.ic + '</div><div class="lb">' + esc(e.lb) + '</div><div class="dt">' + esc(cdnDate(e)) + '</div><div class="big"><strong></strong><span></span></div><div class="hms"></div></div>';
+      const liveCard = (a) => '<div class="cdn-c" style="--ac:' + (a.accent || a.color || CDN_COLORS.storm) + '" data-at="' + Date.parse(a.expiresAt) + '" data-live="1"><div><div class="lb">' + esc(a.eventLabel) + '</div><div class="ar">' + esc(placeOf(a)) + ' · UNTIL ' + esc(a.times?.expires || '') + '</div></div><div class="tm"><div class="ex">EXPIRES IN</div><div class="hms"></div></div></div>';
+      el.innerHTML = '<div class="cdn-h"><b>⏳ Countdowns</b><small>Central time · ticking live</small></div>'
+        + (live.length ? '<div class="cdn-live">' + live.map(liveCard).join('') + '</div>' : '')
+        + '<div class="cdn-grid" style="top:' + (live.length ? 296 : 140) + 'px">' + cards.map(card).join('') + '</div>'
+        + (next ? '<div class="cdn-next" style="--ac:' + CDN_COLORS[next.cat] + '" data-at="' + next.at + '" data-time="' + (next.time ? 1 : 0) + '"><div class="k">NEXT UP</div><div class="ic">' + next.ic + '</div><div class="lb">' + esc(next.lb) + '</div><div class="big"></div><div class="u"></div><div class="hms"></div></div>' : '');
+      const tick = () => {
+        const t = Date.now();
+        el.querySelectorAll('[data-at]').forEach((c) => {
+          const at = Number(c.dataset.at);
+          const left = at - t;
+          const { d, hms } = cdnSplit(left);
+          const hmsEl = c.querySelector('.hms');
+          if (c.dataset.live) { hmsEl.textContent = left > 0 ? (d ? d + 'd ' : '') + hms : 'EXPIRED'; return; }
+          const today = left <= 0;
+          c.classList.toggle('today', today);
+          if (c.classList.contains('cdn-next')) {
+            c.querySelector('.big').textContent = today ? '🎉' : d;
+            c.querySelector('.u').textContent = today ? 'TODAY!' : d === 1 ? 'DAY' : 'DAYS';
+            hmsEl.textContent = today ? '' : hms;
+            return;
+          }
+          c.querySelector('.big strong').textContent = today ? 'TODAY!' : d;
+          c.querySelector('.big span').textContent = today ? '' : d === 1 ? 'day' : 'days';
+          hmsEl.textContent = today ? '' : '+ ' + hms;
+        });
+      };
+      tick();
+      clearInterval(S.cdnTick);
+      S.cdnTick = setInterval(() => { if (S.shot === shot) tick(); else clearInterval(S.cdnTick); }, 1000);
+      setTimeout(() => { if (S.shot === shot) el.classList.add('on'); }, 400);
+      setMood(live.length ? 'alert' : 'calm');
+      chatter(cdnTalk(live, next));
+    };
     const hideGas = () => {
       if (S.styleReady && S.map.getLayer('gas')) S.map.setLayoutProperty('gas', 'visibility', 'none');
     };
