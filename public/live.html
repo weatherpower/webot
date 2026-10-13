@@ -1986,8 +1986,11 @@
       S.map.setFilter('sel-case', ['==', ['get', 'key'], S.sel]);
       S.map.setFilter('sel-line', ['==', ['get', 'key'], S.sel]);
     };
+    // The selected warning's outline pulses. Not on the stream server (lite): each change is a full software map
+    // redraw, and at 11 a second it held the whole stream to ~6 fps. There it stays solid.
     setInterval(() => {
-      if (S.styleReady && S.sel) S.map.setPaintProperty('sel-line', 'line-opacity', 0.55 + 0.45 * Math.abs(Math.sin(Date.now() / 420)));
+      if (OPT.lite || !S.styleReady || !S.sel) return;
+      S.map.setPaintProperty('sel-line', 'line-opacity', 0.55 + 0.45 * Math.abs(Math.sin(Date.now() / 420)));
     }, 90);
     const alertMapLayers = ['a-fill', 'a-case', 'a-line', 'w-line', 'sel-case', 'sel-line'];
     const setAlertMapVisible = (visible) => {
