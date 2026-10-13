@@ -643,6 +643,10 @@ export const applyLiveCommand = async (body = {}) => {
     case 'theme':
       current.theme = THEMES.includes(body.theme) ? body.theme : 'auto';
       break;
+    case 'layout':
+      // The whole stream layout (live.html body.look-*): '' = classic, 'dispatch' = railroad deck, 'porch' = left column.
+      current.layout = ['', 'dispatch', 'porch'].includes(body.layout) ? body.layout : '';
+      break;
     case 'costume':
       // WeBot's hat (WeBot Studio → Costume). auto = by the month (witch hat in October, Santa in December).
       current.costume = ['auto', 'none', 'witch', 'cowboy', 'santa', 'party', 'crown', 'cap'].includes(body.costume) ? body.costume : 'auto';

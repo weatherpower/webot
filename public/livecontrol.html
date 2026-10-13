@@ -227,6 +227,10 @@
 
       <section class="box">
         <h2>Look</h2>
+        <div class="row">
+          <span class="status">LAYOUT</span>
+          <div class="seg" id="layout"><button data-v="dispatch">Dispatch (railroad deck)</button><button data-v="porch">Porch (left column)</button><button data-v="">Classic</button></div>
+        </div>
         <p class="note" style="margin-top:0">Colors of the top and bottom bars. <b>Auto</b> matches the weather: red for tornadoes, storm red for severe storms, green for flooding, teal for hurricanes, icy blue for winter, orange for heat, violet when it's quiet, and starry After Dark on quiet nights (8 PM to 6 AM).</p>
         <div class="themes" id="themes"></div>
         <p class="status" id="theme-line" style="margin:10px 0 0"></p>
@@ -505,6 +509,10 @@
     $('tv-safe').addEventListener('change', () => {
       const safe = Number($('tv-safe').value);
       act({ action: 'tv', safe }, 'TV fit: ' + safe + '% from each edge');
+    });
+    $('layout').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (b) act({ action: 'layout', layout: b.dataset.v }, 'Layout: ' + b.textContent);
     });
     $('themes').addEventListener('click', (e) => {
       const key = e.target.closest('button')?.dataset.theme;

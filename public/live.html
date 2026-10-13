@@ -380,6 +380,79 @@
     #bot.tk-center img { filter: hue-rotate(172deg) saturate(2.2) brightness(.96) !important; }
     #bot.tk-center .eye { filter: drop-shadow(0 0 10px #ff2a35) drop-shadow(0 0 22px #ff2a35) !important; }
 
+    /* ---------- Looks (?look=porch|dispatch, or Live Control): whole new layouts on the same parts ---------- */
+    /* The top/bottom bars become full-stage frames so each part can sit anywhere. */
+    body[class*="look-"] .top::before, body[class*="look-"] .top::after, body[class*="look-"] .bottom::before, body[class*="look-"] .bottom::after { display: none; }
+    body[class*="look-"] .wpi .meta span:last-child { font-size: 0; }
+    body[class*="look-"] .wpi .meta span:last-child::after { font-size: 11px; letter-spacing: .16em; }
+
+    /* Porch: warm amber and charcoal. WeBot has his own column on the left with the warnings under him. */
+    body.look-porch #stage { --edge: #f2a33a; --brand: #f2a33a; --panel: rgba(30,21,13,.95); --line: rgba(242,163,58,.22); }
+    body.look-porch .top { left: 0; top: 0; bottom: 0; right: auto; width: 340px; height: auto; flex-direction: column; padding-top: 286px; background: #1d140c; border-right: 3px solid #f2a33a; }
+    body.look-porch .tally { flex-wrap: wrap; width: 337px; }
+    body.look-porch .tile { width: 84.25px; height: 84px; background: #2a1d12; border-right: 1px solid #1d140c; border-top: 4px solid var(--t); }
+    body.look-porch .tile .n { font-size: 32px; }
+    body.look-porch .hl { flex: 1; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 12px; padding: 22px 22px 0; background: none !important; }
+    body.look-porch .hl .tag { border-color: #f2a33a; color: #f2a33a; }
+    body.look-porch .hl .slot { width: 100%; height: 190px; }
+    body.look-porch .hl .txt { top: 0; transform: none; white-space: normal; font-size: 33px; line-height: 1.06; color: #fff3df; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
+    body.look-porch .hl .txt.enter { transform: translateY(24px); }
+    body.look-porch .hl .txt.leave { transform: translateY(-24px); }
+    body.look-porch .wpi { width: 100%; height: 96px; flex: none; padding: 0 22px; background: #2a1d12; border-left: 0; border-top: 1px solid rgba(242,163,58,.3); }
+    body.look-porch .wpi .meta span:last-child::after { content: "STORM METER"; color: #f2a33a; }
+    body.look-porch .bottom { left: 340px; height: 66px; background: #1d140c; border-top: 3px solid #f2a33a; }
+    body.look-porch .clock { width: 300px; background: #f2a33a; color: #1d140c; }
+    body.look-porch .clock small { color: #4a2f10; }
+    body.look-porch .now .l2 { color: #f5dcb4; }
+    body.look-porch .brandbox { background: #2a1d12; }
+    body.look-porch .bot { left: 44px; top: 18px; right: auto; bottom: auto; z-index: 25; }
+    body.look-porch .card { left: 372px; top: 30px; }
+    body.look-porch .rp { top: 30px; }
+    body.look-porch .focus { left: 372px; bottom: 132px; }
+    body.look-porch .reportchip { left: 372px; bottom: 86px; }
+    body.look-porch .chatbox { right: 32px; bottom: 96px; }
+    body.look-porch .np, body.look-porch .attrib { right: 32px; }
+    body.look-porch .np { bottom: 110px; }
+    body.look-porch .attrib { bottom: 74px; }
+
+    /* Dispatch: railroad black and crossing yellow. One deck along the bottom, WeBot standing on it. */
+    body.look-dispatch #stage { --edge: #ffcc00; --brand: #ffcc00; --panel: rgba(10,10,10,.94); --line: rgba(255,204,0,.25); }
+    body.look-dispatch .top { left: 0; padding-left: 290px; right: 0; top: auto; bottom: 66px; height: 86px; background: #0b0b0b; border-top: 6px solid transparent; border-image: repeating-linear-gradient(135deg, #ffcc00 0 18px, #0b0b0b 18px 36px) 6; }
+    body.look-dispatch .tile { width: 88px; background: #141414; border-right: 1px solid #000; }
+    body.look-dispatch .tile .n svg { color: var(--t); opacity: 1; filter: brightness(1.8); }
+    body.look-dispatch .tile .l { color: #ffcc00; }
+    body.look-dispatch .hl { background: #0b0b0b !important; }
+    body.look-dispatch .hl .tag { border-color: #ffcc00; color: #0b0b0b; background: #ffcc00; }
+    body.look-dispatch .hl .txt { font-family: "WP Mono"; font-size: 32px; letter-spacing: .06em; color: #ffcc00; }
+    body.look-dispatch .wpi { background: #141414; border-left: 1px solid #000; }
+    body.look-dispatch .wpi .meta span:last-child::after { content: "SIGNAL"; color: #ffcc00; }
+    body.look-dispatch .bottom { left: 0; padding-left: 290px; height: 66px; background: #141414; }
+    body.look-dispatch .clock { width: 300px; background: #ffcc00; color: #0b0b0b; }
+    body.look-dispatch .clock small { color: #3a2f00; }
+    body.look-dispatch .clock img { background: #0b0b0b; border-radius: 10px; padding: 4px; }
+    /* Radar box and info cards: a black dispatch board with a yellow frame (not the classic panel look). */
+    body.look-dispatch .panel { background: rgba(8,8,8,.95); border: 2px solid #ffcc00; border-radius: 0; }
+    body.look-dispatch .panel::before, body.look-dispatch .panel::after { display: none; }
+    body.look-dispatch .rp h3, body.look-dispatch .rp .clk { font-family: "WP Mono"; font-size: 28px; letter-spacing: .04em; color: #ffcc00; }
+    body.look-dispatch .rp .clk span { color: #fff; }
+    body.look-dispatch .rp .under { background: #ffcc00; height: 4px; }
+    body.look-dispatch .rp .r3 { border-top: 1px dashed rgba(255,204,0,.4); }
+    body.look-dispatch .rp .r3 .st { color: #ffcc00; }
+    body.look-dispatch .rp .r3 .st svg path { fill: rgba(255,204,0,.18); stroke: #ffcc00; }
+    body.look-dispatch .card h2 { font-family: "WP Mono"; font-size: 32px; letter-spacing: .03em; color: #ffcc00; }
+    body.look-dispatch .reportchip { border: 2px solid #ffcc00; background: rgba(8,8,8,.95); }
+    body.look-dispatch .now .l1 .k { color: #ffcc00; }
+    body.look-dispatch .now .l2 { color: #e8e1c4; }
+    body.look-dispatch .brandbox { background: #0b0b0b; }
+    body.look-dispatch .bot { left: 22px; right: auto; bottom: 24px; z-index: 25; }
+    body.look-dispatch .card { left: 32px; top: 32px; }
+    body.look-dispatch .rp { top: 32px; }
+    body.look-dispatch .focus { left: 32px; bottom: 300px; }
+    body.look-dispatch .reportchip { left: 32px; bottom: 300px; }
+    body.look-dispatch .chatbox { right: 32px; bottom: 178px; }
+    body.look-dispatch .np { right: 32px; bottom: 172px; }
+    body.look-dispatch .attrib { right: 32px; bottom: 160px; }
+
     .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
     body.tv, body.tv * { cursor: none !important; }
@@ -758,6 +831,17 @@
     window.visualViewport?.addEventListener('scroll', fit);
     fit();
     if (OPT.lite) document.body.classList.add('lite');
+    // A whole different layout: Live Control's Layout setting, or ?look=porch | dispatch | classic to preview one.
+    const LOOK = (P.get('look') || '').toLowerCase().replace(/[^a-z]/g, '');
+    const applyLayout = (name) => {
+      const want = LOOK ? (LOOK === 'classic' ? '' : LOOK) : (name || '');
+      if (want === (document.body.dataset.layout || '')) return false;
+      document.body.classList.forEach((c) => { if (c.startsWith('look-')) document.body.classList.remove(c); });
+      if (want) document.body.classList.add('look-' + want);
+      document.body.dataset.layout = want;
+      return true;
+    };
+    applyLayout('');
     if (OPT.tv) {
       document.body.classList.add('tv');
       // Android TV only turns the OK button into a real click when a button has focus, and a WebView only
@@ -4152,6 +4236,7 @@
       const prevCtl = S.control;
       S.live = body;
       S.control = body.control || S.control;
+      if (applyLayout(S.control.layout)) fit();
       $('subbox').classList.toggle('subs-off', S.control.subCount === false);
       // A new costume from WeBot Studio: redraw WeBot with it.
       if ((S.control.costume || 'auto') !== S.costumeShown) { S.costumeShown = S.control.costume || 'auto'; drawBot(); if (typeof applyBrain === 'function' && B.brain) applyBrain(); }
