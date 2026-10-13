@@ -437,6 +437,33 @@ export const puterTokenFor = async (key, { homeNetwork = false } = {}) => {
   return { token: s.puterToken || null, linkedAt: s.puterLinkedAt || null };
 };
 
+// Phone sign-in link (/warningcenter/puter-link/<code>): a one-time code, good for 30 minutes, lets a page
+// opened anywhere hand the server a new Puter sign-in without the controller token. Used once, then gone.
+export const newPuterClaim = async (minutes = 30) => {
+  const s = await loadSecrets();
+  s.puterClaim = { code: crypto.randomBytes(18).toString('base64url'), expires: Date.now() + minutes * 60 * 1000 };
+  await saveSecrets();
+  return s.puterClaim;
+};
+const claimOk = (s, code) => {
+  const c = s.puterClaim;
+  const given = String(code || '');
+  return Boolean(c && c.expires > Date.now() && given.length === c.code.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(c.code)));
+};
+export const puterClaimValid = async (code) => {
+  const s = await loadSecrets();
+  return claimOk(s, code) ? { ok: true, expires: s.puterClaim.expires } : { ok: false };
+};
+export const usePuterClaim = async (code, token, user) => {
+  const s = await loadSecrets();
+  if (!claimOk(s, code)) throw Object.assign(new Error('This sign-in link expired or was already used.'), { status: 403 });
+  const t = String(token || '').trim();
+  if (!t || t.length > 4000) throw Object.assign(new Error('No Puter sign-in came through'), { status: 400 });
+  Object.assign(s, { puterToken: t, puterUser: String(user || '').replace(/\s+/g, ' ').trim().slice(0, 80), puterLinkedAt: new Date().toISOString(), puterClaim: null });
+  await saveSecrets();
+  return { ok: true, user: s.puterUser };
+};
+
 export const liveControl = async () => {
   const current = await loadControl();
   const s = await loadSecrets();

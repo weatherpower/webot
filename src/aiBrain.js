@@ -89,12 +89,15 @@ const callPuter = async (token, model, messages) => {
 export const aiReplyTo = async (text, user, brain, ctx = {}) => {
   const ai = brain?.ai;
   const now = Date.now();
-  if (!ai?.enabled || now < state.pausedUntil) return null;
+  if (!ai?.enabled) return null;
+  const token = await serverPuterToken().catch(() => null);
+  if (!token) return null;
+  // A newly linked Puter account (say, from the phone sign-in link) ends any out-of-credit pause right away.
+  if (state.pausedToken && token !== state.pausedToken) { state.pausedUntil = 0; state.failures = 0; state.pausedToken = null; }
+  if (now < state.pausedUntil) return null;
   if (Math.random() * 100 >= ai.sharePercent) return null; // the local brain's turn
   state.calls = state.calls.filter((t) => now - t < 3600000);
   if (state.calls.length >= ai.maxPerHour) return null;
-  const token = await serverPuterToken().catch(() => null);
-  if (!token) return null;
   state.calls.push(now);
   try {
     const { text: raw, cents } = await callPuter(token, ai.model, [
@@ -109,6 +112,7 @@ export const aiReplyTo = async (text, user, brain, ctx = {}) => {
   } catch (error) {
     // Out of Puter usage or Puter down: back off (2, 4, 8... up to 30 minutes) and let the local brain talk.
     state.failures += 1;
+    state.pausedToken = token;
     state.pausedUntil = now + Math.min(30, 2 ** state.failures) * 60000;
     // Out of Puter credit: the voice uses the same account, so the AI brain steps aside for 6 hours.
     if (/\b402\b|credit|funding|balance/i.test(error.message)) state.pausedUntil = now + 6 * 3600000;

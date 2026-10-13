@@ -171,6 +171,11 @@ app.get('/live', (req, res) => {
   res.sendFile(path.join(publicDir, 'live.html'));
 });
 
+app.get('/live/puter-link/:code', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.join(publicDir, 'puterlink.html'));
+});
+
 app.get('/live/control', (req, res) => {
   res.sendFile(path.join(publicDir, 'livecontrol.html'));
 });

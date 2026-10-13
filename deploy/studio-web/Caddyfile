@@ -8,5 +8,21 @@
 
 {$STUDIO_DOMAIN:207-244-248-128.sslip.io} {
 	encode gzip
-	reverse_proxy 127.0.0.1:7777
+	# Documentary download tracker (static files the PC uploads). Unlisted path, no sign-in, no indexing.
+	handle_path /dl-29c65c78b3/* {
+		root * /srv/dl
+		header Cache-Control no-store
+		header X-Robots-Tag "noindex, nofollow"
+		file_server
+	}
+	# Phone Puter sign-in link (one-time code made on the server, 30 minutes). Only these three paths of the
+	# stream server are reachable here; the rest of it (Live Control) stays home-network only.
+	@puterlink path /warningcenter/live/puter-link/* /warningcenter/api/v3/live/puter-claim/* /warningcenter/public/assets/webot.png
+	handle @puterlink {
+		header X-Robots-Tag "noindex, nofollow"
+		reverse_proxy 127.0.0.1:8899
+	}
+	handle {
+		reverse_proxy 127.0.0.1:7777
+	}
 }

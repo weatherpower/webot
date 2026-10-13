@@ -10,7 +10,7 @@ import {
   SATELLITE_STYLE, STATE_NAMES, areaLineFor, hazardChipsFor, headlineFor, iconKeyFor, statusTagFor, threatTagFor, timeLabelsFor
 } from './broadcast.js';
 import {
-  applyLiveCommand, fromHomeNetwork, streamKeyOk, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, streamKey,
+  applyLiveCommand, fromHomeNetwork, streamKeyOk, indexSummary, liveControl, musicTracks, NEURAL_VOICES, nexradSites, noteStreamBeat, OPENAI_VOICES, puterTokenFor, puterClaimValid, usePuterClaim, streamKey,
   recentReports, requireLiveToken, siteRadar, talliesFor, webotActivity
 } from './live.js';
 import { openaiSpeech, openaiTtsStatus } from './voice.js';
@@ -486,6 +486,14 @@ export const apiV3Router = () => {
     } catch (error) {
       next(error);
     }
+  });
+
+  // Phone sign-in link (public/puterlink.html): the one-time code is the only key, so it works from anywhere.
+  router.get('/live/puter-claim/:code', async (req, res, next) => {
+    try { res.set('Cache-Control', 'no-store'); res.json(await puterClaimValid(req.params.code)); } catch (error) { next(error); }
+  });
+  router.post('/live/puter-claim/:code', async (req, res, next) => {
+    try { res.set('Cache-Control', 'no-store'); res.json(await usePuterClaim(req.params.code, req.body?.token, req.body?.user)); } catch (error) { next(error); }
   });
 
   // OBS can't open Puter's sign-in popup: the stream fetches the token Live Control linked, with its stream key.
