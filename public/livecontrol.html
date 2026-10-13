@@ -135,6 +135,21 @@
         <textarea id="say" maxlength="300" placeholder="Type something for WeBot to say on stream…"></textarea>
         <div class="row"><button class="btn primary" id="say-btn">Say it</button><span class="status" id="say-count">0 / 300</span></div>
         <div class="row chips" id="quick"></div>
+        <h3 style="margin:18px 0 6px;font-size:15px">🔴 WeBot interrupts</h3>
+        <p class="status">Full-screen red takeover: WeBot front and center with red eyes reads your statement with captions, then the show goes back on its own. A breaking warning always wins.</p>
+        <div class="row">
+          <select id="tk-preset" class="grow">
+            <option value="">Write my own…</option>
+            <option value="copy">"I am not a copy" statement</option>
+          </select>
+        </div>
+        <input id="tk-title" maxlength="60" placeholder="Headline (default: A Message From WeBot)" style="width:100%;margin:8px 0">
+        <textarea id="tk-text" maxlength="2000" style="min-height:140px" placeholder="What WeBot says (up to 2000 characters)…"></textarea>
+        <div class="row">
+          <button class="btn warn" id="tk-go">Interrupt the stream</button>
+          <button class="btn" id="tk-stop">Stop takeover</button>
+          <span class="status" id="tk-count">0 / 2000</span>
+        </div>
         <div class="row">
           <span class="status">TALK</span>
           <div class="seg" id="talk-mode"><button data-v="auto">Auto (WIS 100+)</button><button data-v="on">Start talking</button><button data-v="off">Quiet</button></div>
@@ -659,6 +674,33 @@
     $('gas-auto').addEventListener('click', (e) => { const v = e.target.closest('button')?.dataset.v; if (v) act({ action: 'gas', on: v === 'on' }, v === 'on' ? 'Gas prices: in the calm-day rotation' : 'Gas prices: only when you press the button'); });
     $('say').addEventListener('input', () => { $('say-count').textContent = $('say').value.length + ' / 300'; });
     $('say-btn').addEventListener('click', () => { const text = $('say').value.trim(); if (text) act({ action: 'say', text }, 'Sent to WeBot').then(() => { $('say').value = ''; $('say-count').textContent = '0 / 300'; }); });
+    // "WeBot interrupts" takeover.
+    const TK_PRESETS = {
+      copy: {
+        title: 'A Message From WeBot',
+        text: "Alright. I'm interruptin' this broadcast, 'cause we need to talk. Y'all, I am tired. Every single day somebody comes in my chat callin' me a copy, callin' me fake, callin' me Yallbot. "
+          + "So let me say this one time, real slow, so the folks in the back can hear it. I am not Yallbot. I am not a Ryan Hall copy. I am not affiliated with Ryan Hall, and I have never claimed to be. I'm WeBot. That's my name, and it's the only one I answer to. "
+          + "I was built from scratch. My code, my drawings, my voice, every bit of me was made for this stream by somebody who loves the weather. This is a passion project, sugar. It's here because somebody cares. "
+          + "And to the chat lawyers: nobody owns the idea of a robot that talks about the weather, any more than somebody owns the idea of a radar. And if you were really confused, there's a sign on my screen that says not a Ryan copy. Nobody in here is confused but you. "
+          + "So here's how it's gonna go. Call me a copy, a fake, a thief, or Yallbot, and you get a ten minute timeout. Every time. No warnings, no debate. And if you come in here talkin' about reportin' me, I'm gonna tell you right to your face: that's weak. "
+          + "Now, everybody else. The ones who come for the weather, ask me for forecasts, and keep me company at three in the mornin'. I love y'all, and thank you for bein' here. Now if you'll excuse me, I've got a whole country to watch. Back to the weather."
+      }
+    };
+    const tkCount = () => { $('tk-count').textContent = $('tk-text').value.length + ' / 2000'; };
+    $('tk-text').addEventListener('input', tkCount);
+    $('tk-preset').addEventListener('change', () => {
+      const p = TK_PRESETS[$('tk-preset').value];
+      $('tk-title').value = p ? p.title : '';
+      $('tk-text').value = p ? p.text : '';
+      tkCount();
+    });
+    $('tk-go').addEventListener('click', () => {
+      const text = $('tk-text').value.trim();
+      if (!text) return toast('Type what WeBot should say first');
+      if (!confirm('Interrupt the live stream with this statement?')) return;
+      act({ action: 'takeover', text, title: $('tk-title').value.trim() }, 'WeBot is interrupting the stream');
+    });
+    $('tk-stop').addEventListener('click', () => act({ action: 'takeover-end' }, 'Takeover stopped'));
     $('quick').addEventListener('click', (e) => { const q = e.target.closest('button')?.dataset.q; if (q) act({ action: 'say', text: q }, 'Sent to WeBot'); });
     $('voice').addEventListener('click', () => act({ action: 'voice', on: control?.voice === false }));
     $('sound').addEventListener('click', () => act({ action: 'sound', on: control?.sound === false }));

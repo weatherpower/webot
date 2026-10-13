@@ -555,6 +555,21 @@ export const applyLiveCommand = async (body = {}) => {
       pushCommand({ type: 'say', text: expandSlang(text) });
       break;
     }
+    case 'takeover': {
+      // "WeBot interrupts": full-screen red takeover, WeBot front and center with red eyes, reads a long
+      // statement (up to 2000 characters), then the show goes back on its own. Waits out breaking warnings.
+      const text = cleanText(body.text, 2000);
+      if (!text) throw Object.assign(new Error('Nothing to say'), { status: 400 });
+      pushCommand({
+        type: 'takeover', text: expandSlang(text),
+        title: cleanText(body.title, 60) || 'A Message From WeBot',
+        bar: (Array.isArray(body.bar) ? body.bar : []).map((b) => cleanText(b, 28)).filter(Boolean).slice(0, 3)
+      });
+      break;
+    }
+    case 'takeover-end':
+      pushCommand({ type: 'takeover-end' });
+      break;
     case 'next':
       pushCommand({ type: 'next' });
       break;

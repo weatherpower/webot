@@ -326,6 +326,28 @@
     .brk .t { margin-top: 16px; display: inline-block; padding: 8px 18px; background: rgba(0,0,0,.3); font-family: "WP Display"; font-size: 30px; letter-spacing: .06em; }
     .brk .test { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); padding: 8px 18px; background: #ffd34d; color: #111; font-family: "WP Mono"; font-size: 20px; letter-spacing: .2em; }
 
+    /* ---------- "WeBot interrupts" takeover (Live Control) ---------- */
+    .tk { position: absolute; inset: 0; z-index: 60; display: none; overflow: hidden; background: radial-gradient(ellipse at 50% 46%, #3a0508 0%, #120204 55%, #050001 100%); }
+    .tk.show { display: block; animation: tkIn .5s ease-out; }
+    .tk.out { animation: tkOut .6s forwards; }
+    @keyframes tkIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes tkOut { to { opacity: 0; } }
+    .tk .tk-pulse { position: absolute; inset: 0; box-shadow: inset 0 0 260px 40px rgba(255,30,40,.55); animation: tkPulse 1.6s ease-in-out infinite; }
+    @keyframes tkPulse { 50% { box-shadow: inset 0 0 340px 90px rgba(255,30,40,.8); } }
+    .tk .tk-scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 2px, transparent 2px 5px); }
+    .tk .tk-head { position: absolute; left: 0; right: 0; top: 30px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    .tk .tk-k { font: 700 30px "WP Mono"; letter-spacing: .42em; padding: 12px 22px 12px 34px; animation: tkFlash 1s steps(1) infinite; }
+    @keyframes tkFlash { 0% { background: #ff2a35; color: #fff; } 50% { background: #fff; color: #b3000b; } }
+    .tk .tk-title { font: 700 80px/1 "WP Display"; letter-spacing: .03em; text-transform: uppercase; color: #fff; text-shadow: 0 0 30px rgba(255,40,50,.7); }
+    .tk .tk-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 210px; display: flex; flex-direction: column; background: linear-gradient(90deg, #b3000b, #ff2a35, #b3000b); color: #fff; }
+    .tk .tk-tags { height: 50px; display: flex; align-items: center; justify-content: center; gap: 34px; background: rgba(0,0,0,.28); font: 700 28px "WP Display"; letter-spacing: .06em; text-transform: uppercase; }
+    .tk .tk-tags i { width: 10px; height: 10px; background: #fff; transform: rotate(45deg); }
+    .tk .tk-cap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 70px; font: 600 40px/1.18 "WP Sans", system-ui, sans-serif; text-align: center; text-wrap: balance; }
+    #bot.tk-center { right: auto !important; bottom: auto !important; left: 835px !important; top: 430px !important; scale: 2.15; z-index: 61 !important; }
+    #bot.tk-center .tag { display: none; }
+    #bot.tk-center img { filter: hue-rotate(172deg) saturate(2.2) brightness(.96); }
+    #bot.tk-center .eye { filter: drop-shadow(0 0 10px #ff2a35) drop-shadow(0 0 22px #ff2a35); }
+
     .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
     body.tv, body.tv * { cursor: none !important; }
@@ -1025,6 +1047,8 @@
     const pumpSpeech = async () => {
       if (speech.busy || !speech.queue.length) return;
       const item = speech.queue.shift();
+      // "WeBot interrupts" shows each line as a caption while he says it.
+      if (item.takeover && TK.on) TK.el.querySelector('.tk-cap').textContent = item.text;
       speech.busy = true;
       let finished = false;
       const done = () => {
@@ -1104,7 +1128,7 @@
       lines.forEach((p) => {
         const audio = synth(p);
         audio?.catch(() => {});
-        const item = { text: p, audio, force: Boolean(opts.force), chat: Boolean(opts.chat) };
+        const item = { text: p, audio, force: Boolean(opts.force), chat: Boolean(opts.chat), takeover: Boolean(opts.takeover) };
         if (at >= 0) speech.queue.splice(at++, 0, item);
         else speech.queue.push(item);
       });
@@ -1713,7 +1737,57 @@
     drawBot();
     S.costumeShown = 'auto';
     if (!OPT.bot) bot.classList.add('off');
+    // "WeBot interrupts" (Live Control): the whole screen goes red, WeBot comes front and center with red eyes
+    // and reads the statement with captions, then the show picks back up. A breaking warning ends it at once.
+    const TK = { on: false, pending: null, timer: null, started: false, quietAt: 0, t0: 0, el: null };
+    const tkEsc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const takeoverEnd = (why) => {
+      if (!TK.on) { TK.pending = null; return; }
+      TK.on = false;
+      clearInterval(TK.timer);
+      // Stopped early: drop the rest of the statement.
+      if (why !== 'done') { speech.queue = speech.queue.filter((q) => !q.takeover); }
+      const el = TK.el;
+      el.classList.add('out');
+      setTimeout(() => { el.classList.remove('show', 'out'); }, 650);
+      bot.classList.remove('tk-center');
+      setMood('calm');
+      if (!OPT.bot) bot.classList.add('off');
+      if (why !== 'breaking') nextShot(true);
+    };
+    const takeoverStart = (cmd) => {
+      if (S.inBreaking || S.shot?.breaking) { TK.pending = cmd; return; }
+      TK.pending = null;
+      if (!TK.el) { TK.el = document.createElement('div'); TK.el.className = 'tk'; $('stage').appendChild(TK.el); }
+      const tags = (cmd.bar?.length ? cmd.bar : ['Not a Ryan copy', 'Not affiliated', 'Built from scratch']).map((t) => '<span>' + tkEsc(t) + '</span>').join('<i></i>');
+      TK.el.innerHTML = '<div class="tk-pulse"></div><div class="tk-scan"></div><div class="tk-head"><span class="tk-k">WE INTERRUPT THIS BROADCAST</span><div class="tk-title">' + tkEsc(cmd.title || 'A Message From WeBot') + '</div></div>'
+        + '<div class="tk-foot"><div class="tk-tags">' + tags + '</div><div class="tk-cap"></div></div>';
+      TK.el.classList.remove('out');
+      TK.el.classList.add('show');
+      TK.on = true; TK.started = false; TK.quietAt = 0; TK.t0 = Date.now();
+      bot.classList.remove('off');
+      bot.classList.add('tk-center');
+      setMood('danger');
+      // He drops whatever he was about to say and goes straight into the statement.
+      speech.queue = speech.queue.filter((q) => q.force);
+      say(cmd.text, { force: true, takeover: true });
+      clearInterval(TK.timer);
+      TK.timer = setInterval(() => {
+        if (S.inBreaking || S.shot?.breaking) return takeoverEnd('breaking');
+        const now = Date.now();
+        const talking = speech.busy || speech.queue.some((q) => q.takeover);
+        if (talking) { TK.started = true; TK.quietAt = 0; } else if (TK.started && !TK.quietAt) TK.quietAt = now;
+        // Done 3 s after the last line. Voice off or not working: leave it up long enough to read.
+        if (TK.quietAt && now - TK.quietAt > 3000) takeoverEnd('done');
+        else if (!TK.started && now - TK.t0 > Math.max(20000, cmd.text.length * 70)) takeoverEnd('done');
+        else if (now - TK.t0 > 8 * 60000) takeoverEnd('done');
+      }, 300);
+      // Without voice there's nothing to caption line by line, so show the whole statement.
+      if (!voiceOn()) TK.el.querySelector('.tk-cap').textContent = cmd.text;
+    };
+    setInterval(() => { if (TK.pending && !S.inBreaking && !S.shot?.breaking) takeoverStart(TK.pending); }, 2000);
     const setMood = (mood) => {
+      if (TK.on) mood = 'danger';
       bot.style.setProperty('--eye', mood === 'danger' ? '#ff4d5e' : mood === 'alert' ? '#ffc23d' : '#5ff2ff');
       bot.classList.toggle('danger', mood === 'danger');
       bot.classList.toggle('alert', mood === 'alert');
@@ -3918,6 +3992,8 @@
         for (const cmd of (S.control.commands || []).filter((c) => c.id > S.lastCmd)) {
           S.lastCmd = cmd.id;
           if (cmd.type === 'say') say(cmd.text, { force: true });
+          else if (cmd.type === 'takeover') takeoverStart(cmd);
+          else if (cmd.type === 'takeover-end') takeoverEnd('stopped');
           else if (cmd.type === 'next') nextShot(true);
           else if (cmd.type === 'reload') location.reload();
           else if (cmd.type === 'music-next') musicNext();
@@ -3988,7 +4064,7 @@
       return out;
     };
     // Diagnostics (deploy/cloud-stream/fly-check.cjs).
-    window.WPLive = { S, FLY, nextShot: (force) => nextShot(force) };
+    window.WPLive = { S, FLY, nextShot: (force) => nextShot(force), takeover: (cmd) => takeoverStart(cmd), takeoverEnd: () => takeoverEnd('stopped') };
     // Read-only voice check for troubleshooting (deploy/cloud-stream scripts, WeBot Studio).
     window.WPVoice = () => ({ voiceOn: voiceOn(), engine: ttsCfg().engine, puter: pt.state, canNeural: canNeural(), speechWorks: Boolean(speechWorks()), actx: actx ? actx.state : 'none', queue: speech.queue.length, busy: speech.busy, played: speech.played || 0, log: speech.log || [], lastError: pt.lastError || '' });
     // Viewer requests from YouTube chat: say "got it" in the top bar, then cut over to it soon (15 s into the
