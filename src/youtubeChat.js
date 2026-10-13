@@ -2,8 +2,8 @@
 // WeBot does that place next. Reads chat with the YouTube Data API (YOUTUBE_API_KEY) on the channel's
 // current live video (YOUTUBE_CHANNEL_ID, or YOUTUBE_VIDEO_ID to force one). Read-only: it never posts.
 //
-// Quota: the API allows 10,000 units a day and each chat read costs 5, so chat is read about once a
-// minute (every 30 s for a few minutes after someone uses a command), with a daily budget guard.
+// Quota: the API allows 10,000 units a day and each chat read costs 5. Chat is read as often as the rest
+// of the day's budget allows (see pacedMs, "hawk mode"), faster while chat is busy or after a timeout.
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { STATE_NAMES } from './broadcast.js';
@@ -16,10 +16,8 @@ import { dataDir } from './paths.js';
 const API = 'https://www.googleapis.com/youtube/v3';
 const KEY = () => process.env.YOUTUBE_API_KEY || '';
 const DAILY_BUDGET = Number(process.env.YOUTUBE_DAILY_UNITS || 9000);
-// Quiet chat is read every 90 s (5 units a read), busy chat every 30 s: a 24/7 stream stays inside the
-// 10,000-unit daily YouTube quota.
+// First read / fallback wait. The real pace comes from pacedMs() below.
 const BASE_MS = 90 * 1000;
-const ACTIVE_MS = 30 * 1000;
 
 
 /* ---------------- places (U.S. Census Gazetteer, bundled) ---------------- */
@@ -119,11 +117,36 @@ const state = {
   lastReadAt: 0, readUsers: new Map(), commandSeq: 0, commandLog: []
 };
 const ptDay = () => new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
+// The day's quota count is saved to disk so server restarts don't reset it (YouTube's quota doesn't reset).
+const QUOTA_FILE = () => dataDir + '/youtube-quota.json';
+try {
+  const q = JSON.parse(fs.readFileSync(QUOTA_FILE(), 'utf8'));
+  if (q.day === ptDay()) { state.unitsDay = q.day; state.units = Number(q.units) || 0; }
+} catch { /* first run */ }
+const saveQuota = () => fs.promises.writeFile(QUOTA_FILE(), JSON.stringify({ day: state.unitsDay, units: state.units })).catch(() => {});
 const spend = (units) => {
   if (state.unitsDay !== ptDay()) { state.unitsDay = ptDay(); state.units = 0; }
   state.units += units;
+  saveQuota();
 };
 const overBudget = () => state.unitsDay === ptDay() && state.units >= DAILY_BUDGET;
+// Hawk mode: read chat as often as the rest of today's quota allows (spread evenly until midnight Pacific,
+// when YouTube resets it). Busy chat or recent trouble reads ~2.5x faster and borrows from the quiet hours;
+// the pace slows itself back down if that runs the budget low.
+const HAWK_MIN_MS = 12 * 1000;
+const QUIET_MIN_MS = 30 * 1000;
+const msToPtMidnight = () => {
+  const now = new Date();
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23' })
+    .formatToParts(now).filter((x) => x.type !== 'literal').map((x) => [x.type, Number(x.value)]));
+  return Math.max(60 * 1000, ((23 - p.hour) * 3600 + (59 - p.minute) * 60 + (60 - p.second)) * 1000);
+};
+const pacedMs = () => {
+  const used = state.unitsDay === ptDay() ? state.units : 0;
+  const left = DAILY_BUDGET - used - 300; // keep 300 for timeouts, the daily title/thumbnail and live checks
+  if (left <= 0) return 15 * 60 * 1000;
+  return msToPtMidnight() / (left / 5.4); // 5 a read, plus the 5-minute live check
+};
 
 const api = async (path, params, units) => {
   spend(units);
@@ -609,6 +632,8 @@ const timeoutCheck = async (message) => {
     return true;
   }
   timeouts.set(id, now + TIMEOUT_MINUTES * 60 * 1000);
+  // Trouble usually comes back on a new account: watch chat at hawk speed for the next 20 minutes.
+  state.activeUntil = Math.max(state.activeUntil, now + 20 * 60 * 1000);
   const withRule = now - lastRuleLine > 3 * 60 * 1000;
   if (withRule) lastRuleLine = now;
   const made = await accountMade(author.channelId).catch(() => null);
@@ -672,12 +697,13 @@ const loop = async () => {
       else if (state.chatId && Date.now() - state.lastFind > 5 * 60 * 1000) await findLive();
       if (state.chatId) {
         const min = await readChat();
-        wait = Math.max(min, Date.now() < state.activeUntil ? ACTIVE_MS : BASE_MS);
+        const paced = pacedMs();
+        wait = Math.max(min, Date.now() < state.activeUntil ? Math.max(HAWK_MIN_MS, paced * 0.4) : Math.max(QUIET_MIN_MS, paced));
       } else wait = 5 * 60 * 1000;
     }
   } catch (error) {
     // Chat ended / stream changed: look for the live video again. Out of quota: wait it out.
-    if (/quota/i.test(error.message)) { state.units = DAILY_BUDGET; wait = 30 * 60 * 1000; }
+    if (/quota/i.test(error.message)) { state.unitsDay = ptDay(); state.units = DAILY_BUDGET; saveQuota(); wait = 30 * 60 * 1000; }
     else { state.chatId = ''; state.lastFind = 0; wait = 2 * 60 * 1000; }
     console.warn('[chat]', error.message);
   }
