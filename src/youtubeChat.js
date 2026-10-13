@@ -462,7 +462,7 @@ const TARGET = /\b(we\s*-?\s*bot|webot|ryan|this\s+(stream|channel|bot)|weather\
 const FAN = /\bnot\s+a\s+(ryan\s+)?(copy|clone|rip\s*-?\s*off|knock\s*-?\s*off)\b/i;
 // "Stop stealing", "this is theft", "copyright infringement": accusing the stream of stealing counts too.
 // Storms stealing roofs and "stole the show / my heart" don't.
-const STEAL = /\b(steal(s|ing|er|ers)?|stole(n)?|theft|thie(f|ves|ving)|infring(e|es|ed|ing|ement)|plagiari(sm|ze|zed|zing)|ripp(ing|ed)\s+(him\s+|them\s+)?off|intellectual\s+property|copyright(ed)?\s+(infringement|violation|strike|claim))\b/i;
+const STEAL = /\b(steal(s|ing|er|ers)?|stole(n)?|theft|thie(f|ves|ving)|infring(e|es|ed|ing|ement)|plagiari(sm|ze|zed|zing)|ripp(ing|ed)\s+(him\s+|them\s+)?off|intellectual\s+property|trade\s*-?\s*dress|cease\s+and\s+desist|copyright(ed)?\s+(infringement|violation|strike|claim))\b/i;
 const STEAL_TARGET = /\b(you|your|you'?re|ur|u|this|that|stop|buddy|bro|webot|we\s*-?\s*bot|weather\s*power|ryan|hall|yallbot|y'?all\s*-?\s*bot)\b/i;
 const NOT_STEALING = /\b(tornado|hail|storm|wind|flood|roof|power|stole\s+(my|the)\s+(heart|show))\b/i;
 export const downgrades = (text) => {
