@@ -671,6 +671,9 @@ export const applyLiveCommand = async (body = {}) => {
       await saveSecrets();
       break;
     }
+    case 'puter-claim-new':
+      // A one-time phone sign-in link code (see newPuterClaim). Made by the running server so it's in memory.
+      return { claim: await newPuterClaim(Math.min(120, Math.max(5, Number(body.minutes) || 30))) };
     case 'puter-unlink': {
       const s = await loadSecrets();
       Object.assign(s, { puterToken: null, puterUser: '', puterLinkedAt: new Date().toISOString() });

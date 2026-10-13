@@ -89,9 +89,12 @@ app.use((req, res, next) => {
     || req.path.startsWith('/api/warnings/rendered/')
     || req.path.startsWith('/api/v3/')
     || req.path.startsWith('/radar-l2/')
+    || req.path.startsWith('/live/puter-link/')
   );
   // Live control is token-checked in its own handler, which refuses to run without a configured token.
-  const isPublicShortRequest = req.method === 'POST' && (req.path === '/api/v3/short/request' || req.path === '/api/v3/live/control');
+  // The phone Puter link posts its sign-in with a one-time code (checked in usePuterClaim).
+  const isPublicShortRequest = req.method === 'POST' && (req.path === '/api/v3/short/request' || req.path === '/api/v3/live/control'
+    || req.path.startsWith('/api/v3/live/puter-claim/'));
 
   if (isPublicGet || isPublicShortRequest) {
     next();
