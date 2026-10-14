@@ -34,7 +34,8 @@
     .train .tl div { padding: 10px 18px 11px; }
     .train .tl strong { display: block; font: 700 30px/1.05 "WP Display"; letter-spacing: .02em; text-transform: uppercase; color: #fff; }
     .train .tl small { display: block; margin-top: 4px; font: 700 13px/1 "WP Mono"; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.7); }
-    /* Countdowns segment: full board between the header and the bottom bar (WeBot stays in his corner). */
+    /* Countdowns segment: full board between the header and the bottom bar. Next Up's column sits on WeBot's side,
+       ending above his corner (see the look-dispatch overrides for when he's bottom-left). */
     .cdn { position: absolute; left: 0; top: 80px; width: 1920px; height: 920px; z-index: 11; opacity: 0; pointer-events: none; transition: opacity .6s ease; overflow: hidden;
       background: radial-gradient(ellipse at 30% 20%, #1b2a4a 0%, #0c1426 55%, #070b14 100%); }
     .cdn.on { opacity: 1; }
@@ -406,6 +407,10 @@
     body.look-porch .now .l2 { color: #f5dcb4; }
     body.look-porch .brandbox { background: #2a1d12; }
     body.look-porch .bot { left: 44px; top: 18px; right: auto; bottom: auto; z-index: 25; }
+    /* Countdowns with WeBot top-left: header and cards move right of him, Next Up goes in the left column under him. */
+    body.look-porch .cdn-h { left: 330px; }
+    body.look-porch .cdn-next { left: 48px; top: 214px; }
+    body.look-porch .cdn-live, body.look-porch .cdn-grid { left: 358px; width: 1514px; }
     body.look-porch .card { left: 372px; top: 30px; }
     body.look-porch .rp { top: 30px; }
     body.look-porch .focus { left: 372px; bottom: 132px; }
@@ -452,6 +457,10 @@
     body.look-dispatch .chatbox { right: 32px; bottom: 178px; }
     body.look-dispatch .np { right: 32px; bottom: 172px; }
     body.look-dispatch .attrib { right: 32px; bottom: 160px; }
+    /* Countdowns with WeBot bottom-left: Next Up moves to the left column above him, cards fill the right and end above the radio tag. */
+    body.look-dispatch .cdn-next { left: 48px; top: 126px; }
+    body.look-dispatch .cdn-live { left: 358px; width: 1514px; }
+    body.look-dispatch .cdn-grid { left: 358px; width: 1514px; bottom: 128px; }
 
     .gate { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 100; padding: 12px 18px; border: 0; background: #ffd34d; color: #111; font: 700 16px "WP Sans", system-ui, sans-serif; cursor: pointer; }
     .gate[hidden] { display: none; }
