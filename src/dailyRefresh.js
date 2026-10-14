@@ -159,6 +159,8 @@ export const refreshNow = async () => {
   if (!token) throw new Error('YouTube is not linked (run scripts/youtube-auth.mjs on your PC)');
   const id = await findVideo();
   if (!id) throw new Error('No live broadcast found');
+  // Thumbnail first: if it can't be made, stop before spending quota on the title.
+  const jpg = await fs.readFile(await renderThumbnail());
   const auth = { Authorization: 'Bearer ' + token };
   // Title: the API replaces the whole snippet, so send back everything else unchanged.
   const cur = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${id}`, { headers: auth }).then((r) => r.json());
@@ -168,7 +170,6 @@ export const refreshNow = async () => {
   const snippet = { title, description: sn.description, categoryId: sn.categoryId, tags: sn.tags, defaultLanguage: sn.defaultLanguage, defaultAudioLanguage: sn.defaultAudioLanguage };
   const up = await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet', { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ id, snippet }) });
   if (!up.ok) throw new Error('Title update ' + up.status + ' ' + (await up.text()).slice(0, 200));
-  const jpg = await fs.readFile(await renderThumbnail());
   const th = await fetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${id}&uploadType=media`, { method: 'POST', headers: { ...auth, 'Content-Type': 'image/jpeg' }, body: jpg });
   if (!th.ok) throw new Error('Thumbnail upload ' + th.status + ' ' + (await th.text()).slice(0, 200));
   const result = { date: centralDate(), at: new Date().toISOString(), videoId: id, title };
@@ -179,14 +180,17 @@ export const refreshNow = async () => {
 
 export const startDailyRefresh = () => {
   if (process.env.DAILY_REFRESH === 'false') return;
+  // After a failure, wait 2 hours before trying again (a retry every 15 min used up the whole YouTube quota on Oct 13).
+  let failedAt = 0;
   const tick = async () => {
     try {
-      if (!ytLinked() || centralHour() < HOUR) return;
+      if (!ytLinked() || centralHour() < HOUR || Date.now() - failedAt < 2 * 3600000) return;
       const last = existsSync(STATE) ? JSON.parse(await fs.readFile(STATE, 'utf8')) : {};
       if (last.date === centralDate()) return;
       await refreshNow();
     } catch (error) {
-      console.warn('[daily]', error.message);
+      failedAt = Date.now();
+      console.warn('[daily]', error.message, '(next try in 2 h)');
     }
   };
   setTimeout(tick, 60000);
