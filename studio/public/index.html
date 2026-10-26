@@ -250,6 +250,7 @@
           <button class="btn" id="git-commit">Save version</button>
           <button class="btn primary" id="deploy-btn">Deploy to server</button>
         </div>
+        <div id="deploy-status" class="deploy-status" role="status" aria-live="polite">Checking which files still need to reach the VPS…</div>
         <div class="code">
           <div class="files">
             <div class="tools"><input type="text" id="file-filter" placeholder="Find a file…"><label class="toggle"><input type="checkbox" id="file-changed">Changed only</label></div>
@@ -259,7 +260,7 @@
             <div class="tools"><span class="path" id="ed-path">Pick a file</span><span class="chip a" id="ed-dirty" hidden>Unsaved</span><span style="flex:1"></span>
               <button class="btn sm" id="ed-revert" disabled>Undo my changes</button><button class="btn sm primary" id="ed-save" disabled>Save · Ctrl+S</button></div>
             <div class="host" id="ed-host"></div>
-            <div class="note" id="ed-note">Files marked M are changed since the last saved version.</div>
+            <div class="note" id="ed-note">M means a local edit. TO DEPLOY means the file is saved in Studio/GitHub but not yet on your VPS.</div>
           </div>
         </div>
       </section>

@@ -614,7 +614,7 @@ const loadFw = async () => { try { Object.assign(FW, await call('GET', '/api/fir
 pages.server = { enter: () => { if (!envDirty()) loadEnv(); loadFw(); } };
 
 /* ---------------- code ---------------- */
-const ED = { cm: null, path: '', saved: '', dirty: false, files: [] };
+const ED = { cm: null, path: '', saved: '', dirty: false, files: [], pending: [] };
 const modeFor = (p) => (/\.json$/.test(p) ? { name: 'javascript', json: true } : /\.(m|c)?js$/.test(p) ? 'javascript' : /\.html$/.test(p) ? 'htmlmixed' : /\.css$/.test(p) ? 'css'
   : /\.(sh|service)$|Dockerfile|\.dockerignore|\.gitignore/.test(p) ? 'shell' : /\.ya?ml$/.test(p) ? 'yaml' : /\.md$/.test(p) ? 'markdown' : null);
 const initEditor = () => {
@@ -629,19 +629,46 @@ const initEditor = () => {
 };
 const renderTree = () => {
   const f = $('file-filter').value.toLowerCase(), onlyChanged = $('file-changed').checked;
-  const list = ED.files.filter((x) => (!f || x.path.toLowerCase().includes(f)) && (!onlyChanged || x.status));
+  const pending = new Set(ED.pending);
+  const list = ED.files.filter((x) => (!f || x.path.toLowerCase().includes(f)) && (!onlyChanged || x.status || pending.has(x.path)));
   let lastDir = null, html = '';
   for (const x of list) {
     const dir = x.path.includes('/') ? x.path.slice(0, x.path.lastIndexOf('/')) : '(project)';
     if (dir !== lastDir) { html += `<div class="dir">${esc(dir)}</div>`; lastDir = dir; }
-    html += `<button data-file="${esc(x.path)}" class="${x.path === ED.path ? 'on' : ''}" title="${esc(x.path)}">${esc(x.path.split('/').pop())}${x.status ? `<em>${esc(x.status)}</em>` : ''}</button>`;
+    const isPending = pending.has(x.path);
+    html += `<button data-file="${esc(x.path)}" class="${x.path === ED.path ? 'on' : ''}" title="${esc(x.path)}">${esc(x.path.split('/').pop())}${x.status ? `<em>${esc(x.status)}</em>` : isPending ? '<em class="pending">TO DEPLOY</em>' : ''}</button>`;
   }
   $('tree').innerHTML = html || '<div class="dir">No files</div>';
-  const n = ED.files.filter((x) => x.status).length;
+  const n = ED.files.filter((x) => x.status || pending.has(x.path)).length;
   $('code-badge').hidden = !n; $('code-badge').textContent = n;
 };
+const refreshDeployStatus = async () => {
+  const el = $('deploy-status');
+  try {
+    const plan = await call('GET', '/api/deploy/plan');
+    ED.pending = plan.files || [];
+    el.className = 'deploy-status' + (ED.pending.length ? ' needs-deploy' : '');
+    if (ED.pending.length) {
+      el.textContent = ED.pending.length + ' file(s) ready for VPS deployment — ' + ED.pending.join(', ')
+        + '. Review them below, then choose Deploy to server when ready.';
+    } else {
+      el.textContent = 'No deployment pending. The VPS matches the files in Studio (or has no changes Studio can detect).';
+    }
+  } catch (e) {
+    ED.pending = [];
+    el.className = 'deploy-status unavailable';
+    el.textContent = 'Could not compare this Studio with the VPS: ' + e.message;
+  }
+  renderTree();
+};
 const loadFiles = async () => {
-  try { const r = await call('GET', '/api/files'); ED.files = r.files; $('f-head').textContent = r.head; renderTree(); } catch (e) { $('tree').innerHTML = `<div class="dir bad">${esc(e.message)}</div>`; }
+  try {
+    const r = await call('GET', '/api/files');
+    ED.files = r.files;
+    $('f-head').textContent = r.head;
+    renderTree();
+    await refreshDeployStatus();
+  } catch (e) { $('tree').innerHTML = `<div class="dir bad">${esc(e.message)}</div>`; }
 };
 const openFile = async (p) => {
   if (ED.dirty && !confirm('Discard unsaved changes to ' + ED.path + '?')) return;

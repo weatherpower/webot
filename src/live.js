@@ -613,7 +613,7 @@ export const applyLiveCommand = async (body = {}) => {
       if (MUSIC_SOURCES.includes(body.source)) music.source = body.source;
       if (MUSIC_MOODS.includes(body.mood)) music.mood = body.mood;
       // WeBot Radio style: mix (lo-fi with some country), lofi, or country (storms stay lo-fi).
-      if (['mix', 'lofi', 'country'].includes(body.genre)) music.genre = body.genre;
+      if (['mix', 'lofi', 'country', 'halloween'].includes(body.genre)) music.genre = body.genre;
       if ('duck' in body) music.duck = Boolean(body.duck);
       current.music = music;
       break;
