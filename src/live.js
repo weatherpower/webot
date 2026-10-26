@@ -1,4 +1,3 @@
-// Halloween 2026: explicit manual-redeploy marker for WeBot Studio; existing stream controls unchanged.
 // Live stream support: activity index with history, storm reports, nearest-radar loops and the
 // stream control store (pin an alert, focus a state, make the bot talk, banner messages).
 import { saveBrain } from './brain.js';
@@ -614,7 +613,7 @@ export const applyLiveCommand = async (body = {}) => {
       if (MUSIC_SOURCES.includes(body.source)) music.source = body.source;
       if (MUSIC_MOODS.includes(body.mood)) music.mood = body.mood;
       // WeBot Radio style: mix (lo-fi with some country), lofi, or country (storms stay lo-fi).
-      if (['mix', 'lofi', 'country', 'halloween'].includes(body.genre)) music.genre = body.genre;
+      if (['mix', 'lofi', 'country'].includes(body.genre)) music.genre = body.genre;
       if ('duck' in body) music.duck = Boolean(body.duck);
       current.music = music;
       break;
