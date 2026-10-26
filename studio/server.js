@@ -343,7 +343,7 @@ app.post('/api/server/restart', api(async () => {
   return { ok: r.code === 0, out: (r.out + r.err).trim() };
 }));
 app.post('/api/server/rebuild', api(async () => {
-  const r = await ssh(`cd ${R()} && docker compose build -q 2>&1 | tail -3 && docker compose up -d 2>&1 | tail -2`, { timeout: 600000 });
+  const r = await ssh(`cd ${R()} && docker compose build -q 2>&1 && docker compose up -d 2>&1`, { timeout: 600000 });
   healthCache.at = 0;
   return { ok: r.code === 0, out: (r.out + r.err).trim() };
 }));
@@ -559,7 +559,7 @@ app.post('/api/deploy', async (req, res) => {
       }
 
       say('Rebuilding and restarting the stream (about 1–2 minutes, the stream blips once)…');
-      const rebuilt = await ssh(`cd ${R()} && docker compose build -q 2>&1 | tail -3 && docker compose up -d 2>&1 | tail -2`, { timeout: 600000 });
+      const rebuilt = await ssh(`cd ${R()} && docker compose build -q 2>&1 && docker compose up -d 2>&1`, { timeout: 600000 });
       say((rebuilt.out + rebuilt.err).trim() || 'done');
       if (rebuilt.code !== 0) {
         say('Deploy FAILED. The old version may still be running. Check Logs.');
@@ -589,7 +589,7 @@ app.post('/api/deploy', async (req, res) => {
       ssh(`cd ${R()} && docker compose build -q >/dev/null 2>&1`, { timeout: 600000 });
     } else {
       say('Rebuilding and restarting the stream (about 1–2 minutes, the stream blips once)…');
-      const r = await ssh(`cd ${R()} && docker compose build -q 2>&1 | tail -3 && docker compose up -d 2>&1 | tail -2`, { timeout: 600000 });
+      const r = await ssh(`cd ${R()} && docker compose build -q 2>&1 && docker compose up -d 2>&1`, { timeout: 600000 });
       say((r.out + r.err).trim() || 'done');
       if (r.code !== 0) { say('Deploy FAILED. The old version may still be running. Check Logs.'); return res.end(); }
     }

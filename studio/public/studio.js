@@ -772,8 +772,15 @@ $('deploy-btn').addEventListener('click', async () => {
   } catch (e) { out.textContent += '\nERROR: ' + e.message; }
   const ok = /DONE\s*$/.test(out.textContent);
   $('m-title').textContent = ok ? 'Deployed' : 'Deploy stopped';
+  // Keep errors visible and easy to share even when no screenshot was captured.
+  const copyLog = document.createElement('button');
+  copyLog.className = 'btn'; copyLog.textContent = 'Copy deployment log';
+  copyLog.onclick = async () => {
+    try { await navigator.clipboard.writeText(out.textContent); toast('Deployment log copied'); }
+    catch (e) { toast('Could not copy log: ' + e.message, 'bad'); }
+  };
   const close = document.createElement('button'); close.className = 'btn'; close.textContent = 'Close'; close.onclick = () => $('modal').classList.remove('on');
-  $('m-actions').appendChild(close);
+  $('m-actions').append(copyLog, close);
   loadFiles(); loadOverview();
 });
 pages.code = { enter: () => { initEditor(); loadFiles(); setTimeout(() => ED.cm?.refresh(), 0); } };

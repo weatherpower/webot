@@ -1,3 +1,4 @@
+// Halloween 2026: explicit manual-redeploy marker for WeBot Studio; existing stream controls unchanged.
 // Live stream support: activity index with history, storm reports, nearest-radar loops and the
 // stream control store (pin an alert, focus a state, make the bot talk, banner messages).
 import { saveBrain } from './brain.js';
