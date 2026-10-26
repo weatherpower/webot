@@ -68,6 +68,17 @@
     .cdn-next .hms { margin-top: 10px; font: 700 30px/1 "WP Mono"; font-variant-numeric: tabular-nums; }
     .shade { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,0) 12%, rgba(0,0,0,0) 86%, rgba(0,0,0,.35)); }
 
+    /* Small, low-cost Halloween trim: stays behind weather cards and never catches clicks. */
+    .halloween-decor { position: absolute; inset: 0; z-index: 9; pointer-events: none; opacity: 0; transition: opacity .4s ease; }
+    body.halloween .halloween-decor { opacity: 1; }
+    body.brb-on .halloween-decor, body.halloween:has(.brk.show) .halloween-decor { opacity: 0; }
+    .halloween-decor .cobweb { position: absolute; left: 0; top: 81px; width: 155px; height: 155px; opacity: .5; }
+    .halloween-decor .cobweb.right { left: auto; right: 0; transform: scaleX(-1); }
+    .halloween-decor .bats { position: absolute; top: 92px; left: 48%; width: 145px; height: 60px; opacity: .72; }
+    .halloween-decor .october-tag { position: absolute; top: 94px; right: 176px; border: 1px solid rgba(255,158,63,.62);
+      padding: 7px 12px; color: #ffd8ac; background: rgba(30,10,42,.86); font: 700 14px "WP Mono", monospace; letter-spacing: .16em; }
+    @media (prefers-reduced-motion: reduce) { .halloween-decor { transition: none; } }
+
     /* ---------- top bar ---------- */
     .top { position: absolute; left: 0; right: 0; top: 0; height: 80px; display: flex; background: var(--violet); z-index: 20; }
     .tally { display: flex; flex: none; }
@@ -502,6 +513,20 @@
       <div class="r31-visual-label">BACKGROUND GRAPHIC · NOT LIVE RADAR DATA</div>
     </section>
 
+
+    <div class="halloween-decor" aria-hidden="true">
+      <svg class="cobweb" viewBox="0 0 160 160" fill="none" stroke="#e9c5ff" stroke-width="2">
+        <path d="M0 0 L160 0 M0 0 L0 160 M0 0 L114 114 M0 0 L160 75 M0 0 L75 160 M25 0 Q26 23 0 25 M55 0 Q55 56 0 55 M95 0 Q95 95 0 95 M140 0 Q140 140 0 140"/>
+      </svg>
+      <svg class="cobweb right" viewBox="0 0 160 160" fill="none" stroke="#e9c5ff" stroke-width="2">
+        <path d="M0 0 L160 0 M0 0 L0 160 M0 0 L114 114 M0 0 L160 75 M0 0 L75 160 M25 0 Q26 23 0 25 M55 0 Q55 56 0 55 M95 0 Q95 95 0 95 M140 0 Q140 140 0 140"/>
+      </svg>
+      <svg class="bats" viewBox="0 0 160 65" fill="#1d1223" stroke="#ffab62" stroke-width="1.5">
+        <path d="M12 25 Q26 12 39 28 Q46 12 54 24 Q61 12 68 28 Q78 13 91 26 Q72 24 65 41 Q58 34 54 37 Q44 34 39 41 Q29 26 12 25Z"/>
+        <path d="M95 44 Q108 34 114 42 Q119 31 124 41 Q130 34 137 43 Q149 36 158 43 Q141 44 137 52 Q131 47 125 51 Q119 47 113 52 Q106 44 95 44Z"/>
+      </svg>
+      <div class="october-tag">🎃 OCTOBER NIGHTS</div>
+    </div>
 
     <header class="top">
       <div class="tally">
@@ -1326,7 +1351,8 @@
     const RADIO_NAMES = {
       calm: ['Clear Skies', 'Dew Point', 'Warm Front', 'High Pressure', 'Fair Weather', 'Morning Fog', 'Light Breeze', 'Sunday Radar'],
       chill: ['Night Shift', 'Overnight Radar', 'Low Clouds', 'Outflow', 'Mesoscale', 'Watch Box', 'Chaser Coffee', 'Data Feed'],
-      tense: ['Supercell Season', 'Hook Echo', 'Wall Cloud', 'Dryline', 'Rear Flank', 'Couplet', 'Inflow', 'Bounded Weak Echo']
+      tense: ['Supercell Season', 'Hook Echo', 'Wall Cloud', 'Dryline', 'Rear Flank', 'Couplet', 'Inflow', 'Bounded Weak Echo'],
+      halloween: ['Lantern Road', 'October Fog', 'Ghost Station', 'Midnight Crossing', 'Pumpkin Static', 'Moonlit Highway', 'The Last Signal', 'Haunted Backroads']
     };
     // Country songs (calm and chill moods only; storms keep the darker lo-fi).
     const COUNTRY_NAMES = ['Red Dirt Radar', 'Front Porch Forecast', 'Dryline Drive', 'Kiamichi Morning', 'County Road Rain', 'Heat Lightning',
@@ -1337,16 +1363,18 @@
       [[0, 'M'], [5, 'M'], [0, 'M'], [7, 'M']], [[9, 'm'], [5, 'M'], [0, 'M'], [7, 'M']], [[0, 'M'], [4, 'm'], [5, 'M'], [7, 'M']]
     ];
     const COUNTRY = { bpm: [84, 108], keys: [55, 57, 50, 52, 48], tone: 9000, pad: 0 };
-    const CHORDS = { maj7: [0, 4, 7, 11], maj9: [0, 4, 7, 11, 14], m7: [0, 3, 7, 10], m9: [0, 3, 7, 10, 14], m11: [0, 3, 7, 10, 14, 17], dom9: [0, 4, 7, 10, 14], sus: [0, 5, 7, 10, 14] };
+    const CHORDS = { maj7: [0, 4, 7, 11], maj9: [0, 4, 7, 11, 14], m7: [0, 3, 7, 10], m9: [0, 3, 7, 10, 14], m11: [0, 3, 7, 10, 14, 17], dom9: [0, 4, 7, 10, 14], sus: [0, 5, 7, 10, 14], dim7: [0, 3, 6, 9] };
     const PROGS = {
       calm: [[[0, 'maj9'], [9, 'm9'], [2, 'm9'], [7, 'sus']], [[5, 'maj9'], [4, 'm7'], [2, 'm9'], [0, 'maj9']], [[0, 'maj7'], [5, 'maj9'], [9, 'm9'], [5, 'maj9']]],
       chill: [[[2, 'm9'], [7, 'dom9'], [0, 'maj9'], [9, 'm9']], [[9, 'm9'], [5, 'maj9'], [0, 'maj7'], [7, 'sus']], [[4, 'm7'], [9, 'm9'], [2, 'm9'], [7, 'dom9']]],
-      tense: [[[0, 'm9'], [8, 'maj7'], [5, 'm9'], [7, 'm7']], [[0, 'm11'], [0, 'm11'], [8, 'maj9'], [10, 'sus']], [[0, 'm9'], [3, 'maj7'], [8, 'maj7'], [7, 'sus']]]
+      tense: [[[0, 'm9'], [8, 'maj7'], [5, 'm9'], [7, 'm7']], [[0, 'm11'], [0, 'm11'], [8, 'maj9'], [10, 'sus']], [[0, 'm9'], [3, 'maj7'], [8, 'maj7'], [7, 'sus']]],
+      halloween: [[[0, 'm9'], [6, 'dim7'], [3, 'm7'], [7, 'm7']], [[0, 'm11'], [8, 'maj7'], [6, 'dim7'], [0, 'm9']]]
     };
     const STYLES = {
       calm: { bpm: [70, 78], keys: [60, 62, 65, 67], bars: 2, kick: '1000000000100000', snare: '0000100000001000', hat: '1010101010101010', stab: [0], mel: 0.16, scale: [0, 2, 4, 7, 9], pad: 0.7, tone: 6200 },
       chill: { bpm: [80, 88], keys: [57, 60, 62, 64], bars: 1, kick: '1000000010100000', snare: '0000100000001000', hat: '1111111111111111', stab: [0, 6, 11], mel: 0.2, scale: [0, 2, 4, 7, 9], pad: 0.5, tone: 7000 },
-      tense: { bpm: [64, 70], keys: [57, 55, 52, 50], bars: 2, kick: '1000000010000000', snare: '0000000000001000', hat: '0010001000100010', stab: [], arp: true, mel: 0.07, scale: [0, 3, 5, 7, 10], pad: 1, tone: 3800 }
+      tense: { bpm: [64, 70], keys: [57, 55, 52, 50], bars: 2, kick: '1000000010000000', snare: '0000000000001000', hat: '0010001000100010', stab: [], arp: true, mel: 0.07, scale: [0, 3, 5, 7, 10], pad: 1, tone: 3800 },
+      halloween: { bpm: [58, 68], keys: [48, 50, 53, 55], bars: 2, kick: '1000000000000000', snare: '0000000000000000', hat: '0000000000000000', stab: [0], arp: true, mel: 0.30, scale: [0, 3, 6, 7, 10], pad: 0.85, tone: 3300 }
     };
     const makeRadio = (ctx, out, opts = {}) => {
       const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
@@ -1653,10 +1681,14 @@
           api.onTrack?.(track);
           return;
         }
-        const style = STYLES[mood];
-        let name = pick(RADIO_NAMES[mood]);
-        if (track && name === track.name) name = pick(RADIO_NAMES[mood]);
-        track = { mood, style, name, key: pick(style.keys), bpm: Math.round(rnd(style.bpm[0], style.bpm[1])), prog: pick(PROGS[mood]), bars: 48 };
+        // Original Halloween score: soft bells, minor chords and a slow, eerie arpeggio.
+        // Severe-weather mode takes priority over the seasonal arrangement.
+        const spooky = genre === 'halloween' && mood !== 'tense';
+        const arrangement = spooky ? 'halloween' : mood;
+        const style = STYLES[arrangement];
+        let name = pick(RADIO_NAMES[arrangement]);
+        if (track && name === track.name) name = pick(RADIO_NAMES[arrangement]);
+        track = { mood, style, name, key: pick(style.keys), bpm: Math.round(rnd(style.bpm[0], style.bpm[1])), prog: pick(PROGS[arrangement]), bars: 48 };
         step = opts.skipIntro && !api.started ? 4 * 16 : 0;
         api.started = true;
         tone.frequency.setTargetAtTime(style.tone, Math.max(ctx.currentTime, nextAt), 1.5);
@@ -1707,7 +1739,7 @@
         onTrack: null,
         get track() { return track; },
         setMood(mood) { if (STYLES[mood]) wantMood = mood; },
-        setGenre(g) { if (['mix', 'lofi', 'country'].includes(g)) genre = g; },
+        setGenre(g) { if (['mix', 'lofi', 'country', 'halloween'].includes(g)) genre = g; },
         next() { nextAt = Math.max(nextAt, ctx.currentTime + 0.05); newTrack(wantMood); },
         // Schedule every note up to time `until` (seconds on the audio clock).
         schedule(until) {
@@ -1736,7 +1768,7 @@
 
     const musicCfg = () => ({ on: true, volume: 35, source: 'auto', mood: 'auto', genre: 'mix', duck: true, ...(S.control.music || {}) });
     const B = { brain: null, at: 0 };
-    const M = { bus: null, duck: null, radio: null, timer: null, el: null, files: [], filesAt: 0, order: [], idx: -1, playing: '', mode: '', mood: '', fading: false, fails: 0 };
+    const M = { bus: null, duck: null, radio: null, timer: null, el: null, files: [], filesAt: 0, order: [], idx: -1, playing: '', mode: '', mood: '', genre: '', fading: false, fails: 0 };
     const autoMood = () => {
       const t = S.live?.tallies || {};
       const level = S.live?.wis?.level || '';
@@ -1778,7 +1810,7 @@
     };
     const startRadio = () => {
       if (M.radio) return;
-      M.radio = makeRadio(actx, M.bus, { mood: M.mood, genre: musicCfg().genre, lite: OPT.lite });
+      M.radio = makeRadio(actx, M.bus, { mood: M.mood, genre: M.genre || musicCfg().genre, lite: OPT.lite });
       M.radio.onTrack = (track) => { M.playing = track.name + ' · WeBot Radio'; renderNp(); };
       if (Number.isFinite(B.brain?.radio?.countryShare)) M.radio.countryShare = B.brain.radio.countryShare;
       const ahead = OPT.lite ? 2.5 : 0.4;
@@ -1810,9 +1842,17 @@
       const cfg = musicCfg();
       const on = OPT.music && cfg.on && actx.state === 'running';
       const mode = !on ? '' : (cfg.source === 'files' || cfg.source === 'auto') && M.files.length ? 'files' : 'radio';
-      M.mood = cfg.mood === 'auto' ? autoMood() : cfg.mood;
+      // Do not let a manually chosen festive mood mask urgent severe weather.
+      const safetyMood = autoMood();
+      M.mood = safetyMood === 'tense' ? 'tense' : cfg.mood === 'auto' ? safetyMood : cfg.mood;
       M.radio?.setMood(M.mood);
-      M.radio?.setGenre(cfg.genre);
+      const festive = cfg.genre === 'halloween' || (cfg.genre === 'mix' && S.themeKey === 'fall');
+      const desiredGenre = festive && M.mood !== 'tense' ? 'halloween' : cfg.genre === 'halloween' ? 'lofi' : cfg.genre;
+      if (M.genre !== desiredGenre) {
+        M.genre = desiredGenre;
+        M.radio?.setGenre(desiredGenre);
+        M.radio?.next(); // Switch styles without needing a page refresh.
+      }
       const now = actx.currentTime;
       if (mode !== M.mode) {
         if (M.fading) return;
@@ -2311,6 +2351,11 @@
       if (count(/^(hurricane|tropical storm|storm surge) (warning|watch)$/i)) return 'tropical';
       if ((t.svr || 0) >= 3 || level === 'active') return 'storm';
       if ((t.ffw || 0) >= 3 || count(/flash flood emergency/i)) return 'flood';
+      // October 20-31: festive look only when significant hazards above are absent.
+      // Use the broadcast's configured time zone, not the hosting server's UTC date.
+      const [month, day] = new Intl.DateTimeFormat('en-US', { timeZone: OPT.tz, month: 'numeric', day: 'numeric' })
+        .format(new Date()).split('/').map(Number);
+      if (month === 10 && day >= 20) return 'fall';
       // Nights (8 PM to 6 AM on the stream's clock) go after dark unless something dangerous is going on.
       const hour = Number(new Date().toLocaleString('en-US', { timeZone: OPT.tz, hour: 'numeric', hour12: false })) % 24;
       if (hour >= 20 || hour < 6) return 'afterdark';
@@ -2319,8 +2364,11 @@
       return 'violet';
     };
     const applyTheme = () => {
-      const pick = S.control.theme && S.control.theme !== 'auto' ? S.control.theme : weatherTheme();
+      const natural = weatherTheme();
+      const requested = S.control.theme && S.control.theme !== 'auto' ? S.control.theme : natural;
+      const pick = requested === 'fall' && ['tornado', 'storm', 'flood', 'tropical'].includes(natural) ? natural : requested;
       const key = THEMES[pick] ? pick : 'violet';
+      document.body.classList.toggle('halloween', key === 'fall' && !S.inBreaking && !S.control.brb);
       if (S.themeKey === key) return;
       S.themeKey = key;
       const th = THEMES[key];
