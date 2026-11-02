@@ -46,6 +46,9 @@ Xvfb :99 -screen 0 "${WIDTH}x${HEIGHT}x24" -nolisten tcp -ac &
 pids+=($!)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-$(id -u)}"
 mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+# Clear PulseAudio files left from a previous run of this container (after a server reboot they made
+# PulseAudio refuse to start, and the stream had no sound device: Oct 19 2026 outage).
+rm -rf "$XDG_RUNTIME_DIR/pulse" /tmp/pulse-* "${HOME:-/root}"/.config/pulse/*-runtime "${HOME:-/root}"/.config/pulse/*.pid 2>/dev/null || true
 pulseaudio --daemonize=yes --exit-idle-time=-1 --disallow-exit --log-target=stderr >/dev/null 2>&1
 for _ in $(seq 1 20); do pactl info >/dev/null 2>&1 && break; sleep 0.5; done
 pactl load-module module-null-sink sink_name=stream sink_properties=device.description=stream >/dev/null
@@ -86,6 +89,15 @@ CHROME_GL_FLAGS="${CHROME_GL_FLAGS:---disable-gpu-compositing --use-gl=angle --u
     --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
     --user-data-dir=/tmp/stream-chrome "$PAGE" >/dev/null 2>&1
   log "chrome stopped (exit $?), restarting in 3 s"; sleep 3
+done) &
+pids+=($!)
+# Map drawing (SwiftShader, Chrome's GPU process) is the CPU hog. Run it at low priority so the sound
+# (Chrome's audio + PulseAudio) and ffmpeg always get the CPU first; the map just slows a little in a pinch.
+# Checked every 30 s because Chrome makes new threads (and a new GPU process if it restarts).
+(while sleep 30; do
+  for c in $(grep -l -a -e "[-]-type=gpu-process" /proc/[0-9]*/cmdline 2>/dev/null); do p=${c%/cmdline}; p=${p#/proc/}
+    for t in /proc/$p/task/*; do renice -n "${MAP_NICE:-10}" -p "${t##*/}" >/dev/null 2>&1; done
+  done
 done) &
 pids+=($!)
 sleep 12

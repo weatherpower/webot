@@ -40,7 +40,7 @@ Read this first. It explains what this project is, where it runs, and how to cha
 - Port 8899 (Live Control) is firewalled to the owner's home IP (`/usr/local/sbin/wp-firewall.sh`,
   `allowed-ips.txt`). Port 80 is the public status page.
 - Stream settings in `.env`: 1080p output (`STREAM_WIDTH/HEIGHT`), drawn at 720p (`RENDER_WIDTH/HEIGHT`),
-  `STREAM_PRESET=veryfast`, `STREAM_CPUS=5.5`. **The owner wants 1080p kept.** The map is CPU-drawn, so heavy
+  `STREAM_PRESET=veryfast`, `STREAM_CPUS=6`. **The owner wants 1080p kept.** The map is CPU-drawn, so heavy
   map work causes lag and audio dropouts; map moves use a fade instead of zooming.
 
 ## How to deploy a change
@@ -62,3 +62,9 @@ Read this first. It explains what this project is, where it runs, and how to cha
 1. **Fold Live Control into WeBot Studio natively:** Studio has a Controls page (Live Control in a frame); next is native Studio versions, then retire `public/livecontrol.html` (keep `/api/v3/live/control`).
 2. **Open source someday:** move owner-specific IDs/IPs/branding into config, pick a license, one-command VPS setup.
 (Done: costumes, Studio on the web.)
+
+## Audio continuity (verified November 2, 2026)
+- On the six-core Contabo host, keep `STREAM_CPUS=6` in the server-only `.env`; lower caps previously starved audio.
+- `run.sh` lowers every SwiftShader GPU thread to `MAP_NICE=10`, refreshed every 30 seconds. Leave automatic card rendering off while streaming.
+- Clear stale PulseAudio runtime files on startup so a server reboot cannot leave ffmpeg without its sound device.
+- Compare live container and host sources before deploying; older Git sources were missing production map/layout fixes.
