@@ -394,6 +394,66 @@
     body[class*="look-"] .wpi .meta span:last-child { font-size: 0; }
     body[class*="look-"] .wpi .meta span:last-child::after { font-size: 10px; letter-spacing: .08em; }
 
+
+    /* ---------- Modes (Live Control layout "Modes"): Command most days, Storm on big days, Quiet when it's calm ---------- */
+    .mcd, .mpill { display: none; }
+    .mcd { flex: none; flex-direction: column; align-items: flex-end; justify-content: center; padding: 0 28px; font-family: "WP Mono"; }
+    .mcd b { font-size: 56px; line-height: 1; color: #fff; }
+    .mcd small { font-size: 14px; letter-spacing: .14em; color: #ffe9a8; margin-top: 6px; max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mpill { flex: none; align-self: center; margin: 0 4px 0 28px; padding: 7px 18px; border: 1px solid #5fd0ff; border-radius: 40px; color: #5fd0ff; background: rgba(95,208,255,.12); font-family: "WP Mono"; font-size: 15px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; }
+
+    /* Command: night-glass bars with a red rule, yellow LATEST tag and clock, warning colors on the tile tops. */
+    body.look-command #stage { --edge: #ff3b3b; --brand: #ff3b3b; --panel: rgba(8,12,18,.92); --line: rgba(255,255,255,.1); }
+    body.look-command .top { height: 72px; background: rgba(6,9,14,.96); border-bottom: 2px solid #ff3b3b; }
+    body.look-command .tile { width: 84px; background: rgba(14,19,27,.995); border-right: 1px solid #000; border-top: 4px solid var(--t); }
+    body.look-command .tile .n svg { color: var(--t); opacity: 1; filter: brightness(2.2); }
+    body.look-command .hl { background: none !important; }
+    body.look-command .hl .slot { height: 72px; }
+    body.look-command .hl .tag { background: #ffcc00; border-color: #ffcc00; color: #0b0f15; }
+    body.look-command .wpi { background: rgba(14,19,27,.995); border-left: 1px solid #000; }
+    body.look-command .wpi .meta span:last-child::after { content: "SIGNAL"; color: #9fb3c8; }
+    body.look-command .bottom { height: 72px; background: rgba(6,9,14,.96); border-top: 2px solid #26303d; }
+    body.look-command .clock { background: #ffcc00; color: #0b0f15; }
+    body.look-command .clock small { color: #4a3d00; }
+    body.look-command .brandbox { background: rgba(14,19,27,.995); }
+    body.look-command .card, body.look-command .rp { top: 94px; }
+    body.look-command .bot { bottom: 78px; }
+
+    /* Storm: red warning stripes across the top with a live countdown, big tallies, yellow severe deck. */
+    body.look-storm #stage { --edge: #ff3b3b; --brand: #ffcc00; --panel: rgba(10,10,10,.93); --line: rgba(255,59,59,.3); }
+    body.look-storm .top { height: 120px; background: repeating-linear-gradient(135deg, rgba(196,0,0,.99) 0 40px, rgba(168,0,0,.99) 40px 80px); border-bottom: 6px solid #ffcc00; }
+    body.look-storm .tile { width: 108px; background: rgba(10,10,10,.55); border-right: 1px solid rgba(0,0,0,.4); border-bottom: 6px solid var(--t); }
+    body.look-storm .tile .n { font-size: 50px; }
+    body.look-storm .tile .n svg { color: #fff; opacity: .9; }
+    body.look-storm .tile .l { color: #fff; }
+    body.look-storm .hl { background: none !important; }
+    body.look-storm .hl .slot { height: 120px; }
+    body.look-storm .hl .tag { background: #ffcc00; border-color: #ffcc00; color: #000; }
+    body.look-storm .wpi { display: none; }
+    body.look-storm .mcd { display: flex; }
+    body.look-storm .bottom { height: 86px; background: rgba(11,11,11,.995); border-top: 4px solid #ffcc00; }
+    body.look-storm .clock { background: #ff3b3b; }
+    body.look-storm .brandbox { background: #1a1a1a; }
+    body.look-storm .card, body.look-storm .rp { top: 148px; }
+    body.look-storm .bot { bottom: 92px; filter: drop-shadow(0 0 22px rgba(255,59,59,.65)); }
+
+    /* Quiet: soft blue, rounded panels, no empty warning tiles (an ALL QUIET pill instead). */
+    body.look-quiet #stage { --edge: #5fd0ff; --brand: #5fd0ff; --panel: rgba(10,22,36,.88); --line: rgba(95,208,255,.2); }
+    body.look-quiet .top { height: 72px; background: rgba(6,14,24,.9); border-bottom: 1px solid rgba(95,208,255,.25); }
+    body.look-quiet .tally { display: none; }
+    body.look-quiet .mpill { display: flex; }
+    body.look-quiet .hl { background: none !important; }
+    body.look-quiet .hl .slot { height: 72px; }
+    body.look-quiet .hl .tag { border-color: #5fd0ff; color: #5fd0ff; background: rgba(95,208,255,.12); border-radius: 40px; }
+    body.look-quiet .wpi { background: rgba(10,22,36,.995); border-left: 1px solid rgba(95,208,255,.2); }
+    body.look-quiet .wpi .meta span:last-child::after { content: "CALM METER"; color: #5fd0ff; }
+    body.look-quiet .bottom { height: 72px; background: rgba(6,14,24,.92); border-top: 1px solid rgba(95,208,255,.25); }
+    body.look-quiet .clock, body.look-quiet .brandbox { background: rgba(10,22,36,.995); }
+    body.look-quiet .clock b { color: #5fd0ff; }
+    body.look-quiet .panel { border-radius: 14px; }
+    body.look-quiet .card, body.look-quiet .rp { top: 94px; }
+    body.look-quiet .bot { bottom: 78px; }
+
     /* Porch: warm amber and charcoal. WeBot has his own column on the left with the warnings under him. */
     body.look-porch #stage { --edge: #f2a33a; --brand: #f2a33a; --panel: rgba(30,21,13,.95); --line: rgba(242,163,58,.22); }
     body.look-porch .top { left: 0; top: 0; bottom: 0; right: auto; width: 340px; height: auto; flex-direction: column; padding-top: 286px; background: #1d140c; border-right: 3px solid #f2a33a; }
@@ -521,6 +581,7 @@
 
 
     <header class="top">
+      <div class="mpill" id="mpill">ALL QUIET · NO WARNINGS</div>
       <div class="tally">
         <div class="tile" id="t-tor" style="--t:#7a1c2a"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M3 5h18M5 9h14M7 13h9M9 17h5M11 21h2"/></svg><span>0</span></div><div class="l">TOR</div></div>
         <div class="tile" id="t-svr" style="--t:#7c5517"><div class="n"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8z"/></svg><span>0</span></div><div class="l">SVR</div></div>
@@ -536,6 +597,7 @@
         </div>
         <canvas id="spark" width="176" height="92"></canvas>
       </div>
+      <div class="mcd" id="mcd"><b id="mcd-v">--:--</b><small id="mcd-l">UNTIL EXPIRES</small></div>
     </header>
 
     <section class="panel card" id="card"></section>
@@ -590,8 +652,9 @@
       state: (P.get('state') || '').toUpperCase(),
       voice: P.get('voice') !== '0',
       zoom: P.get('zoom') === '1',
-      // Basemap: the WeatherPower Radar satellite map (NASA Blue Marble with roads, counties and labels); ?map=dark for the old dark map.
-      map: P.get('map') === 'dark' ? 'dark' : 'satellite',
+      // Basemap: the dark storm-monitor map. ?map=satellite for the WeatherPower Radar satellite map (much harder to encode:
+      // on Nov 4 it had ffmpeg near 170% CPU and the audio cutting out, so it stays off on the stream server).
+      map: P.get('map') === 'satellite' ? 'satellite' : 'dark',
       // ?halloween=on for preview; ?halloween=off disables; default is Oct 20-31 Central.
       halloween: (P.get('halloween') || 'auto').toLowerCase(),
       sound: P.get('sound') !== '0',
@@ -726,6 +789,14 @@
       if (h < 48) return h + ' HR' + (h === 1 ? '' : 'S') + ' ' + (m % 60) + ' MIN';
       return Math.round(h / 24) + ' DAYS';
     };
+    setInterval(() => {
+      if (!document.body.classList.contains('look-storm')) return;
+      const now = Date.now();
+      const live = (re) => S.alerts.filter((a) => re.test(a.eventLabel || '') && Date.parse(a.expiresAt) > now).sort((a, b) => Date.parse(a.expiresAt) - Date.parse(b.expiresAt))[0];
+      const a = live(/tornado warning/i) || live(/(severe thunderstorm|flash flood) warning/i);
+      $('mcd-v').textContent = a ? countdown(a.expiresAt) : '--:--';
+      $('mcd-l').textContent = a ? (a.eventLabel || '').toUpperCase() + ' · UNTIL EXPIRES' : 'STORM MODE';
+    }, 1000);
     const countdown = (iso) => {
       const ms = Date.parse(iso || '') - Date.now();
       if (!Number.isFinite(ms) || ms <= 0) return '';
@@ -866,8 +937,22 @@
     if (OPT.lite) document.body.classList.add('lite');
     // A whole different layout: Live Control's Layout setting, or ?look=porch | dispatch | classic to preview one.
     const LOOK = (P.get('look') || '').toLowerCase().replace(/[^a-z]/g, '');
+    // Modes: Storm comes in the moment there's a tornado warning (or a pile of severe ones); leaving a mode
+    // waits until the new one has held for 10 minutes, so a warning dropping off doesn't flip the whole screen.
+    const MODE = { now: '', pending: '', since: 0 };
+    const pickMode = () => {
+      const t = S.live?.tallies || {};
+      const want = (t.tor || 0) >= 1 || (t.svr || 0) >= 12 ? 'storm' : !(t.tor || t.svr || t.ffw || t.watches) ? 'quiet' : 'command';
+      if (!S.live) return MODE.now || 'command';
+      if (!MODE.now || want === 'storm') { MODE.now = want; MODE.pending = ''; }
+      else if (want === MODE.now) MODE.pending = '';
+      else if (MODE.pending !== want) { MODE.pending = want; MODE.since = Date.now(); }
+      else if (Date.now() - MODE.since > 600000) { MODE.now = want; MODE.pending = ''; }
+      return MODE.now;
+    };
     const applyLayout = (name) => {
-      const want = LOOK ? (LOOK === 'classic' ? '' : LOOK) : (name || '');
+      let want = LOOK ? (LOOK === 'classic' ? '' : LOOK) : (name || '');
+      if (want === 'modes') want = pickMode();
       if (want === (document.body.dataset.layout || '')) return false;
       document.body.classList.forEach((c) => { if (c.startsWith('look-')) document.body.classList.remove(c); });
       if (want) document.body.classList.add('look-' + want);
@@ -2501,6 +2586,7 @@
       setTally('t-svr', t.svr || 0);
       setTally('t-ffw', t.ffw || 0);
       setTally('t-wch', t.watches || 0);
+      if ((LOOK || S.control?.layout) === 'modes' && applyLayout(S.control?.layout)) fit();
       const wis = S.live?.wis;
       if (wis?.loaded) {
         const color = WIS_COLORS[wis.level] || '#6fd0ff';
