@@ -208,6 +208,8 @@ export const apiV3Router = () => {
         renderer: {
           status: state.status,
           lastFinishedAt: state.lastFinishedAt,
+          lastSuccessfulFetchAt: state.lastSuccessfulFetchAt || null,
+          feedError: Boolean(state.lastError || state.status === 'error'),
           renderedCount: state.renderedCount,
           count: state.count
         },
