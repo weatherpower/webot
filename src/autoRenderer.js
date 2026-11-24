@@ -281,6 +281,9 @@ const toItem = ({ warning, render, hash, status = 'rendered', error = null }) =>
 });
 
 const toPendingItem = async ({ warning, hash, existing, force }) => {
+  if (warning.nwsId && !warning.geometry && !warning.polygon?.length) {
+    return toItem({ warning, render: null, hash, status: 'data' });
+  }
   const item = toItem({ warning, render: null, hash, status: 'pending' });
   if (!force && await canReuseExistingRender(existing, hash)) {
     return mergeExistingRender(item, existing);
@@ -633,6 +636,12 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
         const key = warning.key || warning.nwsId;
         const hash = hashWarning(warning);
         const existing = previous.get(key);
+        if (warning.nwsId && !warning.geometry && !warning.polygon?.length) {
+          renderResults[index] = toItem({ warning, render: null, hash, status: 'data' });
+          completed += 1;
+          await saveProgress(completed === activeWarnings.length);
+          continue;
+        }
         if (!force && await canReuseExistingRender(existing, hash)) {
           let item = mergeExistingRender(pendingItems[index], existing);
           if (existing.discord?.pendingHash === hash && !existing.discord?.postedHash) {
