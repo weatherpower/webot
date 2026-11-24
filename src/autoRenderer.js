@@ -23,6 +23,7 @@ let state = {
   status: 'idle',
   lastStartedAt: null,
   lastFinishedAt: null,
+  lastSuccessfulFetchAt: null,
   lastError: null,
   items: []
 };
@@ -528,7 +529,6 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
       ...state,
       status: force ? 'rendering' : 'refreshing',
       lastStartedAt: new Date().toISOString(),
-      lastError: null,
       items: currentItems,
       renderedCount: currentItems.filter((item) => item.status === 'rendered').length,
       errorCount: currentItems.filter((item) => item.status === 'error').length
@@ -595,6 +595,8 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
       state = {
         ...state,
         status: hasPendingRender(pendingItems) ? 'rendering' : 'refreshing',
+        lastSuccessfulFetchAt: new Date().toISOString(),
+        lastError: null,
         count: activeWarnings.length,
         renderedCount: pendingItems.filter((item) => item.status === 'rendered').length,
         errorCount: pendingItems.filter((item) => item.status === 'error').length,
@@ -707,6 +709,7 @@ export const refreshRenderedWarnings = async ({ force = false } = {}) => {
 
       state = {
         status: hasPendingRender(items) ? 'pending' : 'idle',
+        lastSuccessfulFetchAt: state.lastSuccessfulFetchAt,
         lastStartedAt: state.lastStartedAt,
         lastFinishedAt: new Date().toISOString(),
         lastError: null,
