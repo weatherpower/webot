@@ -262,7 +262,7 @@
       alerts: [], counts: {}, tab: 'warnings', q: '', selected: null, known: null,
       radar: null, frame: 0, playing: true,
       tools: { radar: true, rain: false, sat: false, watches: true, spc: true, reports: false },
-      config: null, map: null, styleReady: false, lastOk: 0, shorts: [], detail: null, shortPoll: null
+      config: null, map: null, styleReady: false, lastOk: 0, feedStatus: 'connecting', shorts: [], detail: null, shortPoll: null
     };
 
     const toast = (msg) => {
@@ -337,7 +337,7 @@
         return;
       }
       if (!items.length) {
-        list.innerHTML = '<div class="empty">' + (S.q ? 'Nothing matches “' + esc(S.q) + '”.' : 'No active ' + esc(S.tab) + ' right now.') + '</div>';
+        list.innerHTML = '<div class="empty">' + (S.feedStatus !== 'live' || !S.lastOk || Date.now() - S.lastOk > 180000 ? 'The alert feed is not current. Check official NWS alerts directly.' : S.q ? 'Nothing matches “' + esc(S.q) + '”.' : 'No active ' + esc(S.tab) + ' right now.') + '</div>';
         return;
       }
       const top = items[0];
@@ -615,7 +615,8 @@
         S.alerts = body.alerts || [];
         S.counts = body.counts || {};
         S.known = new Set(S.alerts.map((a) => a.key));
-        S.lastOk = Date.now();
+        S.lastOk = Date.parse(body.renderer?.lastSuccessfulFetchAt || '') || 0;
+        S.feedStatus = body.renderer?.feedError ? 'error' : S.lastOk ? 'live' : 'connecting';
         if (previous) {
           const fresh = S.alerts.filter((a) => !previous.has(a.key) && a.rank <= 3);
           if (fresh.length) breaking(fresh[0]);
@@ -623,9 +624,9 @@
         if (S.selected && !S.known.has(S.selected)) { toast('The selected alert has expired'); closeDetail(); }
         if (!S.selected) renderList(); else renderTabs();
         highlight();
-        $('live').classList.remove('stale');
       } catch {
-        $('live').classList.add('stale');
+        S.feedStatus = 'error';
+        if (!S.selected) renderList();
       }
       updateLive();
     };
@@ -648,8 +649,10 @@
       } catch {}
     };
     const updateLive = () => {
-      const s = Math.round((Date.now() - S.lastOk) / 1000);
-      $('live-text').textContent = !S.lastOk ? 'CONNECTING' : s < 50 ? 'LIVE · UPDATED ' + s + 'S AGO' : 'LIVE · UPDATED ' + Math.round(s / 60) + 'M AGO';
+      const s = Math.max(0, Math.round((Date.now() - S.lastOk) / 1000));
+      const stale = !S.lastOk || s > 180 || S.feedStatus !== 'live';
+      $('live').classList.toggle('stale', stale);
+      $('live-text').textContent = S.feedStatus === 'error' ? 'FEED UNAVAILABLE' : !S.lastOk ? 'WAITING FOR ALERTS' : s > 180 ? 'FEED STALE · ' + Math.round(s / 60) + 'M AGO' : s < 50 ? 'LIVE · UPDATED ' + s + 'S AGO' : 'LIVE · UPDATED ' + Math.round(s / 60) + 'M AGO';
     };
 
     /* ---------------- events ---------------- */
