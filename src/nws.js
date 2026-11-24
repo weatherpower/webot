@@ -168,13 +168,20 @@ const fetchZoneGeometry = async (zoneUrl) => {
   if (!zoneUrl) return [];
   if (!zoneGeometryCache.has(zoneUrl)) {
     zoneGeometryCache.set(zoneUrl, (async () => {
-      const response = await fetch(zoneUrl, { headers: NWS_HEADERS });
+      const response = await fetch(zoneUrl, { headers: NWS_HEADERS, signal: AbortSignal.timeout(10000) });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) return null;
       return body.geometry || null;
     })());
   }
-  return zoneGeometryCache.get(zoneUrl);
+  try {
+    const geometry = await zoneGeometryCache.get(zoneUrl);
+    if (!geometry) zoneGeometryCache.delete(zoneUrl);
+    return geometry;
+  } catch (error) {
+    zoneGeometryCache.delete(zoneUrl);
+    throw error;
+  }
 };
 
 const hydrateFeatureGeometry = async (feature) => {
@@ -578,7 +585,7 @@ export const fetchActiveWarnings = async ({ area, event, point, warningOnly = fa
   if (event) url.searchParams.set('event', event);
   if (point) url.searchParams.set('point', point);
 
-  const response = await fetch(url, { headers: NWS_HEADERS });
+  const response = await fetch(url, { headers: NWS_HEADERS, signal: AbortSignal.timeout(20000) });
   const body = await response.json();
 
   if (!response.ok) {
@@ -588,7 +595,8 @@ export const fetchActiveWarnings = async ({ area, event, point, warningOnly = fa
     throw error;
   }
 
-  let features = (body.features || []).filter((feature) => (
+  if (!Array.isArray(body.features)) throw new Error('NWS response did not contain a valid features array');
+  let features = body.features.filter((feature) => (
     isTargetAlertEvent(feature.properties?.event || '') &&
     isFeatureActive(feature)
   ));
