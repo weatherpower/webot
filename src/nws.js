@@ -197,7 +197,7 @@ const hydrateFeatureGeometry = async (feature) => {
     }
   });
   const polygons = geometries.flatMap(polygonsFromGeometry);
-  if (polygons.length) {
+  if (polygons.length && geometries.every((geometry) => polygonsFromGeometry(geometry).length > 0)) {
     return {
       ...feature,
       geometry: { type: 'MultiPolygon', coordinates: polygons },
@@ -210,16 +210,12 @@ const hydrateFeatureGeometry = async (feature) => {
 
   if (feature.geometry) return feature;
 
-  const geometry = polygons.length
-    ? { type: 'MultiPolygon', coordinates: polygons }
-    : { type: 'Polygon', coordinates: [boundsPolygonForPoints(geometries.flatMap(pointsFromGeometry)) || DEFAULT_AREA_POLYGON] };
-
   return {
     ...feature,
-    geometry,
+    geometry: null,
     properties: {
       ...(feature.properties || {}),
-      weatherPowerGeometrySource: zones.length ? 'affectedZones' : 'fallback'
+      weatherPowerGeometrySource: 'unavailable'
     }
   };
 };
@@ -500,7 +496,8 @@ const hazardForAlert = (properties) => {
 
 export const nwsFeatureToWarning = (feature) => {
   const properties = feature.properties || {};
-  const polygon = extractPolygon(feature.geometry);
+  const rawPolygon = extractPolygon(feature.geometry);
+  const polygon = Array.isArray(rawPolygon) && rawPolygon.length >= 4 ? rawPolygon : null;
   const center = polygon ? centroid(polygon) : undefined;
   const hazard = hazardForAlert(properties);
   const event = properties.event || 'Warning';
@@ -511,8 +508,7 @@ export const nwsFeatureToWarning = (feature) => {
   ]));
   const stateList = formatStateList(stateCodes);
   const vtecAction = String(firstParam(properties.parameters, 'VTEC') || '').split('.')[1] || '';
-  const isBroadAreaProduct = /\b(watch|hurricane|tropical storm|storm surge|extreme wind|tropical cyclone|typhoon)\b/i.test(event);
-  const state = isBroadAreaProduct && stateList ? stateList : titleCaseState(areaDesc);
+  const state = stateList || titleCaseState(areaDesc);
   const office = properties.senderName?.replace(/^NWS\s+/i, '') || properties.sender || 'NWS';
   const impact = extractLine(properties.description, 'IMPACT');
   const classification = classifyAlert({
@@ -534,7 +530,7 @@ export const nwsFeatureToWarning = (feature) => {
     ? rawInstruction
     : safety;
 
-  return normalizeWarning({
+  const warning = normalizeWarning({
     key: feature.id || properties.id || properties['@id'],
     nwsId: feature.id || properties.id,
     feature,
@@ -575,6 +571,8 @@ export const nwsFeatureToWarning = (feature) => {
     },
     postText: `${event} for ${areaDesc} until ${properties.expires || properties.ends}. ${properties.instruction || 'Take action now.'}`.slice(0, 260)
   });
+  // normalizeWarning has sample defaults for the demo renderer. Never use them for real alerts without geometry.
+  return polygon ? warning : { ...warning, polygon: [], geometry: null, center: null };
 };
 
 export const fetchActiveWarnings = async ({ area, event, point, warningOnly = false, limit = 0 } = {}) => {
