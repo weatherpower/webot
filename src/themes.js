@@ -28,6 +28,7 @@ export const warningThemes = {
   tropicalStatement: theme('Tropical Cyclone', '#008e9f', '#004851', '#3ee4ed', '0, 142, 159', 'tropical-cyclone'),
   flashFlood: theme('Flash Flood', '#14a84a', '#075723', '#42e06f', '20, 168, 74', 'flash-flood'),
   flood: theme('Flood', '#16a34a', '#075728', '#5cff88', '22, 163, 74', 'flood'),
+  freeze: theme('Freeze', '#483d8b', '#2a2356', '#b9a8ff', '72, 61, 139', 'freeze'),
   winter: theme('Winter', '#15a2ff', '#064f7d', '#8bd8ff', '21, 162, 255', 'winter'),
   fire: theme('Fire', '#d000ff', '#620078', '#ff54d7', '208, 0, 255', 'fire'),
   marine: theme('Marine', '#5a4dff', '#211a86', '#8b83ff', '90, 77, 255', 'marine'),
@@ -111,6 +112,9 @@ export const classifyAlert = ({ event = '', headline = '', description = '', ins
   } else if (lower.includes('flood')) {
     family = 'flood';
     theme = warningThemes.flood;
+  } else if (/\b(freeze|frost|extreme cold|cold weather)\b/i.test(lower)) {
+    family = 'winter';
+    theme = warningThemes.freeze;
   } else if (lower.includes('winter') || lower.includes('blizzard') || lower.includes('snow') || lower.includes('ice')) {
     family = 'winter';
     theme = warningThemes.winter;
